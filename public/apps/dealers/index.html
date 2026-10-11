@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>딜러스 — 역경매 마켓</title>
+<style>
+  :root{
+    --bg:#0e1013;--panel:#171a20;--panel2:#1f232b;--border:#2b313c;
+    --text:#eef1f6;--muted:#9099a8;--accent:#ff7a3c;--accent2:#ffd23c;--ok:#2ec28a;--danger:#ef4a5a;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR","Malgun Gothic",sans-serif;
+    font-style:normal;
+  }
+  *{box-sizing:border-box;font-style:normal}
+  body{margin:0;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55}
+  button,input,select,textarea{font-family:inherit;font-style:normal}
+  button{cursor:pointer}
+  .hidden{display:none !important}
+
+  #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .auth-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:36px;width:380px}
+  .logo{font-size:30px;font-weight:900;letter-spacing:-1px;margin:0 0 4px}
+  .logo span{color:var(--accent)}
+  .tag{color:var(--muted);font-size:13px;margin:0 0 26px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .field input,.field select,.field textarea{width:100%;padding:11px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:14px}
+  .field textarea{resize:vertical;min-height:70px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .btn{padding:11px 18px;background:var(--accent);border:none;color:#1a1200;border-radius:9px;font-size:14px;font-weight:700}
+  .btn:hover{filter:brightness(1.05)}
+  .btn.block{width:100%}
+  .btn.ghost{background:var(--panel2);border:1px solid var(--border);color:var(--text);font-weight:600}
+  .btn.ok{background:var(--ok);color:#042117}
+  .btn.sm{padding:7px 12px;font-size:12px}
+  .switch{text-align:center;margin-top:16px;color:var(--muted);font-size:13px}
+  .switch a{color:var(--accent);cursor:pointer}
+  .err{color:var(--danger);font-size:12px;margin-top:10px;min-height:16px}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--panel)}
+  header .logo{font-size:22px}
+  header .me{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px}
+
+  .wrap{max-width:1100px;margin:0 auto;padding:24px;display:grid;grid-template-columns:380px 1fr;gap:24px}
+  @media(max-width:860px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px}
+  .card h2{margin:0 0 16px;font-size:16px;font-weight:700}
+
+  .req-item{background:var(--panel2);border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .15s}
+  .req-item:hover{border-color:var(--accent)}
+  .req-item.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .req-item .t{font-weight:700;margin-bottom:4px}
+  .req-item .meta{color:var(--muted);font-size:12px;display:flex;gap:10px;flex-wrap:wrap}
+  .cat-badge{display:inline-block;padding:2px 9px;border-radius:20px;background:rgba(255,122,60,.15);color:var(--accent);font-size:11px;font-weight:600}
+
+  .quote{background:var(--panel2);border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;animation:pop .3s}
+  .quote.best{border-color:var(--accent2);box-shadow:0 0 0 1px var(--accent2)}
+  @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .quote .dealer{font-weight:700}
+  .quote .msg{color:var(--muted);font-size:12px;margin-top:2px}
+  .quote .price{font-size:20px;font-weight:800;color:var(--accent2);white-space:nowrap}
+  .quote .price small{font-size:11px;color:var(--muted);font-weight:500}
+  .best-tag{font-size:10px;background:var(--accent2);color:#2a2100;padding:2px 7px;border-radius:10px;font-weight:700;margin-left:6px}
+
+  .empty{color:var(--muted);text-align:center;padding:36px 20px;font-size:13px}
+  .live{display:inline-flex;align-items:center;gap:6px;color:var(--ok);font-size:12px}
+  .live .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:blink 1.4s infinite}
+  @keyframes blink{50%{opacity:.3}}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:11px 20px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;z-index:50}
+  .toast.show{opacity:1}
+  .thumb{width:100%;max-height:150px;object-fit:cover;border-radius:8px;margin-top:10px;border:1px solid var(--border)}
+  .status-badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+  .status-open{background:rgba(46,194,138,.15);color:var(--ok)}
+  .status-done{background:rgba(144,153,168,.2);color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- 로그인/가입 -->
+<div id="auth">
+  <div class="auth-card">
+    <h1 class="logo">딜러<span>스</span></h1>
+    <p class="tag">필요한 것 한 줄만 올리면, 딜러들이 가격을 들고 옵니다.</p>
+    <div id="signup-fields" class="hidden">
+      <div class="field"><label>이름</label><input id="a-name" placeholder="홍길동"></div>
+    </div>
+    <div class="field"><label>이메일</label><input id="a-email" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>비밀번호</label><input id="a-pw" type="password" placeholder="6자 이상"></div>
+    <button class="btn block" id="a-submit" onclick="submitAuth()">로그인</button>
+    <div class="err" id="a-err"></div>
+    <div class="switch" id="a-switch">계정이 없으신가요? <a onclick="toggleAuth()">회원가입</a></div>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="main" class="hidden">
+  <header>
+    <div class="logo">딜러<span>스</span></div>
+    <div class="me"><span id="me-name"></span><button class="btn ghost sm" onclick="logout()">로그아웃</button></div>
+  </header>
+  <div class="wrap">
+    <!-- 요청 작성 + 내 요청 -->
+    <div>
+      <div class="card" style="margin-bottom:20px">
+        <h2>필요한 것 올리기</h2>
+        <div class="field"><label>카테고리</label>
+          <select id="r-cat">
+            <option value="전자제품">전자제품</option>
+            <option value="가구">가구</option>
+            <option value="자동차">자동차</option>
+            <option value="여행">여행/숙박</option>
+            <option value="인테리어">인테리어 시공</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="field"><label>무엇이 필요하세요?</label><input id="r-title" placeholder="예: 아이폰 16 프로 256GB"></div>
+        <div class="field"><label>설명 (선택)</label><textarea id="r-desc" placeholder="색상, 조건, 희망사항 등"></textarea></div>
+        <div class="field"><label>예산 (원)</label><input id="r-budget" type="number" placeholder="1500000"></div>
+        <div class="field"><label>사진 (선택)</label><input id="r-photo" type="file" accept="image/*"></div>
+        <button class="btn block" onclick="createRequest()">딜러에게 요청 보내기</button>
+      </div>
+      <div class="card">
+        <h2>내 요청</h2>
+        <div id="my-requests"><div class="empty">아직 올린 요청이 없습니다.</div></div>
+      </div>
+    </div>
+
+    <!-- 실시간 견적 -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 style="margin:0" id="quote-title">견적</h2>
+        <span class="live hidden" id="live-ind"><span class="dot"></span>실시간 수신 중</span>
+      </div>
+      <div id="quote-detail"><div class="empty">왼쪽에서 요청을 선택하면 딜러들의 견적이 실시간으로 들어옵니다.</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="/app/_sdk/igclient.js"></script>
+<script>
+// ===== 설정: 딜러스 프로젝트 키 =====
+// 관리 대시보드에서 '딜러스' 프로젝트를 만들고 발급받은 키를 넣습니다.
+// (데모 편의를 위해 URL ?key= 로도 넘길 수 있게 함)
+const PROJECT_KEY = new URLSearchParams(location.search).get('key') || window.DEALERS_KEY || 'DEALERS_PROJECT_KEY';
+const ig = igClient(location.origin, PROJECT_KEY);
+
+let isSignup = false;
+let myRequests = [];
+let activeReq = null;
+let quoteSub = null;
+let quotes = [];
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function won(n){return Number(n||0).toLocaleString('ko-KR')+'원'}
+
+// ---- 인증 ----
+function toggleAuth(){
+  isSignup=!isSignup;
+  document.getElementById('signup-fields').classList.toggle('hidden',!isSignup);
+  document.getElementById('a-submit').textContent=isSignup?'회원가입':'로그인';
+  document.getElementById('a-switch').innerHTML=isSignup?'이미 계정이 있으신가요? <a onclick="toggleAuth()">로그인</a>':'계정이 없으신가요? <a onclick="toggleAuth()">회원가입</a>';
+  document.getElementById('a-err').textContent='';
+}
+async function submitAuth(){
+  const email=document.getElementById('a-email').value.trim();
+  const pw=document.getElementById('a-pw').value;
+  const name=document.getElementById('a-name').value.trim();
+  try{
+    if(isSignup) await ig.signup(email,pw,name||email.split('@')[0]);
+    else await ig.login(email,pw);
+    enterApp();
+  }catch(e){ document.getElementById('a-err').textContent=e.message; }
+}
+async function logout(){ ig.logout(); location.reload(); }
+
+async function enterApp(){
+  const me=await ig.me();
+  document.getElementById('me-name').textContent=me.name+' 님';
+  document.getElementById('auth').classList.add('hidden');
+  document.getElementById('main').classList.remove('hidden');
+  await loadMyRequests();
+}
+
+// ---- 요청 ----
+async function createRequest(){
+  const title=document.getElementById('r-title').value.trim();
+  if(!title){toast('필요한 것을 입력하세요');return;}
+  const cat=document.getElementById('r-cat').value;
+  const desc=document.getElementById('r-desc').value.trim();
+  const budget=Number(document.getElementById('r-budget').value||0);
+  let photoId=null;
+  const pf=document.getElementById('r-photo').files[0];
+  try{
+    if(pf){ const f=await ig.upload(pf, pf.name); photoId=f.id; }
+    const doc=await ig.create('requests',{title,category:cat,desc,budget,photoId,status:'open',createdAt:Date.now()});
+    document.getElementById('r-title').value='';document.getElementById('r-desc').value='';document.getElementById('r-budget').value='';document.getElementById('r-photo').value='';
+    toast('딜러들에게 요청을 보냈습니다');
+    await loadMyRequests();
+    selectRequest(doc.id);
+  }catch(e){ toast(e.message); }
+}
+
+async function loadMyRequests(){
+  myRequests=await ig.list('requests',{private:true});
+  const el=document.getElementById('my-requests');
+  if(!myRequests.length){el.innerHTML='<div class="empty">아직 올린 요청이 없습니다.</div>';return;}
+  el.innerHTML=myRequests.map(r=>{const d=r.data;return `
+    <div class="req-item ${activeReq===r.id?'active':''}" onclick="selectRequest('${r.id}')">
+      <div class="t">${esc(d.title)}</div>
+      <div class="meta">
+        <span class="cat-badge">${esc(d.category)}</span>
+        ${d.budget?`<span>예산 ${won(d.budget)}</span>`:''}
+        <span class="status-badge ${d.status==='open'?'status-open':'status-done'}">${d.status==='open'?'견적 받는 중':'완료'}</span>
+      </div>
+    </div>`;}).join('');
+}
+
+async function selectRequest(id){
+  activeReq=id;
+  loadMyRequests();
+  const req=myRequests.find(r=>r.id===id);
+  if(!req)return;
+  document.getElementById('quote-title').textContent=`"${req.data.title}" 견적`;
+  document.getElementById('live-ind').classList.remove('hidden');
+
+  // 기존 견적 로드
+  const all=await ig.list('quotes',{limit:200});
+  quotes=all.filter(q=>q.data.requestId===id).map(q=>({...q.data,id:q.id}));
+  renderQuotes();
+
+  // 실시간 구독: 견적 컬렉션 변경을 서버가 자동 브로드캐스트 → 내 요청 것만 필터
+  if(quoteSub) quoteSub.close();
+  quoteSub=ig.subscribe('data:quotes',(msg)=>{
+    if(msg.data && msg.data.requestId===activeReq){
+      const idx=quotes.findIndex(q=>q.dealer===msg.data.dealer);
+      if(idx>=0) quotes[idx]=msg.data; else quotes.push(msg.data);
+      renderQuotes(msg.data.dealer);
+    }
+  });
+}
+
+function renderQuotes(flashDealer){
+  const el=document.getElementById('quote-detail');
+  const req=myRequests.find(r=>r.id===activeReq);
+  if(!quotes.length){
+    el.innerHTML=`${reqPhoto(req)}<div class="empty">딜러들이 견적을 준비 중입니다. 잠시만 기다려 주세요.</div>`;
+    return;
+  }
+  const sorted=[...quotes].sort((a,b)=>a.price-b.price);
+  const best=sorted[0];
+  el.innerHTML=reqPhoto(req)+sorted.map(q=>`
+    <div class="quote ${q===best?'best':''}">
+      <div>
+        <div class="dealer">${esc(q.dealer)}${q===best?'<span class="best-tag">최저가</span>':''}</div>
+        <div class="msg">${esc(q.message||'')}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="price">${won(q.price)}</div>
+        <button class="btn ok sm" style="margin-top:6px" onclick="accept('${esc(q.dealer)}',${q.price})">이 견적 수락</button>
+      </div>
+    </div>`).join('');
+}
+function reqPhoto(req){
+  if(req?.data?.photoId) return `<img class="thumb" src="${ig.fileUrl(req.data.photoId)}" alt="">`;
+  return '';
+}
+
+async function accept(dealer,price){
+  const req=myRequests.find(r=>r.id===activeReq);
+  if(!req)return;
+  await ig.put('requests',req.id,{...req.data,status:'done',acceptedDealer:dealer,acceptedPrice:price});
+  if(quoteSub)quoteSub.close();
+  toast(`${dealer}의 ${won(price)} 견적을 수락했습니다`);
+  await loadMyRequests();
+  document.getElementById('live-ind').classList.add('hidden');
+}
+
+// 시작: 저장된 토큰 있으면 자동 진입
+if(ig.isLoggedIn()){ ig.me().then(enterApp).catch(()=>{}); }
+document.getElementById('a-pw').addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth();});
+</script>
+</body>
+</html>

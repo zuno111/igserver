@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>계모임 — 온라인 계</title>
+<style>
+  :root{
+    --bg:#0d1412;--panel:#14201c;--panel2:#1c2b26;--border:#263a33;
+    --text:#eafff7;--muted:#89a89c;--mint:#2fe0a8;--mint2:#1fb886;--gold:#ffd23c;--danger:#ef6a6a;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR","Malgun Gothic",sans-serif;
+    font-style:normal;
+  }
+  *{box-sizing:border-box;font-style:normal}
+  body{margin:0;background:var(--bg);color:var(--text);font-size:15px;line-height:1.55}
+  button,input,select{font-family:inherit;font-style:normal}
+  button{cursor:pointer}
+  .hidden{display:none !important}
+  .app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:20px}
+
+  /* 인증 */
+  #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .auth-card{width:100%;max-width:380px}
+  .logo{font-size:32px;font-weight:900;letter-spacing:-1px;text-align:center;margin:0 0 4px}
+  .logo span{color:var(--mint)}
+  .tag{color:var(--muted);font-size:13px;text-align:center;margin:0 0 28px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .field input,.field select{width:100%;padding:13px 14px;background:var(--panel2);border:1px solid var(--border);border-radius:11px;color:var(--text);font-size:15px}
+  input:focus,select:focus{outline:none;border-color:var(--mint)}
+  .btn{padding:14px 18px;background:var(--mint);border:none;color:#06241a;border-radius:12px;font-size:15px;font-weight:800}
+  .btn:active{transform:scale(.98)}
+  .btn.block{width:100%}
+  .btn.ghost{background:var(--panel2);border:1px solid var(--border);color:var(--text);font-weight:600}
+  .btn.gold{background:var(--gold);color:#2a2100}
+  .btn.sm{padding:9px 14px;font-size:13px;border-radius:9px}
+  .switch{text-align:center;margin-top:16px;color:var(--muted);font-size:13px}
+  .switch a{color:var(--mint);cursor:pointer}
+  .err{color:var(--danger);font-size:12px;margin-top:10px;min-height:15px;text-align:center}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--border)}
+  header .logo{font-size:20px;margin:0}
+  header .me{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+  .content{padding:18px}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px}
+  .card h2{margin:0 0 14px;font-size:15px;font-weight:800}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
+
+  .gye-card{background:linear-gradient(135deg,var(--panel2),var(--panel));border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:12px;cursor:pointer}
+  .gye-card:active{transform:scale(.99)}
+  .gye-card .name{font-size:17px;font-weight:800;margin-bottom:6px}
+  .gye-card .sub{color:var(--muted);font-size:13px;display:flex;gap:12px;flex-wrap:wrap}
+  .chip{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+  .chip.num{background:rgba(47,224,168,.15);color:var(--mint)}
+  .chip.auc{background:rgba(255,210,60,.15);color:var(--gold)}
+  .chip.done{background:rgba(137,168,156,.2);color:var(--muted)}
+  .progress{height:7px;background:var(--panel2);border-radius:10px;margin-top:12px;overflow:hidden}
+  .progress>div{height:100%;background:var(--mint);border-radius:10px;transition:width .4s}
+
+  .big-amount{font-size:30px;font-weight:900;letter-spacing:-1px}
+  .big-amount small{font-size:14px;color:var(--muted);font-weight:600}
+  .stat-row{display:flex;gap:10px;margin:14px 0}
+  .stat-row .s{flex:1;background:var(--panel2);border-radius:12px;padding:12px;text-align:center}
+  .stat-row .s .n{font-size:18px;font-weight:800}
+  .stat-row .s .l{font-size:11px;color:var(--muted);margin-top:2px}
+
+  .member{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+  .member:last-child{border-bottom:none}
+  .member .who{display:flex;align-items:center;gap:10px}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--mint2);color:#06241a;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px}
+  .member .who .nm{font-weight:700}
+  .member .who .od{font-size:11px;color:var(--muted)}
+  .pay-status{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px}
+  .paid{background:rgba(47,224,168,.15);color:var(--mint)}
+  .unpaid{background:rgba(239,106,106,.12);color:var(--danger)}
+  .winner-tag{background:var(--gold);color:#2a2100;font-size:10px;padding:2px 7px;border-radius:9px;margin-left:6px;font-weight:800}
+
+  .bid-item{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+  .bid-item:last-child{border-bottom:none}
+  .round-result{background:rgba(255,210,60,.08);border:1px solid rgba(255,210,60,.3);border-radius:12px;padding:14px;margin-bottom:10px}
+  .empty{color:var(--muted);text-align:center;padding:30px 18px;font-size:13px}
+  .back{background:none;border:none;color:var(--mint);font-size:14px;padding:0;margin-bottom:6px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:12px 20px;border-radius:12px;font-size:13px;opacity:0;transition:opacity .2s;z-index:100;max-width:90%}
+  .toast.show{opacity:1}
+  .code-box{background:var(--panel2);border:1px dashed var(--mint);border-radius:12px;padding:14px;text-align:center;margin-top:10px}
+  .code-box .c{font-size:24px;font-weight:900;letter-spacing:3px;color:var(--mint);font-family:ui-monospace,monospace}
+  .live{display:inline-flex;align-items:center;gap:6px;color:var(--mint);font-size:11px}
+  .live .dot{width:7px;height:7px;border-radius:50%;background:var(--mint);animation:blink 1.4s infinite}
+  @keyframes blink{50%{opacity:.3}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- 인증 -->
+<div id="auth">
+  <div class="auth-card">
+    <h1 class="logo">계모<span>임</span></h1>
+    <p class="tag">믿을 수 있는 온라인 계. 곗돈은 에스크로로 안전하게.</p>
+    <div id="signup-fields" class="hidden">
+      <div class="field"><label>이름</label><input id="a-name" placeholder="홍길동"></div>
+    </div>
+    <div class="field"><label>이메일</label><input id="a-email" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>비밀번호</label><input id="a-pw" type="password" placeholder="6자 이상"></div>
+    <button class="btn block" id="a-submit" onclick="submitAuth()">로그인</button>
+    <div class="err" id="a-err"></div>
+    <div class="switch" id="a-switch">처음이신가요? <a onclick="toggleAuth()">회원가입</a></div>
+  </div>
+</div>
+
+<!-- 메인 (목록) -->
+<div id="home" class="hidden">
+  <header>
+    <h1 class="logo">계모<span>임</span></h1>
+    <div class="me"><span id="me-name"></span><button class="btn ghost sm" onclick="logout()">로그아웃</button></div>
+  </header>
+  <div class="content">
+    <div class="card">
+      <h2>계 만들기</h2>
+      <div class="field"><label>계 이름</label><input id="g-name" placeholder="예: 우리 동네 10만원 계"></div>
+      <div class="row">
+        <div class="field"><label>인원</label><input id="g-members" type="number" value="4" min="2" max="20"></div>
+        <div class="field"><label>월 납입액(원)</label><input id="g-amount" type="number" value="100000"></div>
+      </div>
+      <div class="field"><label>방식</label>
+        <select id="g-type">
+          <option value="number">번호계 (순번대로 수령)</option>
+          <option value="auction">낙찰계 (입찰로 수령자 결정)</option>
+        </select>
+      </div>
+      <button class="btn block" onclick="createGye()">계 개설</button>
+    </div>
+    <div class="card">
+      <h2>초대코드로 참여</h2>
+      <div class="row">
+        <div class="field" style="flex:2"><input id="j-code" placeholder="초대코드 6자리" style="text-transform:uppercase"></div>
+        <button class="btn" style="flex:1" onclick="joinGye()">참여</button>
+      </div>
+    </div>
+    <h2 style="margin:20px 2px 10px;font-size:15px">내 계모임</h2>
+    <div id="gye-list"><div class="empty">아직 참여한 계가 없습니다.</div></div>
+  </div>
+</div>
+
+<!-- 계 상세 -->
+<div id="detail" class="hidden">
+  <header>
+    <button class="back" onclick="goHome()">← 목록</button>
+    <span class="live" id="d-live"><span class="dot"></span>실시간</span>
+  </header>
+  <div class="content" id="detail-content"></div>
+</div>
+
+</div>
+<div id="toast" class="toast"></div>
+
+<script src="/app/_sdk/igclient.js"></script>
+<script>
+const PROJECT_KEY = new URLSearchParams(location.search).get('key') || window.GYE_KEY || 'GYE_PROJECT_KEY';
+const ig = igClient(location.origin, PROJECT_KEY);
+let me=null, isSignup=false, curGye=null, subs=[];
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2300);}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function won(n){return Number(n||0).toLocaleString('ko-KR')+'원'}
+function initial(n){return (n||'?').trim().charAt(0).toUpperCase()}
+function code6(){return Math.random().toString(36).slice(2,8).toUpperCase()}
+
+// ---- 인증 ----
+function toggleAuth(){isSignup=!isSignup;
+  document.getElementById('signup-fields').classList.toggle('hidden',!isSignup);
+  document.getElementById('a-submit').textContent=isSignup?'회원가입':'로그인';
+  document.getElementById('a-switch').innerHTML=isSignup?'이미 계정이 있으신가요? <a onclick="toggleAuth()">로그인</a>':'처음이신가요? <a onclick="toggleAuth()">회원가입</a>';
+}
+async function submitAuth(){
+  const email=document.getElementById('a-email').value.trim(),pw=document.getElementById('a-pw').value,name=document.getElementById('a-name').value.trim();
+  try{ if(isSignup)await ig.signup(email,pw,name||email.split('@')[0]); else await ig.login(email,pw); await enter(); }
+  catch(e){document.getElementById('a-err').textContent=e.message;}
+}
+function logout(){ig.logout();location.reload();}
+async function enter(){
+  me=await ig.me();
+  document.getElementById('me-name').textContent=me.name+' 님';
+  document.getElementById('auth').classList.add('hidden');
+  goHome();
+}
+function goHome(){
+  closeSubs(); curGye=null;
+  document.getElementById('detail').classList.add('hidden');
+  document.getElementById('home').classList.remove('hidden');
+  loadGyes();
+}
+
+// ---- 계 목록 ----
+async function loadGyes(){
+  const [gyes,mems,states]=await Promise.all([ig.list('gyes',{limit:200}),ig.list('memberships',{limit:500}),ig.list('gyestate',{limit:200})]);
+  const stateMap=Object.fromEntries(states.map(s=>[s.data.gyeId,s.data]));
+  const myMemGyeIds=new Set(mems.filter(m=>m.data.userId===me.id).map(m=>m.data.gyeId));
+  const mine=gyes.filter(g=>g.data.ownerId===me.id||myMemGyeIds.has(g.id));
+  const el=document.getElementById('gye-list');
+  if(!mine.length){el.innerHTML='<div class="empty">아직 참여한 계가 없습니다. 위에서 만들거나 참여하세요.</div>';return;}
+  el.innerHTML=mine.map(g=>{const d=g.data;const st=stateMap[g.id];const joined=mems.filter(m=>m.data.gyeId===g.id).length;
+    const done=st?.status==='done';const received=st?.receivedUserIds?.length||0;
+    const statusTxt=done?'완료':(st?`${st.round}회차 진행중`:`모집중 ${joined}/${d.members}`);
+    return `<div class="gye-card" onclick="openGye('${g.id}')">
+      <div class="name">${esc(d.name)} ${d.type==='auction'?'<span class="chip auc">낙찰계</span>':'<span class="chip num">번호계</span>'} ${done?'<span class="chip done">종료</span>':''}</div>
+      <div class="sub"><span>월 ${won(d.amount)}</span><span>${joined}/${d.members}명</span><span>${statusTxt}</span></div>
+      <div class="progress"><div style="width:${Math.round(received/d.members*100)}%"></div></div>
+    </div>`;}).join('');
+}
+
+// ---- 계 생성 / 참여 ----
+async function createGye(){
+  const name=document.getElementById('g-name').value.trim();
+  if(!name){toast('계 이름을 입력하세요');return;}
+  const members=Math.max(2,Number(document.getElementById('g-members').value||4));
+  const amount=Number(document.getElementById('g-amount').value||0);
+  const type=document.getElementById('g-type').value;
+  if(amount<1000){toast('월 납입액을 입력하세요');return;}
+  const inviteCode=code6();
+  const g=await ig.create('gyes',{name,members,amount,type,inviteCode,ownerId:me.id,ownerName:me.name,createdAt:Date.now()});
+  // 계주도 1번 계원으로 자동 참여
+  await ig.create('memberships',{gyeId:g.id,userId:me.id,name:me.name,order:1,received:false,joinedAt:Date.now()});
+  document.getElementById('g-name').value='';
+  toast('계가 개설되었습니다');
+  openGye(g.id);
+}
+async function joinGye(){
+  const code=document.getElementById('j-code').value.trim().toUpperCase();
+  if(!code){toast('초대코드를 입력하세요');return;}
+  const gyes=await ig.list('gyes',{limit:300});
+  const g=gyes.find(x=>x.data.inviteCode===code);
+  if(!g){toast('해당 코드의 계를 찾을 수 없습니다');return;}
+  const mems=(await ig.list('memberships',{limit:500})).filter(m=>m.data.gyeId===g.id);
+  if(mems.some(m=>m.data.userId===me.id)){toast('이미 참여한 계입니다');openGye(g.id);return;}
+  if(mems.length>=g.data.members){toast('이미 정원이 찼습니다');return;}
+  await ig.create('memberships',{gyeId:g.id,userId:me.id,name:me.name,order:mems.length+1,received:false,joinedAt:Date.now()});
+  document.getElementById('j-code').value='';
+  toast(`'${g.data.name}'에 참여했습니다`);
+  openGye(g.id);
+}
+
+// ---- 계 상세 ----
+async function openGye(id){
+  document.getElementById('home').classList.add('hidden');
+  document.getElementById('detail').classList.remove('hidden');
+  curGye=id;
+  await renderDetail();
+  // 실시간: 관련 컬렉션 변경 시 재렌더
+  closeSubs();
+  for(const coll of ['memberships','payments','bids','rounds','gyes']){
+    subs.push(ig.subscribe('data:'+coll,(msg)=>{
+      const d=msg.data||{};
+      if(d.gyeId===curGye || (coll==='gyes'&&msg.id===curGye)) renderDetail();
+    }));
+  }
+}
+function closeSubs(){subs.forEach(s=>{try{s.close()}catch{}});subs=[];}
+
+async function renderDetail(){
+  if(!curGye)return;
+  const g=await ig.get('gyes',curGye); if(!g){goHome();return;}
+  const d=g.data;
+  const gs=await ig.get('gyestate',curGye);
+  const state=gs?.data;
+  const round=state?.round||1;
+  const status=state?.status||'recruiting';
+  const receivedIds=state?.receivedUserIds||[];
+  const [allMems,allPays,allBids,allRounds]=await Promise.all([
+    ig.list('memberships',{limit:500}),ig.list('payments',{limit:1000}),ig.list('bids',{limit:1000}),ig.list('rounds',{limit:500})
+  ]);
+  const mems=allMems.filter(m=>m.data.gyeId===curGye).map(m=>({id:m.id,...m.data})).sort((a,b)=>a.order-b.order);
+  const pays=allPays.filter(p=>p.data.gyeId===curGye&&p.data.round===round).map(p=>p.data);
+  const bids=allBids.filter(b=>b.data.gyeId===curGye&&b.data.round===round).map(b=>({id:b.id,...b.data}));
+  const rounds=allRounds.filter(r=>r.data.gyeId===curGye).map(r=>r.data).sort((a,b)=>b.round-a.round);
+
+  const paidSet=new Set(pays.map(p=>p.userId));
+  const iPaid=paidSet.has(me.id);
+  const iReceived=receivedIds.includes(me.id);
+  const total=d.amount*mems.length;
+  const isFull=mems.length>=d.members;
+  const myBid=bids.find(b=>b.userId===me.id);
+
+  let html=`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><div style="font-size:19px;font-weight:900;margin-bottom:4px">${esc(d.name)}</div>
+      <div class="sub" style="color:var(--muted);font-size:13px">${d.type==='auction'?'낙찰계':'번호계'} · 계주 ${esc(d.ownerName)}</div></div>
+      ${status==='done'?'<span class="chip done">종료</span>':`<span class="chip ${d.type==='auction'?'auc':'num'}">${round}/${d.members}회차</span>`}
+    </div>
+    <div class="big-amount" style="margin-top:14px">${won(total)} <small>이번 회차 곗돈</small></div>
+    <div class="stat-row">
+      <div class="s"><div class="n">${won(d.amount)}</div><div class="l">월 납입</div></div>
+      <div class="s"><div class="n">${mems.length}/${d.members}</div><div class="l">계원</div></div>
+      <div class="s"><div class="n">${paidSet.size}/${mems.length}</div><div class="l">이번 회차 납입</div></div>
+    </div>`;
+
+  // 모집 중 (초대코드 노출)
+  if(!isFull){
+    html+=`<div class="code-box">초대코드<div class="c">${d.inviteCode}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">정원이 차면 자동으로 1회차가 시작됩니다</div></div>`;
+  } else if(status!=='done'){
+    // 내 액션
+    if(iReceived && d.type==='number'){
+      html+=`<div style="text-align:center;color:var(--muted);font-size:13px;margin-top:10px">이미 목돈을 수령하셨습니다. 남은 회차 납입만 하시면 됩니다.</div>`;
+    }
+    if(!iPaid){
+      html+=`<button class="btn block" style="margin-top:12px" onclick="payRound('${curGye}',${round},${d.amount})">이번 회차 ${won(d.amount)} 납입</button>`;
+    }else{
+      html+=`<div style="text-align:center;color:var(--mint);font-weight:700;margin-top:12px">✓ 이번 회차 납입 완료</div>`;
+    }
+    // 낙찰계 입찰 (아직 수령 안 한 사람만)
+    if(d.type==='auction' && !iReceived){
+      html+=`<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">입찰: 이자로 양보할 금액을 적을수록 곗돈을 더 받지만, 많이 양보할수록 이번 회차 수령 확률이 올라갑니다.</div>
+        <div class="row"><input id="bid-input" type="number" placeholder="양보할 이자(원)" value="${myBid?myBid.bidAmount:''}" style="flex:2;padding:12px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;color:var(--text)">
+        <button class="btn gold" style="flex:1" onclick="placeBid('${curGye}',${round})">${myBid?'입찰 수정':'입찰'}</button></div>
+      </div>`;
+    }
+  }
+  html+=`</div>`;
+
+  // 낙찰계 입찰 현황
+  if(d.type==='auction' && isFull && status!=='done' && bids.length){
+    const sorted=[...bids].sort((a,b)=>b.bidAmount-a.bidAmount);
+    html+=`<div class="card"><h2>이번 회차 입찰 현황 <span class="live"><span class="dot"></span></span></h2>
+      ${sorted.map((b,i)=>`<div class="bid-item"><span>${i===0?'🏆 ':''}${esc(b.name)}</span><span style="font-weight:700;color:${i===0?'var(--gold)':'var(--text)'}">이자 ${won(b.bidAmount)} 양보 → ${won(total-b.bidAmount)} 수령</span></div>`).join('')}</div>`;
+  }
+
+  // 계원 목록
+  html+=`<div class="card"><h2>계원 (${mems.length}명)</h2>${mems.map(m=>`
+    <div class="member"><div class="who"><div class="avatar">${initial(m.name)}</div>
+      <div><div class="nm">${esc(m.name)}${receivedIds.includes(m.userId)?'<span class="winner-tag">수령완료</span>':''}${m.userId===me.id?' (나)':''}</div>
+      <div class="od">${d.type==='number'?m.order+'번':''}</div></div></div>
+      <span class="pay-status ${paidSet.has(m.userId)?'paid':'unpaid'}">${paidSet.has(m.userId)?'납입완료':'미납'}</span>
+    </div>`).join('')}</div>`;
+
+  // 회차 결과 이력
+  if(rounds.length){
+    html+=`<div class="card"><h2>회차 결과</h2>${rounds.map(r=>`
+      <div class="round-result"><div style="font-weight:800">${r.round}회차 — ${esc(r.winnerName)} 님 수령</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:4px">${won(r.payout)} 수령${r.bidAmount?` (이자 ${won(r.bidAmount)} 양보)`:''}</div></div>`).join('')}</div>`;
+  }
+  if(status==='done'){
+    html+=`<div class="card" style="text-align:center"><div style="font-size:16px;font-weight:800;color:var(--mint)">🎉 모든 회차가 끝났습니다</div><div style="color:var(--muted);font-size:13px;margin-top:6px">전원이 목돈을 수령했습니다.</div></div>`;
+  }
+
+  document.getElementById('detail-content').innerHTML=html;
+}
+
+async function payRound(gyeId,round,amount){
+  await ig.create('payments',{gyeId,round,userId:me.id,name:me.name,amount,paidAt:Date.now()});
+  toast(`${won(amount)} 납입 완료 (에스크로 보관)`);
+  renderDetail();
+}
+async function placeBid(gyeId,round){
+  const v=Number(document.getElementById('bid-input').value||0);
+  if(v<0){toast('0 이상 입력하세요');return;}
+  const bids=(await ig.list('bids',{limit:1000})).filter(b=>b.data.gyeId===gyeId&&b.data.round===round&&b.data.userId===me.id);
+  if(bids.length) await ig.put('bids',bids[0].id,{gyeId,round,userId:me.id,name:me.name,bidAmount:v,ts:Date.now()});
+  else await ig.create('bids',{gyeId,round,userId:me.id,name:me.name,bidAmount:v,ts:Date.now()});
+  toast('입찰 완료');
+  renderDetail();
+}
+
+if(ig.isLoggedIn()){ig.me().then(enter).catch(()=>{});}
+document.getElementById('a-pw').addEventListener('keydown',e=>{if(e.key==='Enter')submitAuth();});
+</script>
+</body>
+</html>

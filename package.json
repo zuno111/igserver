@@ -1,0 +1,30 @@
+{
+  "name": "igserver",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "STUDIO ig 공통 서버 인프라 - 웹앱/앱/게임을 한 서버에 올려 실서비스하는 멀티 프로젝트 백엔드",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "smoke": "node test/smoke.js",
+    "cluster": "bash test/cluster.sh",
+    "build": "node build-sea.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.8.1",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "postject": "^1.0.0-alpha.6"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

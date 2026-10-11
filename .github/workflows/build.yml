@@ -1,0 +1,85 @@
+name: 단독 실행파일 빌드
+# 수동 실행 또는 v* 태그 push 시 Windows/Linux/Mac 단독 실행파일을 빌드.
+# Node 22 내장 SEA(단일 실행파일) 방식 — 외부 다운로드 없이 각 러너의 Node로 빌드.
+# 결과물: 압축을 풀고 실행파일만 더블클릭하면 Node 설치 없이 바로 켜짐.
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: win-x64
+            exe: igserver.exe
+          - os: ubuntu-latest
+            label: linux-x64
+            exe: igserver
+          - os: macos-latest
+            label: macos-arm64
+            exe: igserver
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 의존성 설치 (네이티브 prebuilt 포함)
+        run: npm install --no-audit --no-fund
+
+      - name: SEA 단일 실행파일 빌드
+        run: node build-sea.mjs
+
+      - name: 바이너리 스모크 검증
+        shell: bash
+        run: |
+          cd dist
+          ./${{ matrix.exe }} > run.log 2>&1 &
+          for i in $(seq 1 40); do curl -sf http://localhost:8787/healthz >/dev/null && break; sleep 0.5; done
+          curl -sf http://localhost:8787/healthz | grep -q '"driver":"sqlite"' && echo "OK: sqlite 영속 모드로 기동" || (cat run.log; exit 1)
+          rm -f run.log
+
+      - name: 배포용 폴더 정리 (실행에 필요한 것만)
+        shell: bash
+        run: |
+          cd dist
+          rm -rf data
+          # 실행 안내 파일 동봉
+          cat > 실행방법.txt <<'TXT'
+          igServer 실행 방법
+          ====================
+          1. 이 폴더의 실행파일을 더블클릭하세요.
+             - Windows: igserver.exe
+             - Mac/Linux: igserver (터미널에서 ./igserver)
+          2. 브라우저에서 http://localhost:8787/admin/ 접속
+             기본 관리자: admin@studio-ig.local / admin1234 (첫 접속 후 변경하세요)
+
+          * Node.js 설치가 필요 없습니다. 실행파일 하나로 서버가 켜집니다.
+          * better_sqlite3.node 와 public 폴더는 실행파일과 같은 폴더에 두세요.
+          * 데이터는 같은 폴더의 data/ 안에 저장됩니다(재시작해도 유지).
+          TXT
+
+      - name: 아티팩트 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: igserver-${{ matrix.label }}
+          path: dist/
+
+      - name: 릴리스용 zip 묶기
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          cd dist
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then 7z a ../igserver-${{ matrix.label }}.zip . ; else zip -r ../igserver-${{ matrix.label }}.zip . ; fi
+
+      - name: 릴리스에 첨부 (태그 push 시)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: igserver-${{ matrix.label }}.zip

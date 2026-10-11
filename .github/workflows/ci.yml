@@ -1,0 +1,45 @@
+name: CI
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+
+      - name: 스모크 테스트 (sqlite)
+        run: |
+          node src/index.js > server.log 2>&1 &
+          SRV=$!
+          for i in $(seq 1 30); do curl -sf http://localhost:8787/healthz >/dev/null && break; sleep 0.5; done
+          node test/smoke.js
+          CODE=$?
+          kill $SRV 2>/dev/null
+          exit $CODE
+
+      - name: 스모크 테스트 (memory)
+        env:
+          DB_DRIVER: memory
+          PORT: '8790'
+        run: |
+          PORT=8790 DB_DRIVER=memory node src/index.js > server2.log 2>&1 &
+          SRV=$!
+          for i in $(seq 1 30); do curl -sf http://localhost:8790/healthz >/dev/null && break; sleep 0.5; done
+          SMOKE_BASE=http://localhost:8790 node test/smoke.js
+          CODE=$?
+          kill $SRV 2>/dev/null
+          exit $CODE
+
+      - name: 클러스터 테스트 (게이트웨이+워커2)
+        run: bash test/cluster.sh
+
+      - name: Docker 빌드 확인
+        run: docker build -t igserver:ci .

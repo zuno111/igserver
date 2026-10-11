@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>igServer 관리 대시보드</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --border:#2a2f3a;
+    --text:#e6e9ef; --muted:#9aa3b2; --accent:#4f8cff; --accent2:#22c58b;
+    --danger:#ef4a5a; --warn:#f0a93b; --radius:12px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR","Malgun Gothic",sans-serif;
+    font-style:normal;
+  }
+  *{box-sizing:border-box;font-style:normal}
+  body{margin:0;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+  button{font-family:inherit;cursor:pointer;font-style:normal}
+  input,select{font-family:inherit;font-style:normal}
+  a{color:var(--accent);text-decoration:none}
+  .hidden{display:none !important}
+
+  /* 로그인 */
+  #login{min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .login-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:36px;width:360px}
+  .login-card h1{margin:0 0 4px;font-size:22px;font-weight:700}
+  .login-card p{margin:0 0 24px;color:var(--muted);font-size:13px}
+  .field{margin-bottom:14px}
+  .field label{display:block;margin-bottom:6px;color:var(--muted);font-size:12px}
+  .field input{width:100%;padding:11px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px}
+  .field input:focus{outline:none;border-color:var(--accent)}
+
+  /* 레이아웃 */
+  #app{display:flex;min-height:100vh}
+  .sidebar{width:220px;background:var(--panel);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column}
+  .brand{font-size:18px;font-weight:800;padding:6px 10px 20px;letter-spacing:-0.3px}
+  .brand span{color:var(--accent)}
+  .nav{display:flex;flex-direction:column;gap:2px;flex:1}
+  .nav button{text-align:left;padding:10px 12px;background:none;border:none;color:var(--muted);border-radius:8px;font-size:14px}
+  .nav button:hover{background:var(--panel2);color:var(--text)}
+  .nav button.active{background:var(--accent);color:#fff;font-weight:600}
+  .sidebar-foot{border-top:1px solid var(--border);padding-top:14px;font-size:12px;color:var(--muted)}
+  .sidebar-foot button{width:100%;margin-top:8px;padding:8px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:8px}
+
+  .main{flex:1;padding:28px 32px;overflow:auto}
+  .page-title{font-size:22px;font-weight:700;margin:0 0 20px}
+
+  /* 카드/그리드 */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:28px}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+  .stat .label{color:var(--muted);font-size:12px;margin-bottom:8px}
+  .stat .value{font-size:28px;font-weight:700}
+  .stat .sub{color:var(--muted);font-size:12px;margin-top:4px}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+  .panel h2{margin:0 0 16px;font-size:16px;font-weight:700}
+
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--border);font-size:13px}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  td.mono,.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12px}
+  tr:last-child td{border-bottom:none}
+
+  .btn{padding:9px 16px;background:var(--accent);border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:600}
+  .btn:hover{opacity:.9}
+  .btn.sm{padding:6px 11px;font-size:12px}
+  .btn.ghost{background:var(--panel2);border:1px solid var(--border);color:var(--text)}
+  .btn.danger{background:var(--danger)}
+  .btn.warn{background:var(--warn);color:#1a1a1a}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+  .badge.active{background:rgba(34,197,139,.15);color:var(--accent2)}
+  .badge.disabled{background:rgba(239,74,90,.15);color:var(--danger)}
+  .badge.up{background:rgba(34,197,139,.15);color:var(--accent2)}
+  .badge.plan-free{background:rgba(154,163,178,.2);color:var(--muted)}
+  .badge.plan-pro{background:rgba(79,140,255,.18);color:var(--accent)}
+  .badge.plan-unlimited{background:rgba(34,197,139,.18);color:var(--accent2)}
+  .progress{height:8px;background:var(--panel2);border-radius:10px;overflow:hidden}
+  .progress>div{height:100%;border-radius:10px;transition:width .3s}
+
+  .toolbar{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+  .toolbar input{padding:9px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);min-width:200px}
+
+  .key-box{display:flex;align-items:center;gap:8px}
+  .key-box code{background:var(--panel2);padding:5px 9px;border-radius:6px;font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  pre{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:16px;overflow:auto;font-size:12px;line-height:1.6;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border)}
+  .tabs button{padding:9px 14px;background:none;border:none;color:var(--muted);border-bottom:2px solid transparent;font-size:13px}
+  .tabs button.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--accent2);color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s;z-index:100}
+  .toast.show{opacity:1}
+  .empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:460px;max-height:80vh;overflow:auto}
+  .modal h3{margin:0 0 16px;font-size:17px;font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="login">
+  <div class="login-card">
+    <h1>igServer</h1>
+    <p>STUDIO ig 공통 서버 관리 대시보드</p>
+    <div class="field"><label>관리자 이메일</label><input id="l-email" type="email" value="admin@studio-ig.local"></div>
+    <div class="field"><label>비밀번호</label><input id="l-pw" type="password" placeholder="비밀번호" autocomplete="current-password"></div>
+    <button class="btn" style="width:100%;padding:11px" onclick="doLogin()">로그인</button>
+    <p id="l-err" style="color:var(--danger);margin-top:12px;font-size:12px"></p>
+  </div>
+</div>
+
+<!-- 앱 -->
+<div id="app" class="hidden">
+  <aside class="sidebar">
+    <div class="brand">ig<span>Server</span></div>
+    <nav class="nav">
+      <button data-page="overview" class="active" onclick="go('overview')">개요</button>
+      <button data-page="projects" onclick="go('projects')">프로젝트</button>
+      <button data-page="data" onclick="go('data')">데이터</button>
+      <button data-page="nodes" onclick="go('nodes')">클러스터 노드</button>
+      <button data-page="audit" onclick="go('audit')">감사 로그</button>
+      <button data-page="admins" onclick="go('admins')" id="nav-admins" style="display:none">관리자</button>
+      <button data-page="guide" onclick="go('guide')">연동 가이드</button>
+    </nav>
+    <div class="sidebar-foot">
+      <div id="foot-driver">driver: -</div>
+      <button class="ghost" onclick="logout()">로그아웃</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- 개요 -->
+    <section id="page-overview">
+      <h1 class="page-title">개요</h1>
+      <div class="stat-grid" id="overview-stats"></div>
+      <div class="panel"><h2>분당 요청 (최근 30분)</h2><div id="req-chart"></div></div>
+      <div class="panel"><h2>실시간 지표</h2><div class="stat-grid" id="overview-metrics"></div></div>
+    </section>
+
+    <!-- 프로젝트 -->
+    <section id="page-projects" class="hidden">
+      <h1 class="page-title">프로젝트</h1>
+      <div class="toolbar">
+        <input id="p-name" placeholder="새 프로젝트 이름 (예: 컷룸)">
+        <button class="btn" onclick="createProject()">+ 프로젝트 생성</button>
+        <button class="btn ghost" onclick="document.getElementById('import-file').click()">백업 파일로 복원</button>
+        <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importProject(this)">
+      </div>
+      <div class="panel"><div id="projects-list"></div></div>
+    </section>
+
+    <!-- 데이터 뷰어 -->
+    <section id="page-data" class="hidden">
+      <h1 class="page-title">데이터</h1>
+      <div class="toolbar">
+        <select id="dv-project" onchange="dvLoadCollections()" style="padding:9px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);min-width:150px"></select>
+        <select id="dv-collection" onchange="dvLoad()" style="padding:9px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);min-width:150px"></select>
+        <input id="dv-q" placeholder="검색어" onkeydown="if(event.key==='Enter')dvLoad()">
+        <label style="color:var(--muted);font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="dv-deleted" onchange="dvLoad()"> 휴지통</label>
+        <button class="btn ghost" onclick="dvLoad()">새로고침</button>
+      </div>
+      <div class="panel"><div id="dv-list"><div class="empty">프로젝트와 컬렉션을 선택하세요.</div></div></div>
+    </section>
+
+    <!-- 노드 -->
+    <section id="page-nodes" class="hidden">
+      <h1 class="page-title">클러스터 노드</h1>
+      <p style="color:var(--muted);margin-top:-10px">여러 대(라즈베리파이·PC)를 워커로 붙이면 여기에 자동 등록됩니다.</p>
+      <div class="panel"><div id="nodes-list"></div></div>
+    </section>
+
+    <!-- 감사 로그 -->
+    <section id="page-audit" class="hidden">
+      <h1 class="page-title">감사 로그</h1>
+      <div class="panel"><div id="audit-list"></div></div>
+    </section>
+
+    <!-- 관리자 -->
+    <section id="page-admins" class="hidden">
+      <h1 class="page-title">관리자</h1>
+      <div class="toolbar" id="admin-add-bar">
+        <input id="ad-email" placeholder="관리자 이메일" style="flex:1">
+        <input id="ad-pw" type="password" placeholder="비밀번호 (8자+)">
+        <select id="ad-role" style="padding:9px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+          <option value="admin">admin</option>
+          <option value="viewer">viewer</option>
+          <option value="owner">owner</option>
+        </select>
+        <button class="btn" onclick="addAdmin()">+ 추가</button>
+      </div>
+      <div class="panel"><div id="admins-list"></div></div>
+      <p style="color:var(--muted);font-size:12px">owner: 전체 권한(관리자 관리 포함) · admin: 프로젝트 관리 · viewer: 조회만</p>
+    </section>
+
+    <!-- 연동 가이드 -->
+    <section id="page-guide" class="hidden">
+      <h1 class="page-title">연동 가이드</h1>
+      <div class="panel" id="guide-content"></div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+<div id="modal-root"></div>
+
+<script>
+const API = '/admin/api';
+let token = localStorage.getItem('ig_admin_token') || '';
+let myRole = 'viewer';
+let state = { projects: [], overview: null };
+
+// ---- API helper ----
+async function api(method, path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const res = await fetch(API + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  if (res.status === 401 && token) { logout(); throw new Error('세션 만료'); }
+  const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
+  if (!res.ok) throw new Error(data?.message || data?.error || ('HTTP ' + res.status));
+  return data;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+function copy(text) { navigator.clipboard.writeText(text).then(() => toast('복사됨')); }
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function fmtTime(ms){ if(!ms) return '-'; const d=new Date(ms); return d.toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+
+// ---- 로그인 ----
+async function doLogin() {
+  const email = document.getElementById('l-email').value;
+  const pw = document.getElementById('l-pw').value;
+  try {
+    const r = await api('POST', '/login', { email, password: pw });
+    token = r.token; localStorage.setItem('ig_admin_token', token);
+    showApp();
+  } catch (e) { document.getElementById('l-err').textContent = e.message; }
+}
+function logout() { token=''; localStorage.removeItem('ig_admin_token'); document.getElementById('app').classList.add('hidden'); document.getElementById('login').classList.remove('hidden'); }
+document.getElementById('l-pw').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+async function showApp() {
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  try { const me = await api('GET', '/me'); myRole = me.role; } catch {}
+  applyRole();
+  go('overview');
+}
+function applyRole() {
+  // 관리자 메뉴는 admin 이상, 추가 UI는 owner만
+  document.getElementById('nav-admins').style.display = (myRole === 'admin' || myRole === 'owner') ? '' : 'none';
+  const addBar = document.getElementById('admin-add-bar');
+  if (addBar) addBar.style.display = myRole === 'owner' ? '' : 'none';
+}
+
+// ---- 네비게이션 ----
+let current = 'overview';
+function go(page) {
+  current = page;
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.page===page));
+  document.querySelectorAll('.main section').forEach(s => s.classList.add('hidden'));
+  document.getElementById('page-'+page).classList.remove('hidden');
+  if (page==='overview') loadOverview();
+  else if (page==='projects') loadProjects();
+  else if (page==='data') dvInit();
+  else if (page==='nodes') loadNodes();
+  else if (page==='audit') loadAudit();
+  else if (page==='admins') loadAdmins();
+  else if (page==='guide') loadGuide();
+}
+
+// ---- 데이터 뷰어 ----
+let dvOffset = 0;
+async function dvInit(){
+  if(!state.projects.length){ try{ state.projects=(await api('GET','/projects')).projects; }catch{} }
+  const sel=document.getElementById('dv-project');
+  sel.innerHTML='<option value="">프로젝트 선택</option>'+state.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  document.getElementById('dv-collection').innerHTML='';
+}
+async function dvLoadCollections(){
+  const pid=document.getElementById('dv-project').value;
+  const cs=document.getElementById('dv-collection');
+  if(!pid){ cs.innerHTML=''; return; }
+  try{
+    const d=await api('GET','/projects/'+pid);
+    const colls=d.collections||[];
+    cs.innerHTML='<option value="">컬렉션 선택</option>'+colls.map(c=>`<option value="${esc(c.collection)}">${esc(c.collection)} (${c.count})</option>`).join('');
+  }catch(e){ toast(e.message); }
+}
+async function dvLoad(){
+  const pid=document.getElementById('dv-project').value;
+  const coll=document.getElementById('dv-collection').value;
+  if(!pid||!coll){ document.getElementById('dv-list').innerHTML='<div class="empty">프로젝트와 컬렉션을 선택하세요.</div>'; return; }
+  const q=document.getElementById('dv-q').value.trim();
+  const deleted=document.getElementById('dv-deleted').checked;
+  const qs=new URLSearchParams({limit:50,offset:dvOffset}); if(q)qs.set('q',q); if(deleted)qs.set('deleted','true');
+  try{
+    const r=await api('GET',`/projects/${pid}/data/${coll}?${qs}`);
+    if(!r.items.length){ document.getElementById('dv-list').innerHTML='<div class="empty">레코드가 없습니다.</div>'; return; }
+    document.getElementById('dv-list').innerHTML=`
+      <div style="color:var(--muted);font-size:12px;margin-bottom:10px">총 ${r.count}건${deleted?' (휴지통)':''}</div>
+      <table><thead><tr><th>ID</th><th>데이터</th><th>수정</th><th>작업</th></tr></thead><tbody>
+      ${r.items.map(it=>`<tr>
+        <td class="mono" style="font-size:11px">${esc(it.id)}${it.deleted?' <span class="badge disabled">삭제됨</span>':''}</td>
+        <td class="mono" style="font-size:11px;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(JSON.stringify(it.data))}</td>
+        <td class="mono" style="font-size:11px">${fmtTime(it.updated_at)}</td>
+        <td><div class="row-actions">
+          <button class="btn sm ghost" onclick='dvEdit("${pid}","${coll}","${it.id}",${JSON.stringify(JSON.stringify(it.data))})'>편집</button>
+          ${it.deleted?`<button class="btn sm ghost" onclick="dvRestore('${pid}','${coll}','${it.id}')">복구</button>`:`<button class="btn sm danger" onclick="dvDelete('${pid}','${coll}','${it.id}')">삭제</button>`}
+        </div></td></tr>`).join('')}
+      </tbody></table>`;
+  }catch(e){ toast(e.message); }
+}
+function dvEdit(pid,coll,id,dataStr){
+  modal(`<h3>레코드 편집</h3><p class="mono" style="color:var(--muted);font-size:11px">${esc(id)}</p>
+    <textarea id="dv-json" style="width:100%;height:260px;padding:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:ui-monospace,monospace;font-size:12px">${esc(JSON.stringify(JSON.parse(dataStr),null,2))}</textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn" style="flex:1" onclick="dvSave('${pid}','${coll}','${id}')">저장</button>
+      <button class="btn ghost" style="flex:1" onclick="closeModal()">취소</button>
+    </div>`);
+}
+async function dvSave(pid,coll,id){
+  let data; try{ data=JSON.parse(document.getElementById('dv-json').value); }catch(e){ toast('JSON 오류: '+e.message); return; }
+  try{ await api('PUT',`/projects/${pid}/data/${coll}/${id}`,{data}); toast('저장됨'); closeModal(); dvLoad(); }catch(e){ toast(e.message); }
+}
+async function dvDelete(pid,coll,id){
+  if(!confirm('이 레코드를 삭제할까요? (휴지통으로 이동)')) return;
+  try{ await api('DELETE',`/projects/${pid}/data/${coll}/${id}`); toast('삭제됨'); dvLoad(); }catch(e){ toast(e.message); }
+}
+async function dvRestore(pid,coll,id){
+  try{ await api('POST',`/projects/${pid}/data/${coll}/${id}/restore`); toast('복구됨'); dvLoad(); }catch(e){ toast(e.message); }
+}
+
+// ---- 관리자 관리 ----
+async function loadAdmins(){
+  try {
+    const r = await api('GET','/admins');
+    document.getElementById('admins-list').innerHTML = `
+      <table><thead><tr><th>이메일</th><th>역할</th><th>등록</th>${myRole==='owner'?'<th>작업</th>':''}</tr></thead><tbody>
+      ${r.admins.map(a=>`<tr>
+        <td>${esc(a.email)}</td>
+        <td>${myRole==='owner'?`<select onchange="changeRole('${a.id}',this.value)" style="padding:5px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text)">${['owner','admin','viewer'].map(x=>`<option value="${x}" ${a.role===x?'selected':''}>${x}</option>`).join('')}</select>`:`<span class="badge plan-${a.role==='owner'?'unlimited':a.role==='admin'?'pro':'free'}">${a.role}</span>`}</td>
+        <td class="mono">${fmtTime(a.created_at)}</td>
+        ${myRole==='owner'?`<td><button class="btn sm danger" onclick="delAdmin('${a.id}','${esc(a.email)}')">삭제</button></td>`:''}
+      </tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) { toast(e.message); }
+}
+async function addAdmin(){
+  const email=document.getElementById('ad-email').value.trim();
+  const password=document.getElementById('ad-pw').value;
+  const role=document.getElementById('ad-role').value;
+  if(!email||!password){ toast('이메일과 비밀번호를 입력하세요'); return; }
+  try { await api('POST','/admins',{email,password,role}); toast('관리자 추가됨'); document.getElementById('ad-email').value='';document.getElementById('ad-pw').value=''; loadAdmins(); }
+  catch(e){ toast(e.message); }
+}
+async function changeRole(id, role){
+  try { await api('PATCH','/admins/'+id,{role}); toast('역할 변경: '+role); loadAdmins(); }
+  catch(e){ toast(e.message); loadAdmins(); }
+}
+async function delAdmin(id, email){
+  if(!confirm(`관리자 '${email}'를 삭제할까요?`)) return;
+  try { await api('DELETE','/admins/'+id); toast('삭제됨'); loadAdmins(); }
+  catch(e){ toast(e.message); }
+}
+
+// ---- 개요 ----
+async function loadOverview() {
+  try {
+    const o = await api('GET', '/overview'); state.overview = o;
+    document.getElementById('foot-driver').textContent = 'driver: ' + o.driver;
+    const online = Object.values(o.presence || {}).reduce((a, b) => a + b, 0);
+    document.getElementById('overview-stats').innerHTML = `
+      ${stat('프로젝트', o.projects)}
+      ${stat('전체 사용자', o.users)}
+      ${stat('저장된 데이터', o.records)}
+      ${stat('실시간 접속', online)}
+      ${stat('가동 시간', fmtUptime(o.metrics.uptimeSeconds))}`;
+    document.getElementById('req-chart').innerHTML = renderChart(o.series || []);
+    const m = o.metrics;
+    document.getElementById('overview-metrics').innerHTML = `
+      ${stat('총 요청', m.requests)}
+      ${stat('WS 활성 연결', m.wsActive, '누적 '+m.wsConnections)}
+      ${stat('p50 지연', m.latency.p50+'ms', 'p95 '+m.latency.p95+'ms / p99 '+m.latency.p99+'ms')}
+      ${stat('오류', m.errors, 'rate-limit '+m.rateLimited)}
+      ${stat('브로드캐스트', m.broadcasts)}`;
+  } catch (e) { toast(e.message); }
+}
+function stat(label, value, sub){ return `<div class="stat"><div class="label">${label}</div><div class="value">${value}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`; }
+function renderChart(series){
+  if(!series.length) return '<div class="empty">데이터 없음</div>';
+  const max=Math.max(1,...series.map(s=>s.count));
+  const w=600,h=120,bw=w/series.length;
+  const bars=series.map((s,i)=>{const bh=Math.round(s.count/max*(h-24));return `<rect x="${(i*bw+1).toFixed(1)}" y="${h-bh}" width="${(bw-2).toFixed(1)}" height="${bh}" fill="var(--accent)" rx="2"><title>${s.minuteAgo}분 전: ${s.count}건</title></rect>`;}).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:140px">${bars}<text x="2" y="13" fill="var(--muted)" font-size="11">최대 ${max}건/분 · 오른쪽이 현재</text></svg>`;
+}
+function fmtUptime(s){ if(s<60) return s+'초'; if(s<3600) return Math.floor(s/60)+'분'; if(s<86400) return Math.floor(s/3600)+'시간'; return Math.floor(s/86400)+'일'; }
+
+// ---- 프로젝트 ----
+async function loadProjects() {
+  try {
+    const r = await api('GET', '/projects'); state.projects = r.projects;
+    const base = location.origin;
+    if (!r.projects.length) { document.getElementById('projects-list').innerHTML='<div class="empty">아직 프로젝트가 없습니다. 위에서 생성하세요.</div>'; return; }
+    document.getElementById('projects-list').innerHTML = `
+      <table><thead><tr><th>이름</th><th>slug</th><th>API 키</th><th>사용자</th><th>데이터</th><th>상태</th><th>작업</th></tr></thead><tbody>
+      ${r.projects.map(p=>`<tr>
+        <td><strong>${esc(p.name)}</strong> <span class="badge plan-${p.plan||'free'}">${p.plan||'free'}</span></td>
+        <td class="mono">${esc(p.slug)}</td>
+        <td><div class="key-box"><code>${esc(p.api_key)}</code><button class="btn sm ghost" onclick="copy('${esc(p.api_key)}')">복사</button></div></td>
+        <td>${p.users}</td><td>${p.records}</td>
+        <td><span class="badge ${p.status}">${p.status==='active'?'활성':'비활성'}</span></td>
+        <td><div class="row-actions">
+          <button class="btn sm ghost" onclick="manageKeys('${p.id}')">키·웹훅</button>
+          <button class="btn sm ghost" onclick="exportProject('${p.id}','${esc(p.name)}')">백업</button>
+          <button class="btn sm ghost" onclick="showProject('${p.id}')">상세</button>
+          <button class="btn sm ghost" onclick="toggleProject('${p.id}','${p.status}')">${p.status==='active'?'중지':'활성화'}</button>
+          <button class="btn sm danger" onclick="deleteProject('${p.id}','${esc(p.name)}')">삭제</button>
+        </div></td></tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) { toast(e.message); }
+}
+async function createProject() {
+  const name = document.getElementById('p-name').value.trim();
+  if (!name) { toast('이름을 입력하세요'); return; }
+  try { await api('POST','/projects',{name}); document.getElementById('p-name').value=''; toast('생성됨'); loadProjects(); }
+  catch (e) { toast(e.message); }
+}
+async function toggleProject(id, status) {
+  try { await api('PATCH','/projects/'+id,{status: status==='active'?'disabled':'active'}); loadProjects(); }
+  catch (e) { toast(e.message); }
+}
+// ---- 키 · 웹훅 관리 모달 ----
+async function manageKeys(id) {
+  const p = state.projects.find(x => x.id === id);
+  if (!p) return;
+  let webhooks = [], scopedKeys = [], jobs = [];
+  try { webhooks = (await api('GET', `/projects/${id}/webhooks`)).webhooks || []; } catch {}
+  try { scopedKeys = (await api('GET', `/projects/${id}/keys`)).keys || []; } catch {}
+  try { jobs = (await api('GET', `/projects/${id}/jobs`)).jobs || []; } catch {}
+  modal(`<h3>${esc(p.name)} — 키 · 웹훅 · 예약작업</h3>
+    <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted)">공개키 (클라이언트 배포용)</h4>
+    <div class="key-box"><code style="max-width:300px">${esc(p.api_key)}</code>
+      <button class="btn sm ghost" onclick="copy('${esc(p.api_key)}')">복사</button>
+      <button class="btn sm warn" onclick="rotateKey('${id}','api')">재발급</button></div>
+    <h4 style="margin:16px 0 8px;font-size:13px;color:var(--muted)">비밀키 (서버 전용 · 전체 권한)</h4>
+    <div class="key-box"><code style="max-width:300px">${esc(p.secret_key || '-')}</code>
+      <button class="btn sm ghost" onclick="copy('${esc(p.secret_key || '')}')">복사</button>
+      <button class="btn sm warn" onclick="rotateKey('${id}','secret')">재발급</button></div>
+    <p style="color:var(--muted);font-size:11px;margin-top:6px">비밀키는 봇·엔진 등 서버 측에서만 쓰고, 클라이언트에 노출하지 마세요.</p>
+
+    <h4 style="margin:18px 0 8px;font-size:13px;color:var(--muted)">범위 제한 키 (${scopedKeys.length})</h4>
+    <div id="sk-list">${renderScopedKeys(id, scopedKeys)}</div>
+    <div class="row" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <input id="sk-label" placeholder="이름" style="flex:1;min-width:90px;padding:9px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+      <select id="sk-mode" style="padding:9px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)"><option value="read">읽기전용</option><option value="write">읽기+쓰기</option></select>
+      <input id="sk-coll" placeholder="컬렉션(쉼표, 빈칸=전체)" style="flex:1;min-width:120px;padding:9px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+      <button class="btn sm" onclick="addScopedKey('${id}')">발급</button>
+    </div>
+
+    <h4 style="margin:18px 0 8px;font-size:13px;color:var(--muted)">예약 작업 (${jobs.length})</h4>
+    <div id="job-list">${renderJobs(id, jobs)}</div>
+    <div class="row" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <select id="job-type" onchange="document.getElementById('job-coll').style.display=this.value==='cleanup_old'?'':'none'" style="padding:9px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+        <option value="cleanup_old">오래된 레코드 정리</option><option value="empty_trash">휴지통 비우기</option><option value="webhook_ping">웹훅 주기 호출</option>
+      </select>
+      <input id="job-coll" placeholder="컬렉션" style="width:110px;padding:9px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+      <input id="job-days" type="number" placeholder="N일 초과" value="30" style="width:90px;padding:9px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+      <input id="job-int" type="number" placeholder="간격(분)" value="60" style="width:90px;padding:9px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+      <button class="btn sm" onclick="addJob('${id}')">추가</button>
+    </div>
+
+    <h4 style="margin:18px 0 8px;font-size:13px;color:var(--muted)">웹훅 (${webhooks.length})</h4>
+    <div id="wh-list">${renderWebhooks(id, webhooks)}</div>
+    <div class="row" style="margin-top:10px;display:flex;gap:8px">
+      <input id="wh-url" placeholder="https://받을주소/hook" style="flex:2;padding:9px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+      <input id="wh-events" placeholder="data.create,data.update (빈칸=전체)" style="flex:2;padding:9px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+      <button class="btn sm" onclick="addWebhook('${id}')">추가</button>
+    </div>
+    <button class="btn ghost" style="margin-top:16px;width:100%" onclick="closeModal()">닫기</button>`);
+}
+function renderScopedKeys(id, keys) {
+  if (!keys.length) return '<p style="color:var(--muted);font-size:12px">추가 키가 없습니다.</p>';
+  return `<table><tbody>${keys.map(k => `<tr>
+    <td>${esc(k.label)} <span class="badge plan-${k.mode === 'read' ? 'free' : 'pro'}">${k.mode === 'read' ? '읽기' : '쓰기'}</span></td>
+    <td class="mono" style="font-size:11px">${esc(k.key.slice(0, 16))}… <button class="btn sm ghost" onclick="copy('${esc(k.key)}')">복사</button></td>
+    <td style="font-size:11px;color:var(--muted)">${k.collections ? esc(k.collections.join(',')) : '전체'}${k.expiresAt ? ' · ~' + fmtTime(k.expiresAt) : ''}</td>
+    <td style="text-align:right"><button class="btn sm danger" onclick="delScopedKey('${id}','${k.id}')">삭제</button></td></tr>`).join('')}</tbody></table>`;
+}
+async function addScopedKey(id) {
+  const label = document.getElementById('sk-label').value.trim() || '추가 키';
+  const mode = document.getElementById('sk-mode').value;
+  const collections = document.getElementById('sk-coll').value.split(',').map(s => s.trim()).filter(Boolean);
+  try { const r = await api('POST', `/projects/${id}/keys`, { label, mode, collections }); toast('키 발급됨'); copy(r.key.key); manageKeys(id); }
+  catch (e) { toast(e.message); }
+}
+async function delScopedKey(id, keyId) {
+  try { await api('DELETE', `/projects/${id}/keys/${keyId}`); toast('키 삭제됨'); manageKeys(id); } catch (e) { toast(e.message); }
+}
+function renderJobs(id, jobs) {
+  if (!jobs.length) return '<p style="color:var(--muted);font-size:12px">예약 작업이 없습니다.</p>';
+  const typeLabel = { cleanup_old: '오래된 정리', empty_trash: '휴지통 비우기', webhook_ping: '웹훅 호출' };
+  return `<table><tbody>${jobs.map(j => `<tr>
+    <td>${typeLabel[j.type] || j.type}${j.collection ? ` <span class="mono" style="font-size:11px">${esc(j.collection)}</span>` : ''}</td>
+    <td style="font-size:11px;color:var(--muted)">${j.intervalMin}분마다${j.type !== 'webhook_ping' ? ` · ${j.olderThanDays}일↑` : ''}${j.lastRun ? ' · 최근 ' + fmtTime(j.lastRun) : ' · 미실행'}</td>
+    <td style="text-align:right"><button class="btn sm ghost" onclick="runJob('${id}','${j.id}')">실행</button> <button class="btn sm danger" onclick="delJob('${id}','${j.id}')">삭제</button></td></tr>`).join('')}</tbody></table>`;
+}
+async function addJob(id) {
+  const type = document.getElementById('job-type').value;
+  const collection = document.getElementById('job-coll').value.trim();
+  const olderThanDays = Number(document.getElementById('job-days').value || 30);
+  const intervalMin = Number(document.getElementById('job-int').value || 60);
+  if (type === 'cleanup_old' && !collection) { toast('컬렉션을 입력하세요'); return; }
+  try { await api('POST', `/projects/${id}/jobs`, { type, collection, olderThanDays, intervalMin }); toast('작업 추가됨'); manageKeys(id); }
+  catch (e) { toast(e.message); }
+}
+async function runJob(id, jobId) {
+  try { const r = await api('POST', `/projects/${id}/jobs/${jobId}/run`); toast('실행됨: ' + JSON.stringify(r.result)); manageKeys(id); }
+  catch (e) { toast(e.message); }
+}
+async function delJob(id, jobId) {
+  try { await api('DELETE', `/projects/${id}/jobs/${jobId}`); toast('작업 삭제됨'); manageKeys(id); } catch (e) { toast(e.message); }
+}
+function renderWebhooks(id, webhooks) {
+  if (!webhooks.length) return '<p style="color:var(--muted);font-size:12px">등록된 웹훅이 없습니다.</p>';
+  return `<table><tbody>${webhooks.map(w => `<tr>
+    <td class="mono" style="font-size:11px">${esc(w.url)}</td>
+    <td style="font-size:11px;color:var(--muted)">${(w.events && w.events.length) ? esc(w.events.join(', ')) : '전체'}</td>
+    <td style="text-align:right"><button class="btn sm danger" onclick="delWebhook('${id}','${w.id}')">삭제</button></td></tr>`).join('')}</tbody></table>`;
+}
+async function addWebhook(id) {
+  const url = document.getElementById('wh-url').value.trim();
+  const events = document.getElementById('wh-events').value.split(',').map(s => s.trim()).filter(Boolean);
+  if (!url) { toast('URL을 입력하세요'); return; }
+  try { await api('POST', `/projects/${id}/webhooks`, { url, events }); toast('웹훅 등록됨'); manageKeys(id); }
+  catch (e) { toast(e.message); }
+}
+async function delWebhook(id, whid) {
+  try { await api('DELETE', `/projects/${id}/webhooks/${whid}`); toast('웹훅 삭제됨'); manageKeys(id); }
+  catch (e) { toast(e.message); }
+}
+async function rotateKey(id, which) {
+  if (!confirm(`${which === 'secret' ? '비밀키' : '공개키'}를 재발급하면 기존 키는 즉시 무효화됩니다. 계속할까요?`)) return;
+  try { await api('POST', '/projects/' + id + '/rotate-key', { which }); toast('새 키 발급됨'); await loadProjects(); manageKeys(id); }
+  catch (e) { toast(e.message); }
+}
+
+// ---- 백업 / 복원 ----
+async function exportProject(id, name) {
+  try {
+    const backup = await api('GET', `/projects/${id}/export`);
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${name || 'project'}-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    toast('백업 파일 다운로드');
+  } catch (e) { toast(e.message); }
+}
+async function importProject(input) {
+  const file = input.files[0]; if (!file) return;
+  try {
+    const backup = JSON.parse(await file.text());
+    const r = await api('POST', '/import', backup);
+    toast(`복원됨: ${r.restored.records}건 데이터, ${r.restored.users}명 유저`);
+    loadProjects();
+  } catch (e) { toast('복원 실패: ' + e.message); }
+  input.value = '';
+}
+async function deleteProject(id, name) {
+  if (!confirm(`'${name}' 프로젝트와 모든 데이터를 삭제합니다. 되돌릴 수 없습니다.`)) return;
+  try { await api('DELETE','/projects/'+id); toast('삭제됨'); loadProjects(); }
+  catch (e) { toast(e.message); }
+}
+function fmtBytes(n){ if(n==null) return '무제한'; if(n<1024) return n+'B'; if(n<1048576) return (n/1024).toFixed(0)+'KB'; if(n<1073741824) return (n/1048576).toFixed(1)+'MB'; return (n/1073741824).toFixed(1)+'GB'; }
+function usageBar(label, used, max, fmt){
+  const pct = max==null?0:Math.min(100,Math.round(used/max*100));
+  const color = pct>=90?'var(--danger)':pct>=70?'var(--warn)':'var(--accent)';
+  return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>${label}</span><span class="mono">${fmt(used)} / ${max==null?'무제한':fmt(max)}</span></div><div class="progress"><div style="width:${pct}%;background:${color}"></div></div></div>`;
+}
+async function showProject(id) {
+  try {
+    const d = await api('GET','/projects/'+id);
+    const u = await api('GET','/projects/'+id+'/users');
+    let online = []; try { online = (await api('GET','/projects/'+id+'/presence')).online||[]; } catch {}
+    const colls = d.collections||[]; const us=d.usage;
+    modal(`<h3>${esc(d.project.name)}</h3>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <span style="font-size:13px;color:var(--muted)">플랜</span>
+        <select onchange="changePlan('${id}',this.value)" style="padding:7px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+          ${['free','pro','unlimited'].map(pl=>`<option value="${pl}" ${us.plan===pl?'selected':''}>${pl}</option>`).join('')}
+        </select>
+        <button class="btn sm ghost" onclick="manageSchema('${id}')" style="margin-left:auto">스키마 관리</button>
+      </div>
+      <h4 style="margin:0 0 10px;font-size:13px;color:var(--muted)">사용량</h4>
+      ${usageBar('데이터', us.records, us.limits.maxRecords, v=>v.toLocaleString())}
+      ${usageBar('사용자', us.users, us.limits.maxUsers, v=>v.toLocaleString())}
+      ${usageBar('파일 용량', us.fileBytes, us.limits.maxFileBytes, fmtBytes)}
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">요청 한도: ${us.limits.rateMax==null?'무제한':us.limits.rateMax+'회/분'}</div>
+      <h4 style="margin:16px 0 8px;font-size:13px;color:var(--muted)">실시간 접속 (${online.length})</h4>
+      ${online.length?`<table><thead><tr><th>이름</th><th>연결</th><th>방</th><th>접속시각</th></tr></thead><tbody>${online.map(o=>`<tr><td>${esc(o.name)}${o.uid?'':' <span class="badge disabled">익명</span>'}</td><td>${o.connections}</td><td class="mono" style="font-size:11px">${esc((o.rooms||[]).join(', ')||'-')}</td><td class="mono" style="font-size:11px">${fmtTime(o.connectedAt)}</td></tr>`).join('')}</tbody></table>`:'<p style="color:var(--muted);font-size:13px">현재 접속자 없음</p>'}
+      <h4 style="margin:16px 0 8px;font-size:13px;color:var(--muted)">컬렉션</h4>
+      ${colls.length?`<table><tbody>${colls.map(c=>`<tr><td class="mono">${esc(c.collection)}</td><td style="text-align:right">${c.count}건</td></tr>`).join('')}</tbody></table>`:'<p style="color:var(--muted);font-size:13px">아직 없음</p>'}
+      <h4 style="margin:16px 0 8px;font-size:13px;color:var(--muted)">사용자 (${u.users.length})</h4>
+      ${u.users.length?`<table><thead><tr><th>이메일</th><th>이름</th><th>가입</th></tr></thead><tbody>${u.users.slice(0,20).map(x=>`<tr><td>${esc(x.email)}</td><td>${esc(x.name||'-')}</td><td class="mono">${fmtTime(x.created_at)}</td></tr>`).join('')}</tbody></table>`:'<p style="color:var(--muted);font-size:13px">아직 없음</p>'}
+      <button class="btn ghost" style="margin-top:16px;width:100%" onclick="closeModal()">닫기</button>`);
+  } catch (e) { toast(e.message); }
+}
+async function changePlan(id, plan){
+  try { await api('PATCH','/projects/'+id,{plan}); toast('플랜 변경: '+plan); await loadProjects(); showProject(id); }
+  catch(e){ toast(e.message); }
+}
+
+// ---- 스키마 관리 (JSON 편집) ----
+async function manageSchema(id){
+  let schemas={};
+  try { schemas=(await api('GET',`/projects/${id}/schemas`)).schemas||{}; } catch {}
+  const cols=Object.keys(schemas);
+  modal(`<h3>스키마 관리</h3>
+    <p style="color:var(--muted);font-size:12px;margin-top:0">컬렉션별 필드 규칙을 지정하면 잘못된 데이터 쓰기를 서버가 막습니다.</p>
+    ${cols.length?`<div style="margin-bottom:14px">${cols.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span class="mono">${esc(c)} (${Object.keys(schemas[c].fields||{}).length}필드${schemas[c].strict?', strict':''})</span><div><button class="btn sm ghost" onclick="editSchema('${id}','${esc(c)}')">편집</button> <button class="btn sm danger" onclick="delSchema('${id}','${esc(c)}')">삭제</button></div></div>`).join('')}</div>`:'<p style="color:var(--muted);font-size:13px">등록된 스키마가 없습니다.</p>'}
+    <button class="btn sm" onclick="editSchema('${id}','')">+ 새 컬렉션 스키마</button>
+    <button class="btn ghost" style="margin-top:14px;width:100%" onclick="showProject('${id}')">← 상세로</button>`);
+}
+async function editSchema(id, col){
+  let def={fields:{},strict:false};
+  if(col){ try{ def=(await api('GET',`/projects/${id}/schemas`)).schemas[col]||def; }catch{} }
+  const example=JSON.stringify(def.fields&&Object.keys(def.fields).length?def.fields:{title:{type:'string',required:true,max:50},price:{type:'number',min:0},status:{type:'string',enum:['sale','soldout']}},null,2);
+  modal(`<h3>${col?'스키마 편집: '+esc(col):'새 스키마'}</h3>
+    ${col?'':`<div class="field"><label style="font-size:12px;color:var(--muted)">컬렉션 이름</label><input id="sc-col" placeholder="products" style="width:100%;padding:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text)"></div>`}
+    <label style="font-size:12px;color:var(--muted);display:block;margin:10px 0 6px">필드 정의 (JSON)</label>
+    <textarea id="sc-fields" style="width:100%;height:220px;padding:10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:ui-monospace,monospace;font-size:12px">${esc(example)}</textarea>
+    <label style="font-size:12px;color:var(--muted);display:block;margin:10px 0 6px"><input type="checkbox" id="sc-strict" ${def.strict?'checked':''}> strict (스키마에 없는 필드 거부)</label>
+    <div style="font-size:11px;color:var(--muted)">type: string, number, boolean, array, object · 옵션: required, min, max, enum, pattern</div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" style="flex:1" onclick="saveSchema('${id}','${esc(col)}')">저장</button>
+      <button class="btn ghost" style="flex:1" onclick="manageSchema('${id}')">취소</button>
+    </div>`);
+}
+async function saveSchema(id, col){
+  const collection = col || document.getElementById('sc-col').value.trim();
+  if(!collection){ toast('컬렉션 이름을 입력하세요'); return; }
+  let fields;
+  try { fields=JSON.parse(document.getElementById('sc-fields').value); }
+  catch(e){ toast('JSON 형식 오류: '+e.message); return; }
+  const strict=document.getElementById('sc-strict').checked;
+  try { await api('PUT',`/projects/${id}/schemas/${collection}`,{fields,strict}); toast('스키마 저장됨'); manageSchema(id); }
+  catch(e){ toast(e.message); }
+}
+async function delSchema(id, col){
+  if(!confirm(`'${col}' 스키마를 삭제할까요? (데이터는 유지, 검증만 해제)`)) return;
+  try { await api('DELETE',`/projects/${id}/schemas/${col}`); toast('스키마 삭제됨'); manageSchema(id); }
+  catch(e){ toast(e.message); }
+}
+
+// ---- 노드 ----
+async function loadNodes() {
+  try {
+    const r = await api('GET','/nodes');
+    if (!r.nodes.length) { document.getElementById('nodes-list').innerHTML='<div class="empty">등록된 워커 노드가 없습니다. 단독 실행 중이거나, 워커를 아직 붙이지 않았습니다.</div>'; return; }
+    document.getElementById('nodes-list').innerHTML = `
+      <table><thead><tr><th>노드</th><th>주소</th><th>역할</th><th>부하</th><th>CPU</th><th>상태</th><th>마지막 응답</th></tr></thead><tbody>
+      ${r.nodes.map(n=>{ const meta=n.meta||{}; const alive=Date.now()-n.last_seen<15000;
+        return `<tr><td><strong>${esc(n.label||n.id)}</strong></td><td class="mono">${esc(n.url)}</td>
+        <td>${esc(n.mode)}</td><td>${(n.load*100).toFixed(0)}%</td><td>${meta.cpus||'-'}</td>
+        <td><span class="badge ${alive?'up':'disabled'}">${alive?'정상':'응답없음'}</span></td>
+        <td class="mono">${fmtTime(n.last_seen)}</td></tr>`;}).join('')}
+      </tbody></table>`;
+  } catch (e) { toast(e.message); }
+}
+
+// ---- 감사 로그 ----
+async function loadAudit() {
+  try {
+    const r = await api('GET','/audit?limit=200');
+    if (!r.audit.length) { document.getElementById('audit-list').innerHTML='<div class="empty">기록 없음</div>'; return; }
+    document.getElementById('audit-list').innerHTML = `
+      <table><thead><tr><th>시각</th><th>동작</th><th>주체</th><th>IP</th><th>상세</th></tr></thead><tbody>
+      ${r.audit.map(a=>`<tr><td class="mono">${fmtTime(a.created_at)}</td><td><strong>${esc(a.action)}</strong></td>
+        <td class="mono">${esc(a.actor_id||'-')}</td><td class="mono">${esc(a.ip||'-')}</td>
+        <td class="mono">${esc(JSON.stringify(a.meta||{}))}</td></tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) { toast(e.message); }
+}
+
+// ---- 연동 가이드 ----
+function loadGuide() {
+  const base = location.origin;
+  const key = state.projects[0]?.api_key || 'YOUR_PROJECT_KEY';
+  document.getElementById('guide-content').innerHTML = `
+    <p style="color:var(--muted);margin-top:0">프로젝트를 만들면 받은 <strong>API 키</strong>를 아래처럼 넣어 어떤 웹앱/앱에서든 바로 서버를 쓸 수 있습니다. (아래 예제는 첫 프로젝트 키로 채워져 있습니다.)</p>
+    <div class="tabs">
+      <button class="active" onclick="guideTab(this,'js')">웹/JS SDK</button>
+      <button onclick="guideTab(this,'rest')">REST</button>
+      <button onclick="guideTab(this,'ws')">실시간 WebSocket</button>
+    </div>
+    <div id="guide-js"><pre>${esc(`// igClient — 어느 웹앱에나 붙이는 2줄짜리 백엔드 클라이언트
+const ig = igClient('${base}', '${key}');
+
+// 회원가입 / 로그인
+await ig.signup('user@test.com', 'password', '홍길동');
+await ig.login('user@test.com', 'password');
+
+// 데이터 저장 (컬렉션 자유 생성)
+const doc = await ig.create('projects', { title: '첫 영상', duration: 120 });
+await ig.update('projects', doc.id, { title: '수정됨' });
+const list = await ig.list('projects');           // 전체
+const mine = await ig.list('projects', {private:true}); // 내 것만
+
+// 파일 업로드
+const url = await ig.upload(fileBlob, 'photo.png');
+
+// 실시간 구독
+ig.subscribe('data:projects', (msg) => console.log('변경됨', msg));`)}</pre>
+    <p style="color:var(--muted);font-size:12px">igClient 스크립트는 서버의 <code class="mono">/app/_sdk/igclient.js</code> 에서 제공됩니다.</p></div>
+    <div id="guide-rest" class="hidden"><pre>${esc(`# 모든 요청에 프로젝트 키 헤더
+curl -H "X-Project-Key: ${key}" \\
+  ${base}/api/data/projects
+
+# 회원가입
+curl -X POST ${base}/api/auth/signup \\
+  -H "X-Project-Key: ${key}" -H "Content-Type: application/json" \\
+  -d '{"email":"u@test.com","password":"secret1","name":"홍길동"}'
+# → { token, user }
+
+# 데이터 생성 (로그인 토큰 필요)
+curl -X POST ${base}/api/data/projects \\
+  -H "X-Project-Key: ${key}" -H "Authorization: Bearer <TOKEN>" \\
+  -H "Content-Type: application/json" -d '{"title":"첫 영상"}'`)}</pre></div>
+    <div id="guide-ws" class="hidden"><pre>${esc(`const ws = new WebSocket('${base.replace('http','ws')}/ws?key=${key}&token=<TOKEN>');
+ws.onopen = () => ws.send(JSON.stringify({ type:'subscribe', room:'chat-room-1' }));
+ws.onmessage = (e) => {
+  const msg = JSON.parse(e.data);
+  console.log(msg);   // { type:'message', data:{...} }
+};
+// 같은 방에 발행
+ws.send(JSON.stringify({ type:'publish', room:'chat-room-1', data:{ text:'안녕' } }));`)}</pre></div>`;
+}
+function guideTab(btn, t) {
+  btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['js','rest','ws'].forEach(x=>document.getElementById('guide-'+x).classList.toggle('hidden', x!==t));
+}
+
+// ---- 모달 ----
+function modal(html){ document.getElementById('modal-root').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`; }
+function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
+
+// ---- 시작 ----
+if (token) { api('GET','/overview').then(showApp).catch(()=>logout()); }
+
+// 개요 자동 갱신 (10초)
+setInterval(() => { if (current==='overview' && token) loadOverview(); }, 10000);
+</script>
+</body>
+</html>

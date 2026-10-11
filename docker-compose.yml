@@ -1,0 +1,36 @@
+# 원클릭 프로덕션 스택: igServer + PostgreSQL (영속 + 수평확장 가능)
+# 실행:  docker compose up -d
+services:
+  igserver:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      - DATABASE_URL=postgres://ig:igpass@db:5432/igserver
+      - ADMIN_EMAIL=admin@studio-ig.local
+      - ADMIN_PASSWORD=change-me-please
+    volumes:
+      - ig_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=ig
+      - POSTGRES_PASSWORD=igpass
+      - POSTGRES_DB=igserver
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ig"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  ig_data:
+  pg_data:
