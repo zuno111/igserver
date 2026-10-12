@@ -77,15 +77,50 @@ jobs:
           name: igserver-${{ matrix.label }}
           path: dist/
 
-      - name: 릴리스용 zip 묶기
-        if: startsWith(github.ref, 'refs/tags/')
+  # 3개 OS 빌드가 끝나면, 결과물을 한 곳에 모아 Releases 페이지에 올린다.
+  # (로컬에서 태그 push가 막혀 있어도, Actions의 GITHUB_TOKEN은 Release/태그 생성 권한이 있다)
+  release:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 빌드 결과물 모두 내려받기
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: OS별로 zip 묶기
         shell: bash
         run: |
-          cd dist
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then 7z a ../igserver-${{ matrix.label }}.zip . ; else zip -r ../igserver-${{ matrix.label }}.zip . ; fi
+          cd artifacts
+          for d in */ ; do
+            name="${d%/}"
+            ( cd "$d" && zip -r "../../${name}.zip" . )
+          done
+          cd ..
+          ls -la *.zip
 
-      - name: 릴리스에 첨부 (태그 push 시)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Releases 페이지에 올리기 (latest)
         uses: softprops/action-gh-release@v2
         with:
-          files: igserver-${{ matrix.label }}.zip
+          tag_name: latest
+          name: igServer 최신 실행파일
+          make_latest: true
+          prerelease: false
+          body: |
+            Windows / macOS / Linux 단독 실행파일. Node.js 설치가 필요 없습니다.
+
+            받는 법 — 아래 Assets에서 본인 OS 파일을 받으세요.
+            - Windows: `igserver-win-x64.zip` → 압축 해제 → `igserver.exe` 더블클릭
+            - Mac(Apple Silicon): `igserver-macos-arm64.zip`
+            - Linux: `igserver-linux-x64.zip`
+
+            실행 후 브라우저에서 http://localhost:8787/admin/ 접속
+            기본 관리자: admin@studio-ig.local / admin1234 (첫 접속 후 변경하세요)
+
+            Windows 고정 다운로드 링크:
+            https://github.com/zuno111/igserver/releases/latest/download/igserver-win-x64.zip
+          files: "*.zip"
+          fail_on_unmatched_files: true
