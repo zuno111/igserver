@@ -41,17 +41,23 @@ jobs:
         run: |
           cd dist
           ./${{ matrix.exe }} > run.log 2>&1 &
+          SRV=$!
           for i in $(seq 1 40); do curl -sf http://localhost:8787/healthz >/dev/null && break; sleep 0.5; done
-          curl -sf http://localhost:8787/healthz | grep -q '"driver":"sqlite"' && echo "OK: sqlite 영속 모드로 기동" || (cat run.log; exit 1)
+          OK=0
+          curl -sf http://localhost:8787/healthz | grep -q '"driver":"sqlite"' && OK=1 || true
+          # 서버 종료 (Windows는 파일 잠금 해제를 위해 반드시 종료)
+          if [ "${{ runner.os }}" = "Windows" ]; then taskkill //F //IM ${{ matrix.exe }} >/dev/null 2>&1 || true; else kill $SRV 2>/dev/null || true; fi
+          sleep 2
+          if [ "$OK" = "1" ]; then echo "OK: sqlite 영속 모드로 기동"; else cat run.log; exit 1; fi
           rm -f run.log
 
       - name: 배포용 폴더 정리 (실행에 필요한 것만)
         shell: bash
         run: |
           cd dist
-          rm -rf data
-          # 실행 안내 파일 동봉
-          cat > 실행방법.txt <<'TXT'
+          rm -rf data || true
+          # 실행 안내 파일 동봉 (파일명은 ASCII로)
+          cat > HOWTO-RUN.txt <<'TXT'
           igServer 실행 방법
           ====================
           1. 이 폴더의 실행파일을 더블클릭하세요.
