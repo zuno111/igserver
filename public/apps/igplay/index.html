@@ -216,6 +216,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
     <button class="topbtn brand" onclick="go('create')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg><span class="lb">만들기</span>
     </button>
+    <button class="topbtn ghost" id="srvBtn" onclick="openServerDialog()" title="서버 연결">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg><span class="lb" id="srvLbl">서버</span>
+    </button>
     <button class="topbtn" id="walletBtn" onclick="go('shop')" title="ISC 지갑">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffb02e" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M9.5 12h5M12 9.5v5"/></svg><b id="iscBal" style="font-family:'IBM Plex Mono',monospace;color:#ffb02e">0</b><span class="lb" style="color:#93a1b4;font-weight:500">ISC</span>
     </button>
@@ -256,7 +259,27 @@ function skinCol(id){ for(var i=0;i<SKINS.length;i++)if(SKINS[i].id===id)return 
 function earn(amt){ db.isc=(db.isc||0)+amt; saveDB(); updateWallet(); return amt; }
 function spend(amt){ if((db.isc||0)<amt)return false; db.isc-=amt; saveDB(); updateWallet(); return true; }
 function updateWallet(){ var w=document.getElementById('iscBal'); if(w)w.textContent=fmt(db.isc||0); }
-function isBoosted(id){ return (db.boosts[id]||0)>Date.now(); }
+function isBoosted(id){ if(NET.on){ var l=getLevel(id); return l&&(l.boostedUntil||0)>Date.now(); } return (db.boosts[id]||0)>Date.now(); }
+
+/* ---- 서버 연동 (igServer). 미연결 시 전부 로컬 동작(폴백) ---- */
+var NET={on:false, base:'', key:'', token:'', uid:'', name:''};
+(function(){ try{ var c=JSON.parse(localStorage.getItem('igplay_srv')||'null'); if(c&&c.base&&c.key&&c.token){ NET.base=c.base; NET.key=c.key; NET.token=c.token; NET.uid=c.uid||''; NET.name=c.name||''; NET.on=true; } }catch(e){}
+  // igServer에서 서빙될 때 주입되는 기본 설정(window.IGPLAY_API) 지원
+  try{ if(!NET.on && window.IGPLAY_API && window.IGPLAY_API.base && window.IGPLAY_API.key){ NET.base=window.IGPLAY_API.base; NET.key=window.IGPLAY_API.key; } }catch(e){}
+})();
+function netSave(){ try{ localStorage.setItem('igplay_srv', JSON.stringify({base:NET.base,key:NET.key,token:NET.token,uid:NET.uid,name:NET.name})); }catch(e){} }
+function netClear(){ NET.on=false; NET.token=''; netLevels=[]; netLoaded=false; try{ localStorage.removeItem('igplay_srv'); }catch(e){} }
+async function api(method, path, body){
+  var h={'X-Project-Key':NET.key}; if(NET.token)h['Authorization']='Bearer '+NET.token; if(body!==undefined)h['Content-Type']='application/json';
+  var res=await fetch(NET.base.replace(/\/+$/,'')+path,{method:method,headers:h,body:body!==undefined?JSON.stringify(body):undefined});
+  var ct=res.headers.get('content-type')||''; var data=ct.indexOf('json')>=0?await res.json():await res.text();
+  if(!res.ok){ var err=new Error((data&&data.message)||('HTTP '+res.status)); err.status=res.status; err.data=data; throw err; }
+  return data;
+}
+var netLevels=[], netLoaded=false; // 서버 레벨 캐시
+async function netLoadLevels(){ try{ var r=await api('GET','/api/igplay/levels'); netLevels=r.levels||[]; }catch(e){ netLevels=[]; } netLoaded=true; }
+async function netWallet(){ if(!NET.on)return null; try{ var r=await api('GET','/api/igplay/wallet'); if(r.wallet){ db.isc=r.wallet.balance; db.skins=r.wallet.skins; db.skin=r.wallet.skin; saveDB(); updateWallet(); } return r.wallet; }catch(e){ return null; } }
+function updateSrvBtn(){ var l=document.getElementById('srvLbl'); if(l)l.textContent=NET.on?'연결됨':'서버'; var b=document.getElementById('srvBtn'); if(b)b.classList.toggle('on',NET.on); }
 
 function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove('show');},1900); }
 function avaColor(seed){ var h=0; for(var i=0;i<seed.length;i++)h=(h*31+seed.charCodeAt(i))%360; return 'hsl('+h+',62%,58%)'; }
@@ -307,7 +330,7 @@ function seedCoin(){
 }
 var SEED=[seedTutorial(),seedParkour(),seedCoin()];
 
-function allLevels(){ return SEED.concat(db.myLevels); }
+function allLevels(){ return NET.on ? SEED.concat(netLevels) : SEED.concat(db.myLevels); }
 function getLevel(id){ var a=allLevels(); for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i]; return null; }
 function coinCount(lv){ var c=0; lv.voxels.forEach(function(b){if(b.t===3)c++;}); return c; }
 function playCount(lv){ return (lv.plays||0)+(db.plays[lv.id]||0); }
@@ -375,6 +398,7 @@ var feedFilter='전체';
 function renderHome(m,route){
   var title=route==='shorts'?'숏폼':route==='world'?'월드':'추천';
   var sub=route==='shorts'?'60초 안에 끝나는 짧은 레벨':route==='world'?'크리에이터가 만든 월드':'지금 뜨는 블록 레벨';
+  if(NET.on && !netLoaded){ netLoadLevels().then(function(){ netWallet(); renderHome(m,route); }); }
   var lv=allLevels();
   var genres=['전체']; lv.forEach(function(l){ if(genres.indexOf(l.genre)<0)genres.push(l.genre); });
   var html='<div class="wrap"><div class="sechead"><h2>'+title+'</h2><p>'+sub+'</p></div>';
@@ -434,8 +458,51 @@ function openNickDialog(){
   wrap.querySelector('#nko').onclick=function(){ var v=inp.value.trim(); if(v){db.nick=v;saveDB();updateLoginBtn();toast('환영합니다, '+v+'님');} close(); };
   inp.addEventListener('keydown',function(e){ if(e.key==='Enter')wrap.querySelector('#nko').click(); });
 }
-function updateLoginBtn(){ document.getElementById('loginLbl').textContent=db.nick||'로그인'; }
-function me(){ return db.nick||'게스트'; }
+function updateLoginBtn(){ var el=document.getElementById('loginLbl'); if(el)el.textContent=NET.on?(NET.name||'계정'):(db.nick||'로그인'); }
+function me(){ return NET.on ? (NET.name||'플레이어') : (db.nick||'게스트'); }
+
+function openServerDialog(){
+  var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
+  var connected=NET.on;
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;max-width:380px;text-align:left">'+
+    '<h3 style="font-size:19px;margin:0 0 4px">서버 연결 (igServer)</h3>'+
+    '<p style="margin:0 0 14px">연결하면 계정·레벨·랭킹·ISC가 서버에 저장되어 모든 기기·사용자와 공유됩니다. 미연결 시 이 브라우저에만 저장됩니다.</p>'+
+    (connected?'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px">현재 <b style="color:var(--accent)">'+esc(NET.name||NET.uid)+'</b> 으로 연결됨<br><span style="color:var(--muted)">'+esc(NET.base)+'</span></div><div class="obtns"><button class="btn" id="svClose">닫기</button><button class="btn" id="svOut" style="color:var(--danger)">연결 해제</button></div>':
+    ('<input id="svBase" class="svi" placeholder="서버 주소 (예: https://내서버:8787)" value="'+esc(NET.base||'')+'">'+
+     '<input id="svKey" class="svi" placeholder="프로젝트 키 (igk_...)" value="'+esc(NET.key||'')+'">'+
+     '<input id="svEmail" class="svi" placeholder="이메일" autocomplete="username">'+
+     '<input id="svPw" class="svi" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password">'+
+     '<input id="svName" class="svi" placeholder="닉네임 (가입 시)">'+
+     '<div id="svMsg" style="color:var(--danger);font-size:12.5px;min-height:16px;margin:2px 0 10px"></div>'+
+     '<div class="obtns"><button class="btn" id="svClose">취소</button><button class="btn brand" id="svGo">로그인 / 가입</button></div>'))+
+    '</div>';
+  document.body.appendChild(wrap);
+  // 입력 스타일
+  wrap.querySelectorAll('.svi').forEach(function(i){ i.style.cssText='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--fg);outline:none;margin-bottom:9px;font-size:13.5px'; });
+  function close(){ wrap.remove(); }
+  wrap.querySelector('#svClose').onclick=close;
+  wrap.onclick=function(e){ if(e.target===wrap)close(); };
+  var out=wrap.querySelector('#svOut'); if(out)out.onclick=function(){ netClear(); updateSrvBtn(); updateWallet(); toast('연결을 해제했습니다'); close(); render(); };
+  var go2=wrap.querySelector('#svGo');
+  if(go2)go2.onclick=async function(){
+    var base=wrap.querySelector('#svBase').value.trim(), key=wrap.querySelector('#svKey').value.trim();
+    var email=wrap.querySelector('#svEmail').value.trim(), pw=wrap.querySelector('#svPw').value, nm=wrap.querySelector('#svName').value.trim();
+    var msg=wrap.querySelector('#svMsg');
+    if(!base||!key){ msg.textContent='서버 주소와 프로젝트 키를 입력하세요.'; return; }
+    if(!email||!pw){ msg.textContent='이메일과 비밀번호를 입력하세요.'; return; }
+    go2.disabled=true; msg.style.color='var(--muted)'; msg.textContent='연결 중…';
+    NET.base=base; NET.key=key; NET.token='';
+    try{
+      var r;
+      try{ r=await api('POST','/api/auth/login',{email:email,password:pw}); }
+      catch(e){ if(e.status===401||e.status===404){ r=await api('POST','/api/auth/signup',{email:email,password:pw,name:nm||email.split('@')[0]}); } else throw e; }
+      NET.token=r.token; NET.uid=r.user&&r.user.id||''; NET.name=r.user&&r.user.name||nm||email.split('@')[0]; NET.on=true; netSave();
+      await netLoadLevels(); await netWallet();
+      updateSrvBtn(); updateLoginBtn(); toast('서버에 연결되었습니다: '+NET.name);
+      close(); render();
+    }catch(e){ NET.on=false; msg.style.color='var(--danger)'; msg.textContent='실패: '+(e.message||'연결 오류'); go2.disabled=false; }
+  };
+}
 
 /* ============================= WATCH + PLAYER ============================= */
 function renderWatch(m,id){
@@ -485,23 +552,35 @@ function renderWatch(m,id){
   document.getElementById('cbtn').onclick=function(){ postComment(id); };
   document.getElementById('cin').addEventListener('keydown',function(e){if(e.key==='Enter')postComment(id);});
   // like/sub
-  document.getElementById('likeBtn').onclick=function(){ db.likes[id]=!db.likes[id]; saveDB();
-    this.classList.toggle('on',db.likes[id]); this.querySelector('svg').setAttribute('fill',db.likes[id]?'#ffb02e':'none'); document.getElementById('likeN').textContent=fmt(likeCount(lv)); };
+  document.getElementById('likeBtn').onclick=function(){ var btn=this;
+    if(NET.on){ api('POST','/api/igplay/like',{levelId:id}).then(function(r){ btn.classList.toggle('on',r.liked); btn.querySelector('svg').setAttribute('fill',r.liked?'#ffb02e':'none'); document.getElementById('likeN').textContent=fmt(r.likes); netWallet(); }).catch(function(e){ toast(e.message); }); return; }
+    db.likes[id]=!db.likes[id]; saveDB(); btn.classList.toggle('on',db.likes[id]); btn.querySelector('svg').setAttribute('fill',db.likes[id]?'#ffb02e':'none'); document.getElementById('likeN').textContent=fmt(likeCount(lv)); };
   document.getElementById('subBtn').onclick=function(){ db.subs[lv.creatorId]=!db.subs[lv.creatorId]; saveDB();
     this.classList.toggle('on',db.subs[lv.creatorId]); this.textContent=db.subs[lv.creatorId]?'구독중':'구독'; };
-  var tb=document.getElementById('tipBtn'); if(tb)tb.onclick=function(){ if(spend(10)){ db.tips[lv.id]=(db.tips[lv.id]||0)+10; saveDB(); toast('크리에이터에게 10 ISC 후원'); } else toast('ISC가 부족합니다'); };
+  var tb=document.getElementById('tipBtn'); if(tb)tb.onclick=function(){
+    if(NET.on){ api('POST','/api/igplay/tip',{levelId:lv.id,amount:10}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast('크리에이터에게 10 ISC 후원'); }).catch(function(e){ toast(e.message); }); return; }
+    if(spend(10)){ db.tips[lv.id]=(db.tips[lv.id]||0)+10; saveDB(); toast('크리에이터에게 10 ISC 후원'); } else toast('ISC가 부족합니다'); };
   // player
   startPlayer(lv);
 }
 function renderComments(id){
-  var cmts=db.comments[id]||[]; var el=document.getElementById('clist'); if(!el)return; el.innerHTML='';
+  var el=document.getElementById('clist'); if(!el)return;
+  if(NET.on){ el.innerHTML='<div style="color:var(--faint);font-size:13px">불러오는 중…</div>';
+    api('GET','/api/igplay/comments/'+id).then(function(r){ paintComments(id,(r.comments||[]).map(function(c){return {n:c.name||'익명',m:c.body,t:''};})); }).catch(function(){ paintComments(id,[]); });
+    return; }
+  paintComments(id,(db.comments[id]||[]).slice().reverse());
+}
+function paintComments(id,cmts){
+  var el=document.getElementById('clist'); if(!el)return; el.innerHTML='';
+  var h=document.querySelector('.comments h3'); if(h)h.textContent='댓글 '+cmts.length+'개';
   if(!cmts.length){ el.innerHTML='<div style="color:var(--faint);font-size:13px">첫 댓글을 남겨보세요.</div>'; return; }
-  cmts.slice().reverse().forEach(function(c){ var d=document.createElement('div'); d.className='cmt';
-    d.innerHTML='<div class="ava" style="background:'+avaColor(c.n)+'">'+c.n.charAt(0)+'</div><div class="cb"><div class="cn">'+esc(c.n)+'<span>'+c.t+'</span></div><div class="ct">'+esc(c.m)+'</div></div>'; el.appendChild(d); });
+  cmts.forEach(function(c){ var d=document.createElement('div'); d.className='cmt';
+    d.innerHTML='<div class="ava" style="background:'+avaColor(c.n)+'">'+esc(c.n.charAt(0))+'</div><div class="cb"><div class="cn">'+esc(c.n)+(c.t?'<span>'+esc(c.t)+'</span>':'')+'</div><div class="ct">'+esc(c.m)+'</div></div>'; el.appendChild(d); });
 }
 function postComment(id){ var inp=document.getElementById('cin'); var v=inp.value.trim(); if(!v)return;
+  if(NET.on){ api('POST','/api/igplay/comments',{levelId:id,body:v}).then(function(){ inp.value=''; renderComments(id); }).catch(function(e){ toast('댓글 실패: '+e.message); }); return; }
   if(!db.comments[id])db.comments[id]=[]; db.comments[id].push({n:me(),m:v,t:'방금'}); saveDB(); inp.value='';
-  var h=document.querySelector('.comments h3'); if(h)h.textContent='댓글 '+db.comments[id].length+'개'; renderComments(id); }
+  renderComments(id); }
 function shareLevel(id){ var url=location.origin+location.pathname+'#watch/'+id;
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(function(){toast('링크를 복사했습니다');},function(){toast(url);}); } else toast(url); }
 
@@ -575,7 +654,8 @@ function startPlayer(lv){
   var jumpEl=document.getElementById('jump');
   jumpEl.addEventListener('pointerdown',function(e){ keys[' ']=true; e.stopPropagation(); setTimeout(function(){keys[' ']=false;},120); });
 
-  function startPlay(){ var ov=document.getElementById('startOv'); if(ov)ov.remove(); state='play'; reset(); earn(EARN.play); }
+  function startPlay(){ var ov=document.getElementById('startOv'); if(ov)ov.remove(); state='play'; reset();
+    if(NET.on){ api('POST','/api/igplay/events',{type:'play',levelId:lv.id}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} }).catch(function(){}); } else earn(EARN.play); }
   var pb=document.getElementById('playBtn'); if(pb)pb.onclick=startPlay;
 
   function winScreen(){
@@ -583,9 +663,10 @@ function startPlayer(lv){
     if(!db.times[lv.id])db.times[lv.id]=[]; db.times[lv.id].push({n:me(),ms:ms}); db.times[lv.id].sort(function(a,b){return a.ms-b.ms;}); db.times[lv.id]=db.times[lv.id].slice(0,50); saveDB();
     var best=db.times[lv.id][0], rank=db.times[lv.id].findIndex(function(x){return x.ms===ms&&x.n===me();})+1;
     var first=!db.firstClears[lv.id]; if(first){db.firstClears[lv.id]=1;saveDB();}
-    var reward=EARN.clear+Math.round(coinsGot/Math.max(1,coinCount(lv))*10)+(first?EARN.firstClear:0); earn(reward);
+    var reward=EARN.clear+Math.round(coinsGot/Math.max(1,coinCount(lv))*10)+(first?EARN.firstClear:0);
+    if(NET.on){ api('POST','/api/igplay/events',{type:'clear',levelId:lv.id,coins:coinsGot,total:coinCount(lv)}).then(function(rr){ if(rr.wallet){db.isc=rr.wallet.balance;updateWallet();} var el=document.getElementById('rewardLine'); if(el&&typeof rr.reward==='number')el.textContent='+'+rr.reward+' ISC 적립'+(rr.first?' · 첫 클리어 보너스':''); }).catch(function(){}); api('POST','/api/igplay/times',{levelId:lv.id,ms:ms}).catch(function(){}); } else earn(reward);
     var ov=document.createElement('div'); ov.className='overlay'; ov.id='winOv';
-    ov.innerHTML='<div class="ocard"><h3>클리어!</h3><div class="big">'+msToClock(ms)+'</div><p>코인 '+coinsGot+'/'+coinCount(lv)+' · 내 순위 '+rank+'위 · 최고 '+msToClock(best.ms)+'</p><div style="font-family:\'IBM Plex Mono\',monospace;color:#ffb02e;font-weight:600;font-size:15px;margin-bottom:12px">+'+reward+' ISC 적립'+(first?' · 첫 클리어 보너스':'')+'</div><div class="obtns"><button class="btn brand" id="retry">다시</button><button class="btn accent" id="rankBtn">랭킹 보기</button></div></div>';
+    ov.innerHTML='<div class="ocard"><h3>클리어!</h3><div class="big">'+msToClock(ms)+'</div><p>코인 '+coinsGot+'/'+coinCount(lv)+' · 내 순위 '+rank+'위 · 최고 '+msToClock(best.ms)+'</p><div id="rewardLine" style="font-family:\'IBM Plex Mono\',monospace;color:#ffb02e;font-weight:600;font-size:15px;margin-bottom:12px">+'+reward+' ISC 적립'+(first?' · 첫 클리어 보너스':'')+'</div><div class="obtns"><button class="btn brand" id="retry">다시</button><button class="btn accent" id="rankBtn">랭킹 보기</button></div></div>';
     document.getElementById('pl').appendChild(ov);
     ov.querySelector('#retry').onclick=function(){ ov.remove(); startPlay(); };
     ov.querySelector('#rankBtn').onclick=function(){ go('ranking'); };
@@ -731,6 +812,9 @@ function renderEditor(m){
     renderWatchTemp(r.lv); };
   document.getElementById('edsave').onclick=function(){ var r=buildLevel(); if(!r.hasGoal){toast('골 블록을 1개 이상 배치하세요');return;}
     if(!r.lv.voxels.some(function(b){return b.t===1||b.t===2;})){toast('지면 블록을 배치하세요');return;}
+    if(NET.on){ api('POST','/api/igplay/levels',{title:r.lv.title,genre:r.lv.genre,difficulty:r.lv.difficulty,voxels:r.lv.voxels,spawn:r.lv.spawn,desc:r.lv.desc})
+      .then(function(resp){ toast('서버 업로드 완료'); netLoaded=false; netLoadLevels().then(function(){ go('watch/'+resp.level.id); }); })
+      .catch(function(e){ toast('업로드 실패: '+e.message); }); return; }
     db.myLevels.push(r.lv); saveDB(); toast('업로드 완료'); go('watch/'+r.lv.id); };
   document.getElementById('edimport').onchange=function(e){ var f=e.target.files&&e.target.files[0]; if(!f)return; var rd=new FileReader();
     rd.onload=function(){ try{ var data=JSON.parse(rd.result); var vox=data.voxels||data.vox||[]; if(!vox.length){toast('복셀 데이터가 없습니다');return;}
@@ -787,19 +871,30 @@ function renderChannel(m){
 
 /* ============================= RANKING ============================= */
 function renderRanking(m){
-  var lv=allLevels(); var html='<div class="wrap"><div class="sechead"><h2>랭킹</h2><p>레벨별 클리어 타임 기록</p></div><div class="rank">';
-  var any=false;
-  lv.forEach(function(l){ var times=db.times[l.id]; if(!times||!times.length)return; any=true;
-    html+='<div style="margin:22px 0 10px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:2px;background:var(--brand);display:inline-block"></span>'+esc(l.title)+'</div>';
-    times.slice(0,5).forEach(function(t,i){ html+='<div class="rrow'+(i<3?' top'+(i+1):'')+'"><div class="pos">'+(i+1)+'</div><div class="ava" style="width:30px;height:30px;font-size:12px;background:'+avaColor(t.n)+'">'+t.n.charAt(0)+'</div><div class="who">'+esc(t.n)+'</div><div class="tm">'+msToClock(t.ms)+'</div></div>'; });
+  if(NET.on){
+    m.innerHTML='<div class="wrap"><div class="sechead"><h2>랭킹</h2><p>전역 클리어 타임 기록</p></div><div class="rank"><div style="color:var(--muted);font-size:13px">불러오는 중…</div></div></div>';
+    var lv=allLevels();
+    Promise.all(lv.map(function(l){ return api('GET','/api/igplay/ranking/'+l.id).then(function(r){ return {l:l,times:r.ranking||[]}; }).catch(function(){ return {l:l,times:[]}; }); }))
+      .then(function(groups){ paintRanking(groups.filter(function(g){return g.times.length;})); });
+    return;
+  }
+  var lv=allLevels(); var groups=lv.map(function(l){ return {l:l,times:(db.times[l.id]||[]).slice().sort(function(a,b){return a.ms-b.ms;})}; }).filter(function(g){return g.times.length;});
+  paintRanking(groups);
+}
+function paintRanking(groups){
+  var m=document.getElementById('main'); if(!m)return;
+  var html='<div class="wrap"><div class="sechead"><h2>랭킹</h2><p>'+(NET.on?'전역':'레벨별')+' 클리어 타임 기록</p></div><div class="rank">';
+  if(!groups.length){ html+='<div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 21V9M12 21V4M18 21v-7"/></svg><h3>아직 기록이 없습니다</h3><p>레벨을 클리어하면 여기에 타임이 기록됩니다.</p></div>'; }
+  groups.forEach(function(g){ html+='<div style="margin:22px 0 10px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:2px;background:var(--brand);display:inline-block"></span>'+esc(g.l.title)+'</div>';
+    g.times.slice(0,5).forEach(function(t,i){ var nm=t.name||t.n||'?'; html+='<div class="rrow'+(i<3?' top'+(i+1):'')+'"><div class="pos">'+(i+1)+'</div><div class="ava" style="width:30px;height:30px;font-size:12px;background:'+avaColor(nm)+'">'+esc(nm.charAt(0))+'</div><div class="who">'+esc(nm)+'</div><div class="tm">'+msToClock(t.ms)+'</div></div>'; });
   });
-  if(!any){ html+='<div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 21V9M12 21V4M18 21v-7"/></svg><h3>아직 기록이 없습니다</h3><p>레벨을 클리어하면 여기에 타임이 기록됩니다.</p></div>'; }
   html+='</div></div>'; m.innerHTML=html;
 }
 
 /* ============================= SHOP (ISC) ============================= */
 function renderShop(m){
-  var html='<div class="wrap"><div class="sechead"><h2>상점</h2><p>ISC로 스킨 구매 · 내 레벨 부스트 · 창작자 후원</p></div>';
+  if(NET.on) netWallet();
+  var html='<div class="wrap"><div class="sechead"><h2>상점</h2><p>ISC로 스킨 구매 · 내 레벨 부스트 · 창작자 후원'+(NET.on?' · 서버 연결됨':'')+'</p></div>';
   html+='<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:24px;flex-wrap:wrap">'+
     '<div class="ava" style="width:46px;height:46px;background:linear-gradient(135deg,#ffb02e,#ff8a3c);color:#1a1304;font-weight:700">ISC</div>'+
     '<div><div style="color:var(--muted);font-size:12px">보유 잔액</div><div style="font-family:var(--mono);font-size:24px;font-weight:600;color:var(--brand)">'+fmt(db.isc||0)+' ISC</div></div>'+
@@ -816,18 +911,25 @@ function renderShop(m){
       (on?'<button class="btn accent" style="width:100%" disabled>장착중</button>':owned?'<button class="btn" style="width:100%" data-eq="'+s.id+'">장착</button>':'<button class="btn brand" style="width:100%" data-buy="'+s.id+'" data-p="'+s.price+'">'+s.price+' ISC</button>');
     sk.appendChild(c);
   });
-  sk.querySelectorAll('[data-buy]').forEach(function(b){ b.onclick=function(){ var id=b.getAttribute('data-buy'),p=+b.getAttribute('data-p'); if(spend(p)){ db.skins.push(id); db.skin=id; saveDB(); toast('구매·장착 완료'); renderShop(m);} else toast('ISC가 부족합니다'); }; });
-  sk.querySelectorAll('[data-eq]').forEach(function(b){ b.onclick=function(){ db.skin=b.getAttribute('data-eq'); saveDB(); toast('장착 완료'); renderShop(m); }; });
+  sk.querySelectorAll('[data-buy]').forEach(function(b){ b.onclick=function(){ var id=b.getAttribute('data-buy'),p=+b.getAttribute('data-p');
+    if(NET.on){ api('POST','/api/igplay/shop/buy',{skinId:id}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;db.skins=r.wallet.skins;db.skin=r.wallet.skin;saveDB();updateWallet();} toast('구매·장착 완료'); renderShop(m); }).catch(function(e){ toast(e.message); }); return; }
+    if(spend(p)){ db.skins.push(id); db.skin=id; saveDB(); toast('구매·장착 완료'); renderShop(m);} else toast('ISC가 부족합니다'); }; });
+  sk.querySelectorAll('[data-eq]').forEach(function(b){ b.onclick=function(){ var id=b.getAttribute('data-eq');
+    if(NET.on){ api('POST','/api/igplay/shop/equip',{skinId:id}).then(function(r){ if(r.wallet){db.skin=r.wallet.skin;saveDB();} toast('장착 완료'); renderShop(m); }).catch(function(e){ toast(e.message); }); return; }
+    db.skin=id; saveDB(); toast('장착 완료'); renderShop(m); }; });
   var bw=document.getElementById('boostwrap');
-  if(!db.myLevels.length){ bw.innerHTML='<div class="empty" style="padding:28px"><p>부스트할 내 레벨이 없습니다. 만들기로 레벨을 올려보세요.</p></div>'; }
-  else db.myLevels.forEach(function(l){ var d=document.createElement('div'); d.className='rrow';
+  var myLv=NET.on ? netLevels.filter(function(l){return l.creatorId===NET.uid;}) : db.myLevels;
+  if(!myLv.length){ bw.innerHTML='<div class="empty" style="padding:28px"><p>부스트할 내 레벨이 없습니다. 만들기로 레벨을 올려보세요.</p></div>'; }
+  else myLv.forEach(function(l){ var d=document.createElement('div'); d.className='rrow';
     d.innerHTML='<div class="who">'+esc(l.title)+(isBoosted(l.id)?' <span style="color:var(--brand)">★ 부스트중</span>':'')+'</div><button class="btn brand" data-boost="'+l.id+'">24시간 부스트 · 50 ISC</button>';
-    d.querySelector('[data-boost]').onclick=function(){ if(isBoosted(l.id)){toast('이미 부스트 중입니다');return;} if(spend(50)){ db.boosts[l.id]=Date.now()+864e5; saveDB(); toast('부스트 적용'); renderShop(m);} else toast('ISC가 부족합니다'); };
+    d.querySelector('[data-boost]').onclick=function(){ if(isBoosted(l.id)){toast('이미 부스트 중입니다');return;}
+      if(NET.on){ api('POST','/api/igplay/boost',{levelId:l.id}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} netLoaded=false; toast('부스트 적용'); netLoadLevels().then(function(){ renderShop(m); }); }).catch(function(e){ toast(e.message); }); return; }
+      if(spend(50)){ db.boosts[l.id]=Date.now()+864e5; saveDB(); toast('부스트 적용'); renderShop(m);} else toast('ISC가 부족합니다'); };
     bw.appendChild(d); });
 }
 
 /* ============================= boot ============================= */
-updateLoginBtn(); updateWallet();
+updateLoginBtn(); updateWallet(); updateSrvBtn();
 if(!location.hash)location.hash='#home';
 render();
 </script>
