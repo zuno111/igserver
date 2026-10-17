@@ -9,6 +9,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "smoke": "node test/smoke.js",
+    "smoke:igplay": "node test/igplay_demo.js",
     "cluster": "bash test/cluster.sh",
     "build": "node build-sea.mjs"
   },

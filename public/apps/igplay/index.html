@@ -1,0 +1,833 @@
+<title>igPlay</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="브라우저에서 바로 플레이·제작하는 블록 레벨 플랫폼">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 고정 상단바 + 좌측 내비(모바일 하단탭) + 라우트 메인. 단일 다크 아케이드 테마. */
+:root{
+  color-scheme: dark;
+  --bg:#0d1017; --surface:#141a23; --surface2:#1b2330; --surface3:#232d3d;
+  --border:#283244; --border2:#374258;
+  --fg:#e9edf3; --muted:#93a1b4; --faint:#67748a;
+  --brand:#ffb02e; --brand-ink:#1a1304;
+  --accent:#27d4b8; --accent-ink:#03201c;
+  --danger:#f0556b;
+  --easy:#39c06a; --normal:#3aa0ff; --hard:#ff9f1c; --expert:#f0556b;
+  --r:12px; --r2:16px;
+  --sans:'IBM Plex Sans KR', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --mono:'IBM Plex Mono', ui-monospace, monospace;
+  --nav-w:208px; --bar-h:56px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-text-size-adjust:100%;overflow:hidden}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit}
+a{color:inherit;text-decoration:none}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:6px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- App shell ---------- */
+#app{display:flex;flex-direction:column;height:100%}
+#topbar{height:var(--bar-h);flex:0 0 auto;display:flex;align-items:center;gap:12px;
+  padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px));
+  padding-top:env(safe-area-inset-top,0px);background:var(--surface);border-bottom:1px solid var(--border);z-index:30}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--surface);z-index:40}
+.logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:19px;letter-spacing:-.3px;white-space:nowrap}
+.logo .mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--brand),#ff8a3c);
+  display:grid;place-items:center;box-shadow:0 2px 10px rgba(255,176,46,.35)}
+.logo .mark i{width:9px;height:9px;background:var(--brand-ink);border-radius:2px;display:block;transform:rotate(45deg)}
+.logo b{color:var(--fg)} .logo span{color:var(--brand)}
+.search{flex:1 1 auto;max-width:560px;display:flex;align-items:center;gap:8px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:999px;padding:8px 14px;min-width:0}
+.search input{flex:1;background:none;border:none;color:var(--fg);outline:none;font-size:14px;min-width:0}
+.search input::placeholder{color:var(--faint)}
+.search svg{flex:0 0 auto;color:var(--muted)}
+.topbtn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;border:1px solid var(--border2);
+  background:var(--surface2);font-weight:600;font-size:13px;white-space:nowrap}
+.topbtn.brand{background:linear-gradient(135deg,var(--brand),#ff9a3c);color:var(--brand-ink);border:none}
+.topbtn.ghost{background:transparent}
+.spacer{flex:1}
+
+#shell{flex:1 1 auto;display:flex;min-height:0}
+#nav{width:var(--nav-w);flex:0 0 auto;background:var(--surface);border-right:1px solid var(--border);
+  padding:14px 10px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;
+  padding-left:max(10px,env(safe-area-inset-left,0px))}
+.navitem{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--muted);font-weight:600;font-size:14px;border:none;background:none;width:100%;text-align:left}
+.navitem svg{flex:0 0 auto}
+.navitem:hover{background:var(--surface2);color:var(--fg)}
+.navitem.on{background:var(--surface3);color:var(--fg)}
+.navitem.on svg{color:var(--brand)}
+.navnote{margin-top:auto;padding:12px;color:var(--faint);font-size:11.5px;line-height:1.6;border-top:1px solid var(--border)}
+
+#main{flex:1 1 auto;min-width:0;overflow-y:auto;overflow-x:hidden;position:relative}
+.wrap{padding:22px max(18px,env(safe-area-inset-right,0px)) 64px max(18px,env(safe-area-inset-left,0px))}
+
+/* ---------- Feed ---------- */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.chip{padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);
+  font-weight:600;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.chip.on{background:var(--fg);color:#0d1017;border-color:var(--fg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:20px 18px}
+.card{background:none;border:none;text-align:left;padding:0;display:flex;flex-direction:column;gap:10px}
+.thumb{position:relative;aspect-ratio:16/10;border-radius:var(--r2);overflow:hidden;background:var(--surface2);border:1px solid var(--border)}
+.thumb canvas,.thumb img{width:100%;height:100%;display:block;object-fit:cover}
+.thumb .dur{position:absolute;right:8px;bottom:8px;background:rgba(5,8,13,.82);color:#fff;font-size:11px;font-weight:600;
+  padding:3px 7px;border-radius:7px;font-family:var(--mono)}
+.thumb .plv{position:absolute;left:8px;top:8px;display:inline-flex;align-items:center;gap:5px;background:rgba(5,8,13,.78);
+  color:#fff;font-size:10.5px;font-weight:700;padding:4px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px}
+.thumb .plv b{width:7px;height:7px;border-radius:2px;display:block}
+.card:hover .thumb{border-color:var(--border2)}
+.meta{display:flex;gap:11px}
+.ava{width:36px;height:36px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;font-weight:700;font-size:14px;color:#0d1017}
+.mtext{min-width:0}
+.ctitle{font-weight:600;font-size:14.5px;line-height:1.35;color:var(--fg);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.csub{color:var(--muted);font-size:12.5px;margin-top:3px}
+.csub .vf{font-family:var(--mono)}
+.sechead{display:flex;align-items:baseline;gap:10px;margin:4px 0 16px}
+.sechead h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.4px}
+.sechead p{margin:0;color:var(--muted);font-size:13px}
+
+/* ---------- Watch ---------- */
+.watch{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:26px;align-items:start}
+.player{position:relative;aspect-ratio:16/9;border-radius:var(--r2);overflow:hidden;background:#070a10;border:1px solid var(--border)}
+.player canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.hud{position:absolute;inset:0;pointer-events:none;color:#fff;font-family:var(--mono)}
+.hud .row{position:absolute;top:12px;left:12px;display:flex;gap:8px}
+.hud .stat{background:rgba(7,10,16,.72);border:1px solid rgba(255,255,255,.1);padding:6px 11px;border-radius:9px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
+.hud .stat svg{opacity:.9}
+.hud .hint{position:absolute;left:12px;bottom:12px;background:rgba(7,10,16,.66);padding:6px 10px;border-radius:9px;font-size:11px;font-weight:500;color:#cfd7e2;font-family:var(--sans)}
+.ctrlbtn{position:absolute;pointer-events:auto;border-radius:50%;background:rgba(10,14,20,.6);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(3px);display:grid;place-items:center;color:#fff;-webkit-user-select:none;user-select:none;touch-action:none}
+#joy{width:118px;height:118px;left:16px;bottom:16px}
+#joy .knob{width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.28);border:1px solid rgba(255,255,255,.4);transition:none}
+#jump{width:74px;height:74px;right:16px;bottom:22px;font-weight:700;font-size:13px;background:rgba(39,212,184,.22);border-color:rgba(39,212,184,.55)}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(6,9,14,.82);backdrop-filter:blur(4px);pointer-events:auto;text-align:center;padding:20px}
+.ocard{max-width:340px;width:100%}
+.ocard h3{margin:0 0 6px;font-size:26px;font-weight:700}
+.ocard .big{font-family:var(--mono);font-size:34px;font-weight:600;color:var(--brand);margin:8px 0 2px}
+.ocard p{color:var(--muted);margin:4px 0 16px;font-size:13.5px}
+.obtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:11px 20px;border-radius:11px;font-weight:700;font-size:14px;border:1px solid var(--border2);background:var(--surface2)}
+.btn.brand{background:linear-gradient(135deg,var(--brand),#ff9a3c);color:var(--brand-ink);border:none}
+.btn.accent{background:var(--accent);color:var(--accent-ink);border:none}
+.btn.big{padding:13px 26px;font-size:15px}
+.btn:disabled{opacity:.5;cursor:default}
+
+.wtitle{font-size:21px;font-weight:700;letter-spacing:-.4px;margin:18px 0 10px;text-wrap:balance}
+.actionbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.chan{display:flex;align-items:center;gap:12px}
+.chan .nm{font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:6px}
+.chan .sb{color:var(--muted);font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:999px;border:1px solid var(--border2);background:var(--surface2);font-weight:600;font-size:13px}
+.pill.on{background:var(--accent);color:var(--accent-ink);border:none}
+.pill svg{flex:0 0 auto}
+.tags{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
+.tag{padding:6px 11px;border-radius:8px;font-size:11.5px;font-weight:700;background:var(--surface3);color:var(--muted)}
+.tag.gen{color:var(--accent)}
+.desc{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;font-size:13.5px;color:var(--muted);margin-bottom:22px}
+.desc .st{color:var(--fg);font-weight:600;font-family:var(--mono);margin-right:12px}
+.comments h3{font-size:16px;margin:0 0 14px}
+.cform{display:flex;gap:10px;margin-bottom:18px}
+.cform input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;min-width:0}
+.cform input:focus{border-color:var(--border2)}
+.cmt{display:flex;gap:11px;margin-bottom:16px}
+.cmt .ava{width:34px;height:34px;font-size:13px}
+.cmt .cb{min-width:0}
+.cmt .cn{font-weight:600;font-size:13px}
+.cmt .cn span{color:var(--faint);font-weight:400;margin-left:7px;font-size:11.5px}
+.cmt .ct{font-size:13.5px;color:var(--fg);margin-top:2px;word-break:break-word}
+.side h3{font-size:14px;margin:0 0 12px;color:var(--muted)}
+.srec{display:flex;gap:10px;margin-bottom:12px;text-align:left;background:none;border:none;padding:0;width:100%}
+.srec .st{width:150px;flex:0 0 auto;aspect-ratio:16/10;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--surface2)}
+.srec .st canvas{width:100%;height:100%;display:block}
+.srec .si{min-width:0}
+.srec .si .t{font-weight:600;font-size:13px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.srec .si .s{color:var(--muted);font-size:11.5px;margin-top:3px}
+
+/* ---------- Ranking ---------- */
+.rank{max-width:640px}
+.rrow{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-bottom:9px}
+.rrow .pos{font-family:var(--mono);font-weight:700;font-size:16px;width:30px;text-align:center;color:var(--muted)}
+.rrow.top1 .pos{color:var(--brand)} .rrow.top2 .pos,.rrow.top3 .pos{color:var(--accent)}
+.rrow .who{flex:1;font-weight:600}
+.rrow .tm{font-family:var(--mono);font-weight:600;color:var(--brand)}
+
+/* ---------- Editor ---------- */
+.edwrap{display:flex;flex-direction:column;height:100%}
+.edbar{flex:0 0 auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px max(16px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--border);background:var(--surface)}
+.tool{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);font-weight:600;font-size:13px;color:var(--muted)}
+.tool b.sw{width:13px;height:13px;border-radius:3px;display:block}
+.tool.on{color:var(--fg);border-color:var(--border2);background:var(--surface3)}
+.edcanvas{flex:1 1 auto;position:relative;min-height:0;background:#0a0e15}
+.edcanvas canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.edhint{position:absolute;left:12px;top:12px;background:rgba(7,10,16,.7);color:#cfd7e2;font-size:11.5px;padding:7px 11px;border-radius:9px;pointer-events:none;line-height:1.6}
+.edfoot{flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--border);background:var(--surface)}
+.edfoot input,.edfoot select{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--fg);outline:none}
+.edfoot input.t{flex:1;min-width:150px}
+.edfoot .spacer{flex:1}
+
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty svg{color:var(--faint);margin-bottom:14px}
+.empty h3{color:var(--fg);margin:0 0 6px;font-size:17px}
+
+/* channel */
+.chhead{display:flex;align-items:center;gap:18px;margin-bottom:8px}
+.chead .ava{width:76px;height:76px;font-size:30px}
+.chead h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.5px}
+.chead .s{color:var(--muted);font-size:13px;margin-top:4px}
+.ctabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:18px 0 22px}
+.ctab{padding:11px 16px;border:none;background:none;color:var(--muted);font-weight:600;font-size:14px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.ctab.on{color:var(--fg);border-bottom-color:var(--brand)}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--surface3);border:1px solid var(--border2);
+  color:var(--fg);padding:11px 18px;border-radius:11px;font-weight:600;font-size:13.5px;z-index:90;box-shadow:0 8px 30px rgba(0,0,0,.5);
+  opacity:0;pointer-events:none;transition:opacity .2s, transform .2s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:860px){
+  .watch{grid-template-columns:1fr}
+  :root{--nav-w:0px}
+  #nav{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;flex-direction:row;height:62px;
+    padding:6px max(6px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px));border-right:none;border-top:1px solid var(--border);z-index:30;justify-content:space-around}
+  .navitem{flex-direction:column;gap:3px;font-size:10.5px;padding:6px 4px;flex:1;justify-content:center;text-align:center}
+  .navnote{display:none}
+  #main{padding-bottom:62px}
+  .search{max-width:none}
+  .logo b, .logo .kr{display:none}
+}
+@media (max-width:560px){
+  .search .ph{display:none}
+  .topbtn .lb{display:none} .topbtn{padding:8px 11px}
+  .tags{width:100%;margin-left:0}
+}
+</style>
+
+<div id="app">
+  <header id="topbar">
+    <a class="logo" href="#home"><span class="mark"><i></i></span><span>ig</span><b>Play</b></a>
+    <div class="search">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="q" class="ph" placeholder="레벨·크리에이터 검색" autocomplete="off">
+    </div>
+    <div class="spacer"></div>
+    <button class="topbtn brand" onclick="go('create')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg><span class="lb">만들기</span>
+    </button>
+    <button class="topbtn" id="walletBtn" onclick="go('shop')" title="ISC 지갑">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffb02e" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M9.5 12h5M12 9.5v5"/></svg><b id="iscBal" style="font-family:'IBM Plex Mono',monospace;color:#ffb02e">0</b><span class="lb" style="color:#93a1b4;font-weight:500">ISC</span>
+    </button>
+    <button class="topbtn ghost" id="loginBtn" onclick="login()">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span class="lb" id="loginLbl">로그인</span>
+    </button>
+  </header>
+  <div id="shell">
+    <nav id="nav"></nav>
+    <main id="main"></main>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* ============================= store ============================= */
+var DB_KEY='igplay_v1';
+var db;
+function loadDB(){ try{var r=localStorage.getItem(DB_KEY); if(r)return norm(JSON.parse(r));}catch(e){}
+  return norm({nick:null,likes:{},subs:{},comments:{},times:{},myLevels:[],plays:{}}); }
+function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; return d; }
+function saveDB(){ try{localStorage.setItem(DB_KEY,JSON.stringify(db));}catch(e){} }
+db=loadDB();
+
+/* ---- ISC economy (igServer/ISC 계약과 동일한 이벤트·보상 규칙) ---- */
+var EARN={play:2, clear:15, firstClear:40, likeGiven:1, creatorPerPlay:3, creatorPerClear:8};
+var SKINS=[
+  {id:'classic',name:'클래식',col:0xff6b3d,price:0},
+  {id:'mint',name:'민트',col:0x27d4b8,price:60},
+  {id:'violet',name:'바이올렛',col:0x9b6bff,price:90},
+  {id:'gold',name:'골드',col:0xffb02e,price:150},
+  {id:'crimson',name:'크림슨',col:0xf0556b,price:150},
+  {id:'ice',name:'아이스',col:0x8fd0ff,price:220}
+];
+function skinCol(id){ for(var i=0;i<SKINS.length;i++)if(SKINS[i].id===id)return SKINS[i].col; return 0xff6b3d; }
+function earn(amt){ db.isc=(db.isc||0)+amt; saveDB(); updateWallet(); return amt; }
+function spend(amt){ if((db.isc||0)<amt)return false; db.isc-=amt; saveDB(); updateWallet(); return true; }
+function updateWallet(){ var w=document.getElementById('iscBal'); if(w)w.textContent=fmt(db.isc||0); }
+function isBoosted(id){ return (db.boosts[id]||0)>Date.now(); }
+
+function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove('show');},1900); }
+function avaColor(seed){ var h=0; for(var i=0;i<seed.length;i++)h=(h*31+seed.charCodeAt(i))%360; return 'hsl('+h+',62%,58%)'; }
+function fmt(n){ n=Math.round(n); if(n>=10000)return (n/10000).toFixed(n>=100000?0:1).replace(/\.0$/,'')+'만'; if(n>=1000)return (n/1000).toFixed(1).replace(/\.0$/,'')+'천'; return ''+n; }
+function msToClock(ms){ var s=ms/1000; var m=Math.floor(s/60); var r=(s-m*60); return m+':'+(r<10?'0':'')+r.toFixed(2); }
+
+/* ============================= level model ============================= */
+// voxel types: 1 ground, 2 wall, 3 coin(trigger), 4 goal(trigger)
+var TYPE={ground:1,wall:2,coin:3,goal:4};
+var BLOCKCOL={1:0x3fae5b,2:0x6d7a8c,3:0xffb02e,4:0x27d4b8};
+var DIFFCOL={쉬움:'var(--easy)',보통:'var(--normal)',어려움:'var(--hard)','전문가':'var(--expert)'};
+
+function L(x,y,z,t){return {x:x,y:y,z:z,t:t};}
+function rect(arr,x0,z0,w,d,y,t){ for(var x=x0;x<x0+w;x++)for(var z=z0;z<z0+d;z++)arr.push(L(x,y,z,t)); }
+
+function seedTutorial(){
+  var v=[]; rect(v,0,0,12,4,0,1);
+  for(var i=2;i<10;i+=2) v.push(L(i,1,1,3));
+  v.push(L(11,1,3,1)); v.push(L(11,1,3,4)); // pedestal + goal -> place goal above
+  // goal on a small rise
+  v.push(L(10,1,2,4));
+  return {id:'tutorial',title:'튜토리얼 — 블록 한 칸부터 골까지',creator:'igPlay 공식',creatorId:'igplay',verified:true,
+    genre:'입문',difficulty:'쉬움',plays:2031000,likes:61000,desc:'기본 지형과 코인, 골 블록만으로 만든 가장 간단한 레벨입니다. WASD로 이동, Space로 점프, 코인을 모아 골에 도착하세요.',
+    voxels:v,spawn:{x:1,y:1,z:2}};
+}
+function seedParkour(){
+  var v=[];
+  rect(v,0,0,4,4,0,1);                 // start pad
+  var pads=[[6,0,1],[9,1,2],[12,1,0],[15,2,2],[18,2,1],[21,3,2]];
+  pads.forEach(function(p){ rect(v,p[0],p[2],2,2,p[1],1); });
+  v.push(L(9,2,2,3)); v.push(L(15,3,2,3)); v.push(L(18,3,1,3)); v.push(L(12,2,0,3));
+  rect(v,24,2,3,3,3,1); v.push(L(25,4,3,4)); // goal pad + goal
+  return {id:'parkour-s1',title:'블록 파쿠르 시즌 1 — 하늘 섬 건너기',creator:'파쿠르랩',creatorId:'parkourlab',
+    genre:'파쿠르',difficulty:'어려움',plays:1280000,likes:98000,desc:'떨어진 발판을 점프로 건너 골 발판에 도달하세요. 공중 코인 4개는 보너스입니다. 모서리에서 한 박자 멈췄다 뛰는 게 핵심입니다.',
+    voxels:v,spawn:{x:1,y:1,z:2}};
+}
+function seedCoin(){
+  var v=[]; rect(v,0,0,14,14,0,1);
+  // scatter walls
+  var walls=[[3,3],[3,4],[8,2],[10,9],[10,10],[5,10],[6,6],[7,6],[11,4]];
+  walls.forEach(function(w){ v.push(L(w[0],1,w[1],2)); });
+  var coins=[[1,12],[4,8],[6,2],[9,5],[12,1],[12,12],[2,6],[8,11],[11,7],[5,13],[13,5],[0,9]];
+  coins.forEach(function(c){ v.push(L(c[0],1,c[1],3)); });
+  v.push(L(13,1,13,4));
+  return {id:'coin-rush',title:'코인 러시 — 숲속 대작전',creator:'Voxel Street',creatorId:'voxelstreet',
+    genre:'수집',difficulty:'보통',plays:512000,likes:44000,desc:'12개의 코인을 가장 빠르게 모아 골에 도착하세요. 벽을 피해 최단 경로를 찾는 게 기록 단축의 관건입니다.',
+    voxels:v,spawn:{x:0,y:1,z:0}};
+}
+var SEED=[seedTutorial(),seedParkour(),seedCoin()];
+
+function allLevels(){ return SEED.concat(db.myLevels); }
+function getLevel(id){ var a=allLevels(); for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i]; return null; }
+function coinCount(lv){ var c=0; lv.voxels.forEach(function(b){if(b.t===3)c++;}); return c; }
+function playCount(lv){ return (lv.plays||0)+(db.plays[lv.id]||0); }
+function likeCount(lv){ return (lv.likes||0)+(db.likes[lv.id]?1:0); }
+
+/* ============================= thumbnails (top-down minimap) ============================= */
+function drawThumb(cv,lv){
+  var ctx=cv.getContext('2d'); var W=cv.width,H=cv.height;
+  var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#1a2432'); g.addColorStop(1,'#111823');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  var minx=1e9,maxx=-1e9,minz=1e9,maxz=-1e9;
+  lv.voxels.forEach(function(b){ if(b.x<minx)minx=b.x; if(b.x>maxx)maxx=b.x; if(b.z<minz)minz=b.z; if(b.z>maxz)maxz=b.z; });
+  if(minx>maxx){return;}
+  var bw=maxx-minx+1, bd=maxz-minz+1, pad=10;
+  var s=Math.min((W-pad*2)/bw,(H-pad*2)/bd); s=Math.max(2,s);
+  var ox=(W-bw*s)/2-minx*s, oy=(H-bd*s)/2-minz*s;
+  // ground first, then walls, then coins/goal
+  function cell(b,col,size){ ctx.fillStyle=col; var px=ox+b.x*s, py=oy+b.z*s; var m=(s-size*s)/2; ctx.fillRect(px+m,py+m,s*size,s*size); }
+  lv.voxels.forEach(function(b){ if(b.t===1)cell(b,'#2f5f3f',0.96); });
+  lv.voxels.forEach(function(b){ if(b.t===2)cell(b,'#5a6678',0.9); });
+  lv.voxels.forEach(function(b){ if(b.t===3){ctx.fillStyle='#ffb02e';var px=ox+(b.x+0.5)*s,py=oy+(b.z+0.5)*s;ctx.beginPath();ctx.arc(px,py,Math.max(2,s*0.28),0,7);ctx.fill();} });
+  lv.voxels.forEach(function(b){ if(b.t===4){ctx.fillStyle='#27d4b8';var px=ox+(b.x+0.5)*s,py=oy+(b.z+0.5)*s;ctx.beginPath();ctx.arc(px,py,Math.max(3,s*0.4),0,7);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=1.5;ctx.stroke();} });
+  if(lv.spawn){ctx.strokeStyle='#ffffff';ctx.lineWidth=2;var sx=ox+(lv.spawn.x+0.5)*s,sy=oy+(lv.spawn.z+0.5)*s;ctx.beginPath();ctx.arc(sx,sy,Math.max(3,s*0.3),0,7);ctx.stroke();}
+}
+
+/* ============================= router ============================= */
+function go(route){ location.hash='#'+route; }
+var activeSession=null;
+function teardown(){ if(activeSession){ try{activeSession.dispose();}catch(e){} activeSession=null; } }
+function parseHash(){ var h=location.hash.replace(/^#/,'')||'home'; var p=h.split('/'); return {name:p[0],arg:p[1]}; }
+function render(){
+  teardown();
+  var r=parseHash(); var m=document.getElementById('main'); m.scrollTop=0;
+  buildNav(r.name);
+  if(r.name==='watch'&&r.arg){ renderWatch(m,r.arg); }
+  else if(r.name==='create'){ renderEditor(m); }
+  else if(r.name==='channel'){ renderChannel(m); }
+  else if(r.name==='ranking'){ renderRanking(m); }
+  else if(r.name==='shop'){ renderShop(m); }
+  else renderHome(m,r.name);
+}
+window.addEventListener('hashchange',render);
+
+/* ============================= nav ============================= */
+var NAVS=[['home','추천','M3 11l9-8 9 8M5 10v10h14V10'],
+          ['shorts','숏폼','M4 6h16v12H4zM10 9l5 3-5 3z'],
+          ['world','월드','M12 3a9 9 0 100 18 9 9 0 000-18M3 12h18M12 3c3 4 3 14 0 18M12 3c-3 4-3 14 0 18'],
+          ['ranking','랭킹','M6 21V9M12 21V4M18 21v-7'],
+          ['shop','상점','M4 8h16l-1.3 11a2 2 0 01-2 1.8H7.3a2 2 0 01-2-1.8zM8 8V6a4 4 0 018 0v2'],
+          ['channel','내 채널','M12 8a4 4 0 100-8 4 4 0 000 8M4 21c0-4 4-6 8-6s8 2 8 6']];
+function buildNav(active){
+  var n=document.getElementById('nav'); n.innerHTML='';
+  NAVS.forEach(function(it){
+    var b=document.createElement('button'); b.className='navitem'+((active===it[0]||(active==='watch'&&it[0]==='home'))?' on':'');
+    b.innerHTML='<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="'+it[2]+'"/></svg><span>'+it[1]+'</span>';
+    b.onclick=function(){go(it[0]==='channel'?'channel':it[0]);}; n.appendChild(b);
+  });
+  var note=document.createElement('div'); note.className='navnote';
+  note.innerHTML='에디터로 만든 블록 레벨을 브라우저에서 바로 플레이하고 공유하는 플랫폼입니다. STUDIO ig';
+  n.appendChild(note);
+}
+
+/* ============================= home / feed ============================= */
+var feedFilter='전체';
+function renderHome(m,route){
+  var title=route==='shorts'?'숏폼':route==='world'?'월드':'추천';
+  var sub=route==='shorts'?'60초 안에 끝나는 짧은 레벨':route==='world'?'크리에이터가 만든 월드':'지금 뜨는 블록 레벨';
+  var lv=allLevels();
+  var genres=['전체']; lv.forEach(function(l){ if(genres.indexOf(l.genre)<0)genres.push(l.genre); });
+  var html='<div class="wrap"><div class="sechead"><h2>'+title+'</h2><p>'+sub+'</p></div>';
+  html+='<div class="chips">'+genres.map(function(g){return '<button class="chip'+(g===feedFilter?' on':'')+'" data-g="'+g+'">'+g+'</button>';}).join('')+'</div>';
+  html+='<div class="grid" id="feed"></div></div>';
+  m.innerHTML=html;
+  m.querySelectorAll('.chip').forEach(function(c){ c.onclick=function(){ feedFilter=c.getAttribute('data-g'); renderHome(m,route); }; });
+  var feed=document.getElementById('feed');
+  var list=lv.filter(function(l){return feedFilter==='전체'||l.genre===feedFilter;});
+  list.sort(function(a,b){return (isBoosted(b.id)?1:0)-(isBoosted(a.id)?1:0);});
+  if(!list.length){ feed.innerHTML='<div class="empty" style="grid-column:1/-1"><h3>레벨이 없습니다</h3><p>만들기로 첫 레벨을 올려보세요.</p></div>'; return; }
+  list.forEach(function(l){ feed.appendChild(makeCard(l)); });
+}
+function makeCard(l){
+  var c=document.createElement('button'); c.className='card'; c.onclick=function(){go('watch/'+l.id);};
+  var diff=l.difficulty, dc=DIFFCOL[diff]||'var(--muted)';
+  c.innerHTML=
+   '<div class="thumb"><canvas width="248" height="155"></canvas>'+
+     '<span class="plv"><b style="background:'+dc+'"></b>'+diff+'</span>'+
+     (isBoosted(l.id)?'<span class="plv" style="left:auto;right:8px;background:rgba(255,176,46,.92);color:#1a1304">★ 부스트</span>':'')+
+     '<span class="dur">'+coinCount(l)+' 코인</span></div>'+
+   '<div class="meta"><div class="ava" style="background:'+avaColor(l.creatorId)+'">'+l.creator.charAt(0)+'</div>'+
+     '<div class="mtext"><div class="ctitle">'+esc(l.title)+'</div>'+
+     '<div class="csub">'+esc(l.creator)+(l.verified?' ✔':'')+'</div>'+
+     '<div class="csub"><span class="vf">플레이 '+fmt(playCount(l))+'회</span> · '+l.genre+'</div></div></div>';
+  var cv=c.querySelector('canvas'); drawThumb(cv,l);
+  return c;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+/* ============================= search ============================= */
+document.getElementById('q').addEventListener('keydown',function(e){
+  if(e.key==='Enter'){ var kw=this.value.trim(); go('home'); setTimeout(function(){
+    var m=document.getElementById('main'); var list=allLevels().filter(function(l){return !kw||l.title.indexOf(kw)>=0||l.creator.indexOf(kw)>=0||l.genre.indexOf(kw)>=0;});
+    m.innerHTML='<div class="wrap"><div class="sechead"><h2>검색</h2><p>"'+esc(kw)+'" · '+list.length+'개</p></div><div class="grid" id="feed"></div></div>';
+    var feed=document.getElementById('feed'); if(!list.length){feed.innerHTML='<div class="empty" style="grid-column:1/-1"><h3>결과가 없습니다</h3></div>';}
+    list.forEach(function(l){feed.appendChild(makeCard(l));});
+  },30); }
+});
+
+/* ============================= login ============================= */
+function login(){
+  if(db.nick){ if(confirmInline()){} return; }
+  var name=prompt? null : null; // prompt blocked in artifact; use inline
+  openNickDialog();
+}
+function confirmInline(){ openNickDialog(); return true; }
+function openNickDialog(){
+  var cur=db.nick||'';
+  var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px"><h3 style="font-size:19px">닉네임 설정</h3><p>플레이 기록과 댓글에 표시됩니다.</p><input id="nk" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:14px" placeholder="닉네임" value="'+esc(cur)+'"><div class="obtns"><button class="btn" id="nkc">취소</button><button class="btn brand" id="nko">저장</button></div></div>';
+  document.body.appendChild(wrap);
+  var inp=wrap.querySelector('#nk'); inp.focus();
+  function close(){ wrap.remove(); }
+  wrap.querySelector('#nkc').onclick=close;
+  wrap.onclick=function(e){ if(e.target===wrap)close(); };
+  wrap.querySelector('#nko').onclick=function(){ var v=inp.value.trim(); if(v){db.nick=v;saveDB();updateLoginBtn();toast('환영합니다, '+v+'님');} close(); };
+  inp.addEventListener('keydown',function(e){ if(e.key==='Enter')wrap.querySelector('#nko').click(); });
+}
+function updateLoginBtn(){ document.getElementById('loginLbl').textContent=db.nick||'로그인'; }
+function me(){ return db.nick||'게스트'; }
+
+/* ============================= WATCH + PLAYER ============================= */
+function renderWatch(m,id){
+  var lv=getLevel(id); if(!lv){ m.innerHTML='<div class="wrap"><div class="empty"><h3>레벨을 찾을 수 없습니다</h3></div></div>'; return; }
+  db.plays[id]=(db.plays[id]||0)+1; saveDB();
+  var liked=!!db.likes[id], subbed=!!db.subs[lv.creatorId];
+  var recs=allLevels().filter(function(l){return l.id!==id;});
+  var cmts=db.comments[id]||[];
+  var html='<div class="wrap"><div class="watch"><div class="col-main">'+
+    '<div class="player" id="pl">'+
+      '<canvas id="glcv"></canvas>'+
+      '<div class="hud"><div class="row">'+
+        '<div class="stat"><svg width="15" height="15" viewBox="0 0 24 24" fill="#ffb02e"><circle cx="12" cy="12" r="9"/></svg><span id="hCoin">0/'+coinCount(lv)+'</span></div>'+
+        '<div class="stat"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="hTime">0:00.00</span></div></div>'+
+        '<div class="hint">WASD 이동 · Space 점프 · 화면 드래그로 시점 · R 재시작</div>'+
+        '<div class="ctrlbtn" id="joy"><div class="knob"></div></div>'+
+        '<div class="ctrlbtn" id="jump">점프</div>'+
+        '<div class="overlay" id="startOv"><div class="ocard"><h3>'+esc(lv.title)+'</h3><p>'+coinCount(lv)+'개의 코인을 모아 골(청록 블록)에 도착하세요.</p><div class="obtns"><button class="btn brand big" id="playBtn">▶ 플레이</button></div></div></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="wtitle">'+esc(lv.title)+'</div>'+
+    '<div class="actionbar"><div class="chan"><div class="ava" style="background:'+avaColor(lv.creatorId)+'">'+lv.creator.charAt(0)+'</div>'+
+      '<div><div class="nm">'+esc(lv.creator)+(lv.verified?' <svg width="14" height="14" viewBox="0 0 24 24" fill="#27d4b8"><path d="M12 2l2.4 1.8 3-.2 1 2.8 2.6 1.6-1 2.8 1 2.8-2.6 1.6-1 2.8-3-.2L12 22l-2.4-1.8-3 .2-1-2.8L3 14.2l1-2.8-1-2.8 2.6-1.6 1-2.8 3 .2z"/><path d="M8.5 12l2.5 2.5 4.5-4.5" stroke="#07100e" stroke-width="2" fill="none"/></svg>':'')+'</div>'+
+      '<div class="sb">구독자 '+fmt(380000+(lv.creatorId.length*13000))+'명</div></div>'+
+      '<button class="pill'+(subbed?' on':'')+'" id="subBtn">'+(subbed?'구독중':'구독')+'</button></div>'+
+      '<button class="pill" id="likeBtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="'+(liked?'#ffb02e':'none')+'" stroke="currentColor" stroke-width="2"><path d="M7 10v11H3V10zM7 10l4-8c1.5 0 2.5 1 2.5 2.5V8h5a2 2 0 012 2.3l-1.3 8A2 2 0 0117 20H7"/></svg><span id="likeN">'+fmt(likeCount(lv))+'</span></button>'+
+      '<button class="pill" id="tipBtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M9.5 12h5M12 9.5v5"/></svg>후원 10</button>'+
+      '<button class="pill" onclick="shareLevel(\''+id+'\')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>공유</button>'+
+      '<button class="pill" onclick="go(\'ranking\')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 21V9M12 21V4M18 21v-7"/></svg>랭킹</button>'+
+      '<div class="tags"><span class="tag gen">'+lv.genre+'</span><span class="tag" style="color:'+(DIFFCOL[lv.difficulty]||'')+'">'+lv.difficulty+'</span></div>'+
+    '</div>'+
+    '<div class="desc"><span class="st">플레이 '+fmt(playCount(lv))+'회</span><span class="st">코인 '+coinCount(lv)+'</span><span class="st">블록 '+lv.voxels.length+'</span><br>'+esc(lv.desc||'')+'</div>'+
+    '<div class="comments"><h3>댓글 '+cmts.length+'개</h3>'+
+      '<div class="cform"><input id="cin" placeholder="댓글 추가…" autocomplete="off"><button class="btn brand" id="cbtn">등록</button></div>'+
+      '<div id="clist"></div></div>'+
+    '</div>'+
+    '<aside class="side"><h3>다음 레벨</h3><div id="recs"></div></aside>'+
+  '</div></div>';
+  m.innerHTML=html;
+  // recs
+  var rc=document.getElementById('recs');
+  recs.forEach(function(l){ var b=document.createElement('button'); b.className='srec'; b.onclick=function(){go('watch/'+l.id);};
+    b.innerHTML='<div class="st"><canvas width="150" height="94"></canvas></div><div class="si"><div class="t">'+esc(l.title)+'</div><div class="s">'+esc(l.creator)+'<br>플레이 '+fmt(playCount(l))+'회</div></div>';
+    drawThumb(b.querySelector('canvas'),l); rc.appendChild(b); });
+  // comments
+  renderComments(id);
+  document.getElementById('cbtn').onclick=function(){ postComment(id); };
+  document.getElementById('cin').addEventListener('keydown',function(e){if(e.key==='Enter')postComment(id);});
+  // like/sub
+  document.getElementById('likeBtn').onclick=function(){ db.likes[id]=!db.likes[id]; saveDB();
+    this.classList.toggle('on',db.likes[id]); this.querySelector('svg').setAttribute('fill',db.likes[id]?'#ffb02e':'none'); document.getElementById('likeN').textContent=fmt(likeCount(lv)); };
+  document.getElementById('subBtn').onclick=function(){ db.subs[lv.creatorId]=!db.subs[lv.creatorId]; saveDB();
+    this.classList.toggle('on',db.subs[lv.creatorId]); this.textContent=db.subs[lv.creatorId]?'구독중':'구독'; };
+  var tb=document.getElementById('tipBtn'); if(tb)tb.onclick=function(){ if(spend(10)){ db.tips[lv.id]=(db.tips[lv.id]||0)+10; saveDB(); toast('크리에이터에게 10 ISC 후원'); } else toast('ISC가 부족합니다'); };
+  // player
+  startPlayer(lv);
+}
+function renderComments(id){
+  var cmts=db.comments[id]||[]; var el=document.getElementById('clist'); if(!el)return; el.innerHTML='';
+  if(!cmts.length){ el.innerHTML='<div style="color:var(--faint);font-size:13px">첫 댓글을 남겨보세요.</div>'; return; }
+  cmts.slice().reverse().forEach(function(c){ var d=document.createElement('div'); d.className='cmt';
+    d.innerHTML='<div class="ava" style="background:'+avaColor(c.n)+'">'+c.n.charAt(0)+'</div><div class="cb"><div class="cn">'+esc(c.n)+'<span>'+c.t+'</span></div><div class="ct">'+esc(c.m)+'</div></div>'; el.appendChild(d); });
+}
+function postComment(id){ var inp=document.getElementById('cin'); var v=inp.value.trim(); if(!v)return;
+  if(!db.comments[id])db.comments[id]=[]; db.comments[id].push({n:me(),m:v,t:'방금'}); saveDB(); inp.value='';
+  var h=document.querySelector('.comments h3'); if(h)h.textContent='댓글 '+db.comments[id].length+'개'; renderComments(id); }
+function shareLevel(id){ var url=location.origin+location.pathname+'#watch/'+id;
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(function(){toast('링크를 복사했습니다');},function(){toast(url);}); } else toast(url); }
+
+/* ---------------- Three.js player engine ---------------- */
+function startPlayer(lv){
+  var canvas=document.getElementById('glcv'); var cont=document.getElementById('pl');
+  var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  var scene=new THREE.Scene(); scene.background=new THREE.Color(0x8fb7d9);
+  scene.fog=new THREE.Fog(0x8fb7d9,24,64);
+  var camera=new THREE.PerspectiveCamera(62,16/9,0.1,200);
+  var hemi=new THREE.HemisphereLight(0xeaf3ff,0x3a4a3a,0.95); scene.add(hemi);
+  var sun=new THREE.DirectionalLight(0xffffff,0.9); sun.position.set(18,34,12); scene.add(sun);
+
+  // build world
+  var solids={}; var coins=[]; var goals=[]; var coinMeshes=[]; var goalMesh=null;
+  var geo=new THREE.BoxGeometry(1,1,1);
+  function key(x,y,z){return x+','+y+','+z;}
+  var matCache={};
+  function mat(t){ if(!matCache[t])matCache[t]=new THREE.MeshLambertMaterial({color:BLOCKCOL[t]}); return matCache[t]; }
+  var gm=new THREE.Group(); scene.add(gm);
+  lv.voxels.forEach(function(b){
+    if(b.t===1||b.t===2){ solids[key(b.x,b.y,b.z)]=true; var mesh=new THREE.Mesh(geo,mat(b.t)); mesh.position.set(b.x+0.5,b.y+0.5,b.z+0.5);
+      // subtle top shade for ground
+      gm.add(mesh);
+      var edge=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:0.12})); edge.position.copy(mesh.position); gm.add(edge);
+    } else if(b.t===3){ coins.push(b); var cm=new THREE.Mesh(new THREE.OctahedronGeometry(0.28),new THREE.MeshLambertMaterial({color:0xffb02e,emissive:0x5a3c00})); cm.position.set(b.x+0.5,b.y+0.55,b.z+0.5); gm.add(cm); coinMeshes.push(cm); }
+    else if(b.t===4){ goals.push(b); var pillar=new THREE.Mesh(new THREE.BoxGeometry(0.9,1.4,0.9),new THREE.MeshLambertMaterial({color:0x27d4b8,emissive:0x064a40,transparent:true,opacity:0.92})); pillar.position.set(b.x+0.5,b.y+0.7,b.z+0.5); gm.add(pillar); goalMesh=pillar; }
+  });
+  // player mesh (simple character block)
+  var pg=new THREE.Group();
+  var body=new THREE.Mesh(new THREE.BoxGeometry(0.56,0.9,0.56),new THREE.MeshLambertMaterial({color:skinCol(db.skin)})); body.position.y=0.75; pg.add(body);
+  var head=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5),new THREE.MeshLambertMaterial({color:0xffd9b0})); head.position.y=1.45; pg.add(head);
+  scene.add(pg);
+
+  function isSolid(x,y,z){ return !!solids[key(x,y,z)]; }
+  var RW=0.3, PH=1.45, GRAV=24, MOVE=5.4, JUMPV=8.6;
+  function boxHit(px,py,pz){
+    var x0=Math.floor(px-RW),x1=Math.floor(px+RW-1e-6),y0=Math.floor(py),y1=Math.floor(py+PH-1e-6),z0=Math.floor(pz-RW),z1=Math.floor(pz+RW-1e-6);
+    for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++)for(var z=z0;z<=z1;z++)if(isSolid(x,y,z))return true; return false;
+  }
+  var P={x:lv.spawn.x+0.5,y:lv.spawn.y,z:lv.spawn.z+0.5,vy:0,onGround:false};
+  var yaw=Math.PI, pitch=0.62, dist=7;
+  var state='idle'; // idle|play|win
+  var t0=0, elapsed=0, coinsGot=0;
+
+  function reset(){ P.x=lv.spawn.x+0.5; P.y=lv.spawn.y; P.z=lv.spawn.z+0.5; P.vy=0; P.onGround=false;
+    coinsGot=0; elapsed=0; t0=performance.now(); coins=[]; lv.voxels.forEach(function(b){if(b.t===3)coins.push(b);});
+    coinMeshes.forEach(function(c){c.visible=true;}); yaw=Math.PI; pitch=0.62;
+    var hc=document.getElementById('hCoin'); if(hc)hc.textContent='0/'+coinCount(lv);
+  }
+  // input
+  var keys={}, joy={x:0,y:0,on:false};
+  function kd(e){ keys[e.key.toLowerCase()]=true; if(e.key===' ')e.preventDefault(); if(e.key.toLowerCase()==='r'&&state==='play')reset(); }
+  function ku(e){ keys[e.key.toLowerCase()]=false; }
+  window.addEventListener('keydown',kd); window.addEventListener('keyup',ku);
+  // look drag on canvas
+  var lookId=null,lx=0,ly=0;
+  canvas.addEventListener('pointerdown',function(e){ lookId=e.pointerId; lx=e.clientX; ly=e.clientY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove',function(e){ if(e.pointerId!==lookId)return; yaw-=(e.clientX-lx)*0.006; pitch-=(e.clientY-ly)*0.006; pitch=Math.max(0.12,Math.min(1.35,pitch)); lx=e.clientX; ly=e.clientY; });
+  canvas.addEventListener('pointerup',function(e){ if(e.pointerId===lookId)lookId=null; });
+  canvas.addEventListener('pointercancel',function(e){ if(e.pointerId===lookId)lookId=null; });
+  // joystick
+  var joyEl=document.getElementById('joy'),knob=joyEl.querySelector('.knob'),joyId=null;
+  function joyMove(e){ var r=joyEl.getBoundingClientRect(); var dx=e.clientX-(r.left+r.width/2), dy=e.clientY-(r.top+r.height/2); var mx=r.width/2-14; var d=Math.hypot(dx,dy); if(d>mx){dx*=mx/d;dy*=mx/d;} knob.style.transform='translate('+dx+'px,'+dy+'px)'; joy.x=dx/mx; joy.y=dy/mx; }
+  joyEl.addEventListener('pointerdown',function(e){ joyId=e.pointerId; joy.on=true; joyEl.setPointerCapture(e.pointerId); joyMove(e); e.stopPropagation(); });
+  joyEl.addEventListener('pointermove',function(e){ if(e.pointerId!==joyId)return; joyMove(e); e.stopPropagation(); });
+  function joyEnd(e){ if(e.pointerId!==joyId)return; joyId=null; joy.on=false; joy.x=0; joy.y=0; knob.style.transform='translate(0,0)'; }
+  joyEl.addEventListener('pointerup',joyEnd); joyEl.addEventListener('pointercancel',joyEnd);
+  // jump button
+  var jumpEl=document.getElementById('jump');
+  jumpEl.addEventListener('pointerdown',function(e){ keys[' ']=true; e.stopPropagation(); setTimeout(function(){keys[' ']=false;},120); });
+
+  function startPlay(){ var ov=document.getElementById('startOv'); if(ov)ov.remove(); state='play'; reset(); earn(EARN.play); }
+  var pb=document.getElementById('playBtn'); if(pb)pb.onclick=startPlay;
+
+  function winScreen(){
+    state='win'; var ms=elapsed;
+    if(!db.times[lv.id])db.times[lv.id]=[]; db.times[lv.id].push({n:me(),ms:ms}); db.times[lv.id].sort(function(a,b){return a.ms-b.ms;}); db.times[lv.id]=db.times[lv.id].slice(0,50); saveDB();
+    var best=db.times[lv.id][0], rank=db.times[lv.id].findIndex(function(x){return x.ms===ms&&x.n===me();})+1;
+    var first=!db.firstClears[lv.id]; if(first){db.firstClears[lv.id]=1;saveDB();}
+    var reward=EARN.clear+Math.round(coinsGot/Math.max(1,coinCount(lv))*10)+(first?EARN.firstClear:0); earn(reward);
+    var ov=document.createElement('div'); ov.className='overlay'; ov.id='winOv';
+    ov.innerHTML='<div class="ocard"><h3>클리어!</h3><div class="big">'+msToClock(ms)+'</div><p>코인 '+coinsGot+'/'+coinCount(lv)+' · 내 순위 '+rank+'위 · 최고 '+msToClock(best.ms)+'</p><div style="font-family:\'IBM Plex Mono\',monospace;color:#ffb02e;font-weight:600;font-size:15px;margin-bottom:12px">+'+reward+' ISC 적립'+(first?' · 첫 클리어 보너스':'')+'</div><div class="obtns"><button class="btn brand" id="retry">다시</button><button class="btn accent" id="rankBtn">랭킹 보기</button></div></div>';
+    document.getElementById('pl').appendChild(ov);
+    ov.querySelector('#retry').onclick=function(){ ov.remove(); startPlay(); };
+    ov.querySelector('#rankBtn').onclick=function(){ go('ranking'); };
+  }
+
+  var last=performance.now(), acc=0, STEP=1/60, raf;
+  function step(dt){
+    // movement intent
+    var ix=0,iz=0;
+    if(keys['w'])iz-=1; if(keys['s'])iz+=1; if(keys['a'])ix-=1; if(keys['d'])ix+=1;
+    if(joy.on){ ix+=joy.x; iz+=joy.y; }
+    var len=Math.hypot(ix,iz); if(len>1){ix/=len;iz/=len;}
+    var fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+    var right=new THREE.Vector3(fwd.z,0,-fwd.x);
+    var mvx=(fwd.x*(-iz)+right.x*ix), mvz=(fwd.z*(-iz)+right.z*ix);
+    var ml=Math.hypot(mvx,mvz); if(ml>0){ mvx=mvx/ml*MOVE*dt; mvz=mvz/ml*MOVE*dt; }
+    // X
+    var nx=P.x+mvx; if(!boxHit(nx,P.y,P.z))P.x=nx; else { if(mvx>0)P.x=Math.floor(nx+RW)-RW-1e-3; else P.x=Math.floor(nx-RW)+1+RW+1e-3; if(boxHit(P.x,P.y,P.z))P.x=nx-mvx; }
+    // Z
+    var nz=P.z+mvz; if(!boxHit(P.x,P.y,nz))P.z=nz; else { if(mvz>0)P.z=Math.floor(nz+RW)-RW-1e-3; else P.z=Math.floor(nz-RW)+1+RW+1e-3; if(boxHit(P.x,P.y,P.z))P.z=nz-mvz; }
+    // gravity / jump
+    if((keys[' ']||keys['spacebar'])&&P.onGround){ P.vy=JUMPV; P.onGround=false; }
+    P.vy-=GRAV*dt; if(P.vy<-30)P.vy=-30;
+    P.onGround=false;
+    var ny=P.y+P.vy*dt;
+    if(!boxHit(P.x,ny,P.z))P.y=ny;
+    else { if(P.vy<0){ P.y=Math.floor(ny)+1; P.onGround=true; } else { P.y=Math.floor(ny+PH)-PH-1e-3; } P.vy=0; }
+    if(P.y<-20){ reset(); } // fell off -> respawn
+    // face movement
+    if(ml>0) pg.rotation.y=Math.atan2(mvx,mvz);
+    // coins
+    for(var i=coins.length-1;i>=0;i--){ var c=coins[i]; var cx=c.x+0.5,cz=c.z+0.5,cy=c.y+0.55;
+      if(Math.abs(P.x-cx)<0.55&&Math.abs(P.z-cz)<0.55&&P.y<cy+0.6&&P.y+PH>cy-0.2){ coins.splice(i,1); coinsGot++; coinMeshes.forEach(function(m){ if(Math.abs(m.position.x-cx)<0.01&&Math.abs(m.position.z-cz)<0.01)m.visible=false; }); var hc=document.getElementById('hCoin'); if(hc)hc.textContent=coinsGot+'/'+coinCount(lv); } }
+    // goal
+    for(var g=0;g<goals.length;g++){ var go2=goals[g]; if(Math.abs(P.x-(go2.x+0.5))<0.7&&Math.abs(P.z-(go2.z+0.5))<0.7&&Math.abs(P.y-go2.y)<1.4){ winScreen(); return; } }
+  }
+  function frame(now){
+    raf=requestAnimationFrame(frame); var dt=(now-last)/1000; last=now; if(dt>0.1)dt=0.1;
+    if(state==='play'){ acc+=dt; while(acc>=STEP){ step(STEP); if(state==='win')break; acc-=STEP; } elapsed=now-t0; var ht=document.getElementById('hTime'); if(ht)ht.textContent=msToClock(elapsed); }
+    // animate coins + goal
+    coinMeshes.forEach(function(m){ m.rotation.y+=dt*2; });
+    if(goalMesh)goalMesh.rotation.y+=dt*0.8;
+    pg.position.set(P.x,P.y,P.z);
+    // camera
+    var T=new THREE.Vector3(P.x,P.y+1.1,P.z);
+    var cp=new THREE.Vector3(T.x-Math.sin(yaw)*Math.cos(pitch)*dist, T.y+Math.sin(pitch)*dist, T.z-Math.cos(yaw)*Math.cos(pitch)*dist);
+    camera.position.lerp(cp,0.4); camera.lookAt(T);
+    renderer.render(scene,camera);
+  }
+  function resize(){ var w=cont.clientWidth,h=cont.clientHeight; if(!w||!h)return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+  var ro=new ResizeObserver(resize); ro.observe(cont); resize();
+  raf=requestAnimationFrame(frame);
+
+  activeSession={ dispose:function(){ cancelAnimationFrame(raf); window.removeEventListener('keydown',kd); window.removeEventListener('keyup',ku); ro.disconnect(); try{renderer.dispose();geo.dispose();}catch(e){} } };
+}
+
+/* ============================= EDITOR ============================= */
+function renderEditor(m){
+  var cur={t:1}; // current tool type; 0=erase
+  m.innerHTML='<div class="edwrap">'+
+    '<div class="edbar" id="edbar"></div>'+
+    '<div class="edcanvas" id="edc"><canvas id="edgl"></canvas>'+
+      '<div class="edhint">좌클릭/탭: 블록 놓기 · 우클릭 또는 지우개: 제거 · 드래그: 시점 회전 · 휠: 확대</div>'+
+    '</div>'+
+    '<div class="edfoot">'+
+      '<input class="t" id="edtitle" placeholder="레벨 제목" value="새 블록 레벨">'+
+      '<select id="edgenre"><option>파쿠르</option><option>수집</option><option>입문</option><option>어드벤처</option><option>스피드런</option></select>'+
+      '<select id="eddiff"><option>쉬움</option><option selected>보통</option><option>어려움</option><option>전문가</option></select>'+
+      '<div class="spacer"></div>'+
+      '<label class="btn" style="cursor:pointer">에셋 임포트<input id="edimport" type="file" accept=".json,.vox,application/json" hidden></label>'+
+      '<button class="btn" id="edtest">▶ 테스트</button>'+
+      '<button class="btn brand" id="edsave">업로드</button>'+
+    '</div></div>';
+  var tools=[['지면',1,'#3fae5b'],['벽',2,'#6d7a8c'],['코인',3,'#ffb02e'],['골',4,'#27d4b8'],['시작',5,'#ffffff'],['지우개',0,'#f0556b']];
+  var bar=document.getElementById('edbar');
+  tools.forEach(function(tl){ var b=document.createElement('button'); b.className='tool'+(tl[1]===cur.t?' on':''); b.innerHTML='<b class="sw" style="background:'+tl[2]+'"></b>'+tl[0];
+    b.onclick=function(){ cur.t=tl[1]; bar.querySelectorAll('.tool').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); }; bar.appendChild(b); });
+
+  // three editor scene
+  var canvas=document.getElementById('edgl'); var cont=document.getElementById('edc');
+  var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  var scene=new THREE.Scene(); scene.background=new THREE.Color(0x0e141d);
+  var camera=new THREE.PerspectiveCamera(55,1,0.1,500);
+  scene.add(new THREE.HemisphereLight(0xdfe9ff,0x30383f,1.0));
+  var sun=new THREE.DirectionalLight(0xffffff,0.75); sun.position.set(10,20,8); scene.add(sun);
+  // ground plane + grid
+  var GS=24;
+  var grid=new THREE.GridHelper(GS,GS,0x33465c,0x202a36); grid.position.set(GS/2,0,GS/2); scene.add(grid);
+  var plane=new THREE.Mesh(new THREE.PlaneGeometry(GS,GS),new THREE.MeshBasicMaterial({visible:false})); plane.rotation.x=-Math.PI/2; plane.position.set(GS/2,0,GS/2); scene.add(plane);
+  var geo=new THREE.BoxGeometry(1,1,1); var edgeGeo=new THREE.EdgesGeometry(geo);
+  var voxels={}; // key -> {t,mesh,edge}
+  var spawn={x:3,y:1,z:3}; var spawnMarker=null;
+  function key(x,y,z){return x+','+y+','+z;}
+  function matFor(t){ return new THREE.MeshLambertMaterial({color:BLOCKCOL[t]||0xffffff}); }
+  function addVox(x,y,z,t){ if(t===5){ setSpawn(x,y,z); return; } var k=key(x,y,z); if(voxels[k])removeVox(x,y,z);
+    var mesh=new THREE.Mesh(geo,matFor(t)); mesh.position.set(x+0.5,y+0.5,z+0.5); scene.add(mesh);
+    var edge=new THREE.LineSegments(edgeGeo,new THREE.LineBasicMaterial({color:0x0a0e14,transparent:true,opacity:0.35})); edge.position.copy(mesh.position); scene.add(edge);
+    voxels[k]={t:t,mesh:mesh,edge:edge}; }
+  function removeVox(x,y,z){ var k=key(x,y,z); var v=voxels[k]; if(!v)return; scene.remove(v.mesh); scene.remove(v.edge); v.mesh.geometry===geo||v.mesh.geometry.dispose&&v.mesh.geometry.dispose(); v.mesh.material.dispose(); delete voxels[k]; }
+  function setSpawn(x,y,z){ spawn={x:x,y:y,z:z}; if(!spawnMarker){ spawnMarker=new THREE.Mesh(new THREE.BoxGeometry(0.7,1.4,0.7),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.5,wireframe:true})); scene.add(spawnMarker); } spawnMarker.position.set(x+0.5,y+0.7,z+0.5); }
+  // starter platform (realistic working state)
+  for(var x=0;x<8;x++)for(var z=0;z<8;z++)addVox(x,0,z,1);
+  setSpawn(3,1,3);
+
+  // camera orbit
+  var tgt=new THREE.Vector3(GS/2*0.4,1,GS/2*0.4), oyaw=0.7,opitch=0.9,odist=20;
+  function updCam(){ var cx=tgt.x+Math.sin(oyaw)*Math.cos(opitch)*odist, cy=tgt.y+Math.sin(opitch)*odist, cz=tgt.z+Math.cos(oyaw)*Math.cos(opitch)*odist; camera.position.set(cx,cy,cz); camera.lookAt(tgt); }
+  var ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
+  var dragId=null,px=0,py=0,moved=0,btn=0;
+  canvas.addEventListener('pointerdown',function(e){ dragId=e.pointerId; px=e.clientX; py=e.clientY; moved=0; btn=e.button; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove',function(e){ if(e.pointerId!==dragId)return; var dx=e.clientX-px,dy=e.clientY-py; moved+=Math.abs(dx)+Math.abs(dy);
+    oyaw-=dx*0.007; opitch=Math.max(0.2,Math.min(1.45,opitch-dy*0.007)); px=e.clientX; py=e.clientY; updCam(); });
+  canvas.addEventListener('pointerup',function(e){ if(e.pointerId!==dragId)return; var wasBtn=btn; dragId=null; if(moved<6){ doEdit(e,wasBtn===2||cur.t===0); } });
+  canvas.addEventListener('contextmenu',function(e){e.preventDefault();});
+  canvas.addEventListener('wheel',function(e){ e.preventDefault(); odist=Math.max(6,Math.min(48,odist+ (e.deltaY>0?2:-2))); updCam(); },{passive:false});
+  function doEdit(e,erase){
+    var r=canvas.getBoundingClientRect(); ndc.x=((e.clientX-r.left)/r.width)*2-1; ndc.y=-((e.clientY-r.top)/r.height)*2+1;
+    ray.setFromCamera(ndc,camera);
+    var meshes=[plane]; for(var k in voxels)meshes.push(voxels[k].mesh);
+    var hits=ray.intersectObjects(meshes,false); if(!hits.length)return;
+    var h=hits[0];
+    if(erase){ if(h.object!==plane){ var p=h.object.position; removeVox(Math.floor(p.x),Math.floor(p.y),Math.floor(p.z)); } return; }
+    var cx,cy,cz;
+    if(h.object===plane){ cx=Math.floor(h.point.x); cy=0; cz=Math.floor(h.point.z); }
+    else { var n=h.face.normal; var p=h.object.position; cx=Math.floor(p.x+n.x); cy=Math.floor(p.y+n.y); cz=Math.floor(p.z+n.z); }
+    if(cx<0||cz<0||cx>=GS||cz>=GS||cy<0||cy>18)return;
+    addVox(cx,cy,cz,cur.t);
+  }
+  updCam();
+  var raf; function frame(){ raf=requestAnimationFrame(frame); if(spawnMarker)spawnMarker.rotation.y+=0.01; renderer.render(scene,camera); }
+  function resize(){ var w=cont.clientWidth,h=cont.clientHeight; if(!w||!h)return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+  var ro=new ResizeObserver(resize); ro.observe(cont); resize(); frame();
+
+  function collect(){ var vox=[]; var hasGoal=false; for(var k in voxels){ var v=voxels[k]; var p=v.mesh.position; vox.push(L(Math.floor(p.x),Math.floor(p.y),Math.floor(p.z),v.t)); if(v.t===4)hasGoal=true; }
+    return {vox:vox,hasGoal:hasGoal}; }
+  function buildLevel(){ var c=collect();
+    var lv={ id:'my-'+Date.now(), title:document.getElementById('edtitle').value.trim()||'새 블록 레벨',
+      creator:me(), creatorId:'me_'+(db.nick||'guest'), genre:document.getElementById('edgenre').value, difficulty:document.getElementById('eddiff').value,
+      plays:0, likes:0, desc:'에디터로 제작한 레벨입니다.', voxels:c.vox, spawn:spawn, mine:true };
+    return {lv:lv,hasGoal:c.hasGoal}; }
+  document.getElementById('edtest').onclick=function(){ var r=buildLevel(); if(!r.hasGoal){toast('골 블록을 1개 이상 배치하세요');return;} window._testLevel=r.lv; teardown();
+    // render a temporary watch using the test level
+    renderWatchTemp(r.lv); };
+  document.getElementById('edsave').onclick=function(){ var r=buildLevel(); if(!r.hasGoal){toast('골 블록을 1개 이상 배치하세요');return;}
+    if(!r.lv.voxels.some(function(b){return b.t===1||b.t===2;})){toast('지면 블록을 배치하세요');return;}
+    db.myLevels.push(r.lv); saveDB(); toast('업로드 완료'); go('watch/'+r.lv.id); };
+  document.getElementById('edimport').onchange=function(e){ var f=e.target.files&&e.target.files[0]; if(!f)return; var rd=new FileReader();
+    rd.onload=function(){ try{ var data=JSON.parse(rd.result); var vox=data.voxels||data.vox||[]; if(!vox.length){toast('복셀 데이터가 없습니다');return;}
+      Object.keys(voxels).forEach(function(k){ var p=voxels[k].mesh.position; removeVox(Math.floor(p.x),Math.floor(p.y),Math.floor(p.z)); });
+      vox.forEach(function(b){ var x=b.x|0,y=b.y|0,z=b.z|0; if(x>=0&&z>=0&&x<GS&&z<GS&&y>=0&&y<=18)addVox(x,y,z,b.t||1); });
+      if(data.spawn)setSpawn(data.spawn.x|0,data.spawn.y|0,data.spawn.z|0);
+      if(data.title&&document.getElementById('edtitle'))document.getElementById('edtitle').value=data.title;
+      toast('임포트 완료 ('+vox.length+' 블록)'); }catch(err){ toast('JSON 파싱 실패'); } };
+    rd.readAsText(f); e.target.value=''; };
+
+  activeSession={ dispose:function(){ cancelAnimationFrame(raf); ro.disconnect(); try{renderer.dispose();}catch(e){} } };
+}
+function renderWatchTemp(lv){ // play an unsaved test level
+  var m=document.getElementById('main'); location.hash='#create'; // keep hash on create, render manual
+  // temporarily inject level into SEED-like getter
+  var old=getLevel; // not replacing; instead render directly
+  m.innerHTML=''; var holder=document.createElement('div'); m.appendChild(holder);
+  // reuse renderWatch by temporarily adding to a lookup
+  _temp=lv; renderWatchFor(m,lv,true);
+}
+var _temp=null;
+function renderWatchFor(m,lv,isTest){
+  // minimal watch wrapper for test play
+  m.innerHTML='<div class="wrap"><div style="max-width:960px;margin:0 auto">'+
+    '<div class="player" id="pl"><canvas id="glcv"></canvas>'+
+    '<div class="hud"><div class="row"><div class="stat"><svg width="15" height="15" viewBox="0 0 24 24" fill="#ffb02e"><circle cx="12" cy="12" r="9"/></svg><span id="hCoin">0/'+coinCount(lv)+'</span></div>'+
+    '<div class="stat"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="hTime">0:00.00</span></div></div>'+
+    '<div class="hint">테스트 플레이 · WASD · Space · R 재시작</div>'+
+    '<div class="ctrlbtn" id="joy"><div class="knob"></div></div><div class="ctrlbtn" id="jump">점프</div>'+
+    '<div class="overlay" id="startOv"><div class="ocard"><h3>테스트 플레이</h3><p>저장 전 레벨을 플레이해봅니다.</p><div class="obtns"><button class="btn brand big" id="playBtn">▶ 플레이</button></div></div></div></div></div>'+
+    '<div style="display:flex;gap:10px;margin-top:16px"><button class="btn" onclick="go(\'create\')">◀ 에디터로</button></div>'+
+  '</div></div>';
+  startPlayer(lv);
+}
+
+/* ============================= CHANNEL ============================= */
+var chanTab='all';
+function renderChannel(m){
+  var nick=db.nick||'게스트'; var mine=db.myLevels;
+  var liked=allLevels().filter(function(l){return db.likes[l.id];});
+  var cleared=allLevels().filter(function(l){return (db.times[l.id]||[]).some(function(t){return t.n===nick;});});
+  var html='<div class="wrap"><div class="chead"><div class="ava" style="background:'+avaColor(nick)+'">'+nick.charAt(0)+'</div>'+
+    '<div><h1>'+esc(nick)+'</h1><div class="s">@'+(db.nick?esc(db.nick.toLowerCase()):'guest')+' · 업로드 '+mine.length+' · 클리어 '+cleared.length+'</div>'+
+    '<div style="margin-top:10px;display:flex;gap:8px"><button class="btn brand" onclick="go(\'create\')">+ 레벨 만들기</button>'+(db.nick?'':'<button class="btn" onclick="login()">닉네임 설정</button>')+'</div></div></div>';
+  html+='<div class="ctabs">'+[['all','전체'],['mine','내 레벨'],['cleared','클리어'],['liked','좋아요']].map(function(t){return '<button class="ctab'+(t[0]===chanTab?' on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
+  html+='<div class="grid" id="cfeed"></div></div>';
+  m.innerHTML=html;
+  m.querySelectorAll('.ctab').forEach(function(t){ t.onclick=function(){ chanTab=t.getAttribute('data-t'); renderChannel(m); }; });
+  var list= chanTab==='mine'?mine : chanTab==='liked'?liked : chanTab==='cleared'?cleared : mine.concat(liked.filter(function(l){return mine.indexOf(l)<0;}));
+  var feed=document.getElementById('cfeed');
+  if(!list.length){ feed.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg><h3>아직 콘텐츠가 없습니다</h3><p>만들기로 첫 블록 레벨을 올려보세요.</p></div>'; return; }
+  list.forEach(function(l){ feed.appendChild(makeCard(l)); });
+}
+
+/* ============================= RANKING ============================= */
+function renderRanking(m){
+  var lv=allLevels(); var html='<div class="wrap"><div class="sechead"><h2>랭킹</h2><p>레벨별 클리어 타임 기록</p></div><div class="rank">';
+  var any=false;
+  lv.forEach(function(l){ var times=db.times[l.id]; if(!times||!times.length)return; any=true;
+    html+='<div style="margin:22px 0 10px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:2px;background:var(--brand);display:inline-block"></span>'+esc(l.title)+'</div>';
+    times.slice(0,5).forEach(function(t,i){ html+='<div class="rrow'+(i<3?' top'+(i+1):'')+'"><div class="pos">'+(i+1)+'</div><div class="ava" style="width:30px;height:30px;font-size:12px;background:'+avaColor(t.n)+'">'+t.n.charAt(0)+'</div><div class="who">'+esc(t.n)+'</div><div class="tm">'+msToClock(t.ms)+'</div></div>'; });
+  });
+  if(!any){ html+='<div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 21V9M12 21V4M18 21v-7"/></svg><h3>아직 기록이 없습니다</h3><p>레벨을 클리어하면 여기에 타임이 기록됩니다.</p></div>'; }
+  html+='</div></div>'; m.innerHTML=html;
+}
+
+/* ============================= SHOP (ISC) ============================= */
+function renderShop(m){
+  var html='<div class="wrap"><div class="sechead"><h2>상점</h2><p>ISC로 스킨 구매 · 내 레벨 부스트 · 창작자 후원</p></div>';
+  html+='<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:24px;flex-wrap:wrap">'+
+    '<div class="ava" style="width:46px;height:46px;background:linear-gradient(135deg,#ffb02e,#ff8a3c);color:#1a1304;font-weight:700">ISC</div>'+
+    '<div><div style="color:var(--muted);font-size:12px">보유 잔액</div><div style="font-family:var(--mono);font-size:24px;font-weight:600;color:var(--brand)">'+fmt(db.isc||0)+' ISC</div></div>'+
+    '<div style="margin-left:auto;color:var(--faint);font-size:12px;max-width:260px">플레이 +'+EARN.play+' · 클리어 +'+EARN.clear+' · 첫 클리어 보너스 +'+EARN.firstClear+'. 창작자는 자신의 레벨이 플레이될 때 적립됩니다.</div></div>';
+  html+='<h3 style="font-size:16px;margin:0 0 14px">플레이어 스킨</h3><div class="grid" id="skins"></div>';
+  html+='<h3 style="font-size:16px;margin:30px 0 14px">내 레벨 부스트</h3><div id="boostwrap"></div></div>';
+  m.innerHTML=html;
+  var sk=document.getElementById('skins');
+  SKINS.forEach(function(s){
+    var owned=db.skins.indexOf(s.id)>=0, on=db.skin===s.id;
+    var hex='#'+('000000'+s.col.toString(16)).slice(-6);
+    var c=document.createElement('div'); c.style.cssText='background:var(--surface);border:1px solid '+(on?'var(--brand)':'var(--border)')+';border-radius:14px;padding:16px;text-align:center';
+    c.innerHTML='<div style="width:56px;height:56px;border-radius:12px;margin:0 auto 12px;background:'+hex+'"></div><div style="font-weight:600;margin-bottom:10px">'+s.name+'</div>'+
+      (on?'<button class="btn accent" style="width:100%" disabled>장착중</button>':owned?'<button class="btn" style="width:100%" data-eq="'+s.id+'">장착</button>':'<button class="btn brand" style="width:100%" data-buy="'+s.id+'" data-p="'+s.price+'">'+s.price+' ISC</button>');
+    sk.appendChild(c);
+  });
+  sk.querySelectorAll('[data-buy]').forEach(function(b){ b.onclick=function(){ var id=b.getAttribute('data-buy'),p=+b.getAttribute('data-p'); if(spend(p)){ db.skins.push(id); db.skin=id; saveDB(); toast('구매·장착 완료'); renderShop(m);} else toast('ISC가 부족합니다'); }; });
+  sk.querySelectorAll('[data-eq]').forEach(function(b){ b.onclick=function(){ db.skin=b.getAttribute('data-eq'); saveDB(); toast('장착 완료'); renderShop(m); }; });
+  var bw=document.getElementById('boostwrap');
+  if(!db.myLevels.length){ bw.innerHTML='<div class="empty" style="padding:28px"><p>부스트할 내 레벨이 없습니다. 만들기로 레벨을 올려보세요.</p></div>'; }
+  else db.myLevels.forEach(function(l){ var d=document.createElement('div'); d.className='rrow';
+    d.innerHTML='<div class="who">'+esc(l.title)+(isBoosted(l.id)?' <span style="color:var(--brand)">★ 부스트중</span>':'')+'</div><button class="btn brand" data-boost="'+l.id+'">24시간 부스트 · 50 ISC</button>';
+    d.querySelector('[data-boost]').onclick=function(){ if(isBoosted(l.id)){toast('이미 부스트 중입니다');return;} if(spend(50)){ db.boosts[l.id]=Date.now()+864e5; saveDB(); toast('부스트 적용'); renderShop(m);} else toast('ISC가 부족합니다'); };
+    bw.appendChild(d); });
+}
+
+/* ============================= boot ============================= */
+updateLoginBtn(); updateWallet();
+if(!location.hash)location.hash='#home';
+render();
+</script>

@@ -13,6 +13,15 @@ import { randomId } from '../config.js';
 
 const router = Router();
 
+// 서버 전용 컬렉션 보호: '_' 로 시작하는 컬렉션은 범용 데이터 API로 읽기/쓰기 금지
+// (ISC 지갑/원장 등 서버 권한 데이터는 전용 모듈에서만 다룬다)
+router.param('collection', (req, res, next, val) => {
+  if (typeof val === 'string' && val.startsWith('_')) {
+    return res.status(403).json({ error: 'reserved_collection', message: '서버 전용 컬렉션입니다.' });
+  }
+  next();
+});
+
 // 변경 이력 기록 (프로젝트 settings.history !== false 일 때. 기본 on)
 function recordHistory(req, collection, docId, op, data) {
   if (req.project?.settings?.history === false) return;
