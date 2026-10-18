@@ -18,6 +18,7 @@ import dataRoutes from './routes/data.js';
 import fileRoutes from './routes/files.js';
 import adminRoutes, { ensureAdmin } from './routes/admin.js';
 import igplayRoutes from './routes/igplay.js';
+import igmarketRoutes from './routes/igmarket.js';
 
 const MODE = process.env.MODE || 'standalone';
 
@@ -78,6 +79,7 @@ async function main() {
   app.use('/api/auth', authRoutes);
   app.use('/api/data', enforceKeyScope, dataRoutes);
   app.use('/api/igplay', enforceKeyScope, igplayRoutes);
+  app.use('/api/igmarket', enforceKeyScope, igmarketRoutes);
   // 프로젝트 자기 정보 / 사용량 조회
   app.get('/api/project', (req, res) => res.json({ project: { id: req.project.id, name: req.project.name, slug: req.project.slug } }));
   app.get('/api/project/usage', async (req, res, next) => { try { res.json(await getUsage(getRepo(), req.project)); } catch (e) { next(e); } });

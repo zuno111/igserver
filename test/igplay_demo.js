@@ -176,6 +176,37 @@ async function run() {
   r = await j('POST', '/api/igplay/ads/reward', { key, token: player, body: { watchedMs: 5000 } });
   ok('광고 보상 쿨다운(429)', r.status === 429, JSON.stringify(r.data));
 
+  // ===== igMarket (레벨 거래·투자, ISC 공유) =====
+  // 판매 매물 등록(크리에이터 자기 레벨)
+  r = await j('POST', '/api/igmarket/listings', { key, token: creator, body: { kind: 'level', refId: levelId, title: '테스트 코인러시(판매)', mode: 'sale', price: 50 } });
+  ok('마켓 판매 매물 등록', r.status === 201 && r.data.listing?.mode === 'sale' && r.data.listing.price === 50, JSON.stringify(r.data.listing));
+  const saleId = r.data.listing?.id;
+  // 타인 레벨 등록 거부
+  r = await j('POST', '/api/igmarket/listings', { key, token: player, body: { kind: 'level', refId: levelId, title: '탈취', mode: 'sale', price: 10 } });
+  ok('타인 레벨 매물 등록 거부(403/409)', r.status === 403 || r.status === 409);
+  // 본인 매물 구매 거부
+  r = await j('POST', '/api/igmarket/listings/' + saleId + '/buy', { key, token: creator, body: {} });
+  ok('본인 매물 구매 거부', r.status === 400);
+  // 플레이어가 구매 → 소유권 이전 + 판매자 적립(수수료 5%)
+  r = await j('GET', '/api/igplay/wallet', { key, token: creator });
+  const sellerBefore = r.data.wallet.balance;
+  r = await j('POST', '/api/igmarket/listings/' + saleId + '/buy', { key, token: player, body: {} });
+  ok('마켓 구매 성공', r.status === 200, JSON.stringify(r.data));
+  r = await j('GET', '/api/igplay/wallet', { key, token: creator });
+  ok('판매자 적립(가격-수수료)', r.data.wallet.balance === sellerBefore + Math.round(50 * 0.95), JSON.stringify(r.data.wallet));
+  r = await j('GET', '/api/igmarket/listings/' + saleId, { key });
+  ok('매물 상태 sold', r.status === 200 && r.data.listing.status === 'sold');
+  // 투자 매물 등록 + 투자 (투자자 잔액 범위 내 금액으로)
+  r = await j('POST', '/api/igmarket/listings', { key, token: creator, body: { kind: 'project', title: '신작 프로젝트', mode: 'invest', goal: 20 } });
+  ok('마켓 투자 매물 등록', r.status === 201 && r.data.listing?.mode === 'invest' && r.data.listing.goal === 20);
+  const investId = r.data.listing?.id;
+  r = await j('POST', '/api/igmarket/listings/' + investId + '/invest', { key, token: player, body: { amount: 8 } });
+  ok('투자 집행(8)', r.status === 200 && r.data.raised === 8 && r.data.status === 'open', JSON.stringify(r.data));
+  r = await j('POST', '/api/igmarket/listings/' + investId + '/invest', { key, token: player, body: { amount: 12 } });
+  ok('투자 목표 도달 → funded', r.status === 200 && r.data.raised === 20 && r.data.status === 'funded', JSON.stringify(r.data));
+  r = await j('GET', '/api/igmarket/myshares', { key, token: player });
+  ok('내 지분 조회(누적 20)', r.status === 200 && r.data.shares.some((s) => s.amount === 20));
+
   // 보안: 제네릭 /api/data 로 ISC 내부 컬렉션 쓰기 차단
   r = await j('POST', '/api/data/_isc_wallet', { key, token: player, body: { balance: 999999 } });
   ok('내부 컬렉션(_isc_wallet) 쓰기 차단(403)', r.status === 403, JSON.stringify(r.data));

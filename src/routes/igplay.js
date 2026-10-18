@@ -15,6 +15,7 @@ import { getRepo } from '../db/index.js';
 import { requireUser, optionalUser } from '../middleware/auth.js';
 import { broadcast } from '../realtime.js';
 import { randomId } from '../config.js';
+import { getWallet, putWallet, ledger, credit, debit, START_ISC } from '../isc.js';
 
 const router = Router();
 
@@ -24,48 +25,10 @@ const SKINS = {
   classic: { price: 0 }, mint: { price: 60 }, violet: { price: 90 },
   gold: { price: 150 }, crimson: { price: 150 }, ice: { price: 220 },
 };
-const START_ISC = 120;
 const PLAY_COOLDOWN_MS = 60 * 1000;   // 같은 레벨 플레이 적립 쿨다운(어뷰징 방지)
 const BOOST_MS = 24 * 3600 * 1000;
 const BOOST_COST = 50;
 const TIP_MIN = 1, TIP_MAX = 1000;
-
-// ---- 지갑 헬퍼 (서버 전용) ----
-async function getWallet(pid, uid) {
-  const rec = await getRepo().getRecord(pid, '_isc_wallet', uid);
-  if (rec && rec.data) return { balance: rec.data.balance | 0, skins: rec.data.skins || ['classic'], skin: rec.data.skin || 'classic' };
-  return { balance: START_ISC, skins: ['classic'], skin: 'classic' };
-}
-async function putWallet(pid, uid, w) {
-  await getRepo().putRecord({ project_id: pid, collection: '_isc_wallet', doc_id: uid, data: w, owner_id: uid });
-  return w;
-}
-async function ledger(pid, uid, delta, reason, ref) {
-  await getRepo().putRecord({
-    project_id: pid, collection: '_isc_ledger', doc_id: randomId('l_'),
-    data: { uid, delta, reason, ref: ref || null, ts: Date.now() }, owner_id: uid,
-  });
-}
-// 적립: 지갑 반영 + 원장 기록 + 실시간 알림
-async function credit(pid, uid, amount, reason, ref) {
-  if (!uid || amount <= 0) return null;
-  const w = await getWallet(pid, uid);
-  w.balance += amount;
-  await putWallet(pid, uid, w);
-  await ledger(pid, uid, amount, reason, ref);
-  broadcast(pid, `isc:${uid}`, { type: 'isc_changed', balance: w.balance, delta: amount, reason, ts: Date.now() });
-  return w;
-}
-// 차감: 잔액 부족이면 null
-async function debit(pid, uid, amount, reason, ref) {
-  const w = await getWallet(pid, uid);
-  if (w.balance < amount) return null;
-  w.balance -= amount;
-  await putWallet(pid, uid, w);
-  await ledger(pid, uid, -amount, reason, ref);
-  broadcast(pid, `isc:${uid}`, { type: 'isc_changed', balance: w.balance, delta: -amount, reason, ts: Date.now() });
-  return w;
-}
 
 function levelPublic(rec) {
   if (!rec) return null;
