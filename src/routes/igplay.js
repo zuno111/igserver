@@ -72,7 +72,7 @@ function levelPublic(rec) {
   const d = rec.data || {};
   return {
     id: rec.doc_id, title: d.title, creator: d.creator, creatorId: rec.owner_id,
-    genre: d.genre, difficulty: d.difficulty, voxels: d.voxels || [], spawn: d.spawn || null,
+    genre: d.genre, difficulty: d.difficulty, voxels: d.voxels || [], props: d.props || [], spawn: d.spawn || null,
     desc: d.desc || '', plays: d.plays | 0, likes: d.likes | 0,
     boostedUntil: d.boostedUntil || 0, created_at: rec.created_at,
   };
@@ -103,7 +103,7 @@ router.get('/levels/:id', optionalUser, async (req, res, next) => {
 // 업로드
 router.post('/levels', requireUser, async (req, res, next) => {
   try {
-    const { title, genre, difficulty, voxels, spawn, desc } = req.body || {};
+    const { title, genre, difficulty, voxels, spawn, desc, props } = req.body || {};
     if (!title || typeof title !== 'string') return res.status(400).json({ error: 'bad_title', message: '제목이 필요합니다.' });
     if (!Array.isArray(voxels) || !voxels.length) return res.status(400).json({ error: 'bad_voxels', message: '블록 데이터가 필요합니다.' });
     if (!voxels.some((b) => b && (b.t === 1 || b.t === 2))) return res.status(400).json({ error: 'no_ground', message: '지면 블록이 필요합니다.' });
@@ -114,7 +114,8 @@ router.post('/levels', requireUser, async (req, res, next) => {
       title: String(title).slice(0, 80), creator: req.user.name || '익명',
       genre: GENRES.includes(genre) ? genre : '어드벤처',
       difficulty: DIFFS.includes(difficulty) ? difficulty : '보통',
-      voxels: voxels.slice(0, 20000), spawn: spawn || null, desc: String(desc || '').slice(0, 500),
+      voxels: voxels.slice(0, 20000), props: Array.isArray(props) ? props.slice(0, 50) : [],
+      spawn: spawn || null, desc: String(desc || '').slice(0, 500),
       plays: 0, likes: 0, boostedUntil: 0,
     };
     const rec = await repo.putRecord({ project_id: req.project.id, collection: 'levels', doc_id: id, data, owner_id: req.user.uid });

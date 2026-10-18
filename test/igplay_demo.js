@@ -68,6 +68,15 @@ async function run() {
   r = await j('GET', '/api/igplay/levels', { key });
   ok('레벨 피드 조회', r.status === 200 && r.data.levels.some((l) => l.id === levelId));
 
+  // 메시 프롭(webmax OBJ) 포함 레벨 업로드 → 저장·반환 확인
+  const propLvl = sampleLevel('프롭 포함 레벨');
+  propLvl.props = [{ verts: [[0,0,0],[1,0,0],[0,1,0]], faces: [0,1,2], pos: { x: 3, y: 1, z: 3 }, scale: 1, color: 11583684, size: { w: 1, h: 1, d: 1 }, collide: true }];
+  r = await j('POST', '/api/igplay/levels', { key, token: creator, body: propLvl });
+  ok('메시 프롭 레벨 업로드', r.status === 201 && Array.isArray(r.data.level?.props) && r.data.level.props.length === 1, JSON.stringify(r.data.level?.props));
+  const propId = r.data.level?.id;
+  r = await j('GET', '/api/igplay/levels/' + propId, { key });
+  ok('프롭 데이터 보존(verts/faces)', r.status === 200 && r.data.level.props[0].faces.length === 3 && r.data.level.props[0].verts.length === 3, JSON.stringify(r.data.level.props[0]));
+
   // 플레이어 지갑 초기값(120)
   r = await j('GET', '/api/igplay/wallet', { key, token: player });
   ok('지갑 초기 잔액 120', r.status === 200 && r.data.wallet.balance === 120, JSON.stringify(r.data.wallet));

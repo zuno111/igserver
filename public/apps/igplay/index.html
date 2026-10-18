@@ -696,6 +696,58 @@ function buildVoxelMesh(voxels, solids, group){
   return {tris:faceCount*2, faces:faceCount};
 }
 
+/* ---------------- OBJ 파서 (의존성 0) + 복셀화 없는 메시 프롭 ----------------
+   webmax가 내보낸 OBJ(정점 v / 면 f)를 그대로 BufferGeometry로 읽어 레벨에 '메시 프롭'으로 배치.
+   복셀로 뭉개지 않으므로 같은 형상을 훨씬 적은 폴리곤으로 표현한다. 충돌은 AABB(바운딩박스)로 근사. */
+function parseOBJ(text){
+  var vs=[], out=[]; var lines=text.split(/\r?\n/);
+  for(var i=0;i<lines.length;i++){
+    var ln=lines[i]; if(!ln)continue;
+    if(ln.charCodeAt(0)===118&&ln.charCodeAt(1)===32){ // "v "
+      var p=ln.split(/\s+/); vs.push([parseFloat(p[1]),parseFloat(p[2]),parseFloat(p[3])]);
+    } else if(ln.charCodeAt(0)===102&&ln.charCodeAt(1)===32){ // "f "
+      var q=ln.split(/\s+/); var idxs=[];
+      for(var k=1;k<q.length;k++){ if(!q[k])continue; var vi=parseInt(q[k].split('/')[0],10); if(vi<0)vi=vs.length+vi+1; idxs.push(vi-1); }
+      for(var t=1;t+1<idxs.length;t++){ out.push(idxs[0],idxs[t],idxs[t+1]); } // 팬 삼각형화
+    }
+  }
+  if(!vs.length||!out.length)return null;
+  var pos=new Float32Array(out.length*3);
+  for(var j=0;j<out.length;j++){ var v=vs[out[j]]; if(!v){pos[j*3]=0;pos[j*3+1]=0;pos[j*3+2]=0;continue;} pos[j*3]=v[0];pos[j*3+1]=v[1];pos[j*3+2]=v[2]; }
+  var g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.computeVertexNormals();
+  return {geometry:g, tris:out.length/3, verts:vs.length};
+}
+// OBJ 지오메트리를 단위 스케일(targetSize 칸)로 정규화 + 바닥 정렬. {geometry, size:{x,y,z}} 반환
+function normalizeGeo(g, targetSize){
+  g.computeBoundingBox(); var bb=g.boundingBox; var sz=new THREE.Vector3(); bb.getSize(sz);
+  var maxd=Math.max(sz.x,sz.y,sz.z)||1; var s=(targetSize||3)/maxd;
+  var cx=(bb.min.x+bb.max.x)/2, cz=(bb.min.z+bb.max.z)/2, miny=bb.min.y;
+  var m=g.attributes.position.array;
+  for(var i=0;i<m.length;i+=3){ m[i]=(m[i]-cx)*s; m[i+1]=(m[i+1]-miny)*s; m[i+2]=(m[i+2]-cz)*s; }
+  g.attributes.position.needsUpdate=true; g.computeVertexNormals(); g.computeBoundingBox();
+  var ns=new THREE.Vector3(); g.boundingBox.getSize(ns);
+  return {w:ns.x,h:ns.y,d:ns.z};
+}
+// 레벨 props[] → 씬에 메시 + 충돌 박스 목록 반환
+function buildProps(props, group){
+  var boxes=[]; if(!props||!props.length)return boxes;
+  props.forEach(function(pr){
+    if(!pr.verts||!pr.faces)return;
+    // props 저장형: {verts:[[x,y,z]...], faces:[i,i,i...], pos:{x,y,z}, scale, color, size:{w,h,d}}
+    var g=new THREE.BufferGeometry();
+    var pos=new Float32Array(pr.faces.length*3);
+    for(var j=0;j<pr.faces.length;j++){ var v=pr.verts[pr.faces[j]]||[0,0,0]; pos[j*3]=v[0];pos[j*3+1]=v[1];pos[j*3+2]=v[2]; }
+    g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.computeVertexNormals();
+    var sc=pr.scale||1;
+    var mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:pr.color||0xb0b8c4}));
+    mesh.scale.set(sc,sc,sc); mesh.position.set(pr.pos.x,pr.pos.y,pr.pos.z); group.add(mesh);
+    // 충돌 AABB (월드 좌표)
+    var w=(pr.size?pr.size.w:1)*sc, h=(pr.size?pr.size.h:1)*sc, d=(pr.size?pr.size.d:1)*sc;
+    if(pr.collide!==false) boxes.push({minx:pr.pos.x-w/2,maxx:pr.pos.x+w/2,miny:pr.pos.y,maxy:pr.pos.y+h,minz:pr.pos.z-d/2,maxz:pr.pos.z+d/2});
+  });
+  return boxes;
+}
+
 /* ---------------- Three.js player engine ---------------- */
 function startPlayer(lv){
   var canvas=document.getElementById('glcv'); var cont=document.getElementById('pl');
@@ -730,11 +782,19 @@ function startPlayer(lv){
   var head=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5),new THREE.MeshLambertMaterial({color:0xffd9b0})); head.position.y=1.45; pg.add(head);
   scene.add(pg);
 
+  // 메시 프롭(webmax 리얼3D) 렌더 + AABB 충돌 박스
+  var propBoxes=buildProps(lv.props, gm);
   function isSolid(x,y,z){ return !!solids[key(x,y,z)]; }
   var RW=0.3, PH=1.45, GRAV=24, MOVE=5.4, JUMPV=8.6;
+  function hitProp(px,py,pz){
+    for(var i=0;i<propBoxes.length;i++){ var b=propBoxes[i];
+      if(px+RW>b.minx&&px-RW<b.maxx && pz+RW>b.minz&&pz-RW<b.maxz && py+PH>b.miny&&py<b.maxy)return true; }
+    return false;
+  }
   function boxHit(px,py,pz){
     var x0=Math.floor(px-RW),x1=Math.floor(px+RW-1e-6),y0=Math.floor(py),y1=Math.floor(py+PH-1e-6),z0=Math.floor(pz-RW),z1=Math.floor(pz+RW-1e-6);
-    for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++)for(var z=z0;z<=z1;z++)if(isSolid(x,y,z))return true; return false;
+    for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++)for(var z=z0;z<=z1;z++)if(isSolid(x,y,z))return true;
+    return hitProp(px,py,pz);
   }
   var P={x:lv.spawn.x+0.5,y:lv.spawn.y,z:lv.spawn.z+0.5,vy:0,onGround:false};
   var yaw=Math.PI, pitch=0.62, dist=7;
@@ -860,6 +920,7 @@ function renderEditor(m){
       '<select id="eddiff"><option>쉬움</option><option selected>보통</option><option>어려움</option><option>전문가</option></select>'+
       '<div class="spacer"></div>'+
       '<label class="btn" style="cursor:pointer">에셋 임포트<input id="edimport" type="file" accept=".json,.vox,application/json" hidden></label>'+
+      '<label class="btn" style="cursor:pointer" title="webmax 3D 모델(OBJ)을 메시 그대로 배치">3D 임포트(OBJ)<input id="edobj" type="file" accept=".obj" hidden></label>'+
       '<button class="btn" id="edtest">▶ 테스트</button>'+
       '<button class="btn brand" id="edsave">업로드</button>'+
     '</div></div>';
@@ -881,6 +942,7 @@ function renderEditor(m){
   var plane=new THREE.Mesh(new THREE.PlaneGeometry(GS,GS),new THREE.MeshBasicMaterial({visible:false})); plane.rotation.x=-Math.PI/2; plane.position.set(GS/2,0,GS/2); scene.add(plane);
   var geo=new THREE.BoxGeometry(1,1,1); var edgeGeo=new THREE.EdgesGeometry(geo);
   var voxels={}; // key -> {t,mesh,edge}
+  var edProps=[]; // 에디터 메시 프롭 목록 {mesh, data}
   var spawn={x:3,y:1,z:3}; var spawnMarker=null;
   function key(x,y,z){return x+','+y+','+z;}
   function matFor(t){ return new THREE.MeshLambertMaterial({color:BLOCKCOL[t]||0xffffff}); }
@@ -928,14 +990,14 @@ function renderEditor(m){
   function buildLevel(){ var c=collect();
     var lv={ id:'my-'+Date.now(), title:document.getElementById('edtitle').value.trim()||'새 블록 레벨',
       creator:me(), creatorId:'me_'+(db.nick||'guest'), genre:document.getElementById('edgenre').value, difficulty:document.getElementById('eddiff').value,
-      plays:0, likes:0, desc:'에디터로 제작한 레벨입니다.', voxels:c.vox, spawn:spawn, mine:true };
+      plays:0, likes:0, desc:'에디터로 제작한 레벨입니다.', voxels:c.vox, spawn:spawn, props:edProps.map(function(p){return p.data;}), mine:true };
     return {lv:lv,hasGoal:c.hasGoal}; }
   document.getElementById('edtest').onclick=function(){ var r=buildLevel(); if(!r.hasGoal){toast('골 블록을 1개 이상 배치하세요');return;} window._testLevel=r.lv; teardown();
     // render a temporary watch using the test level
     renderWatchTemp(r.lv); };
   document.getElementById('edsave').onclick=function(){ var r=buildLevel(); if(!r.hasGoal){toast('골 블록을 1개 이상 배치하세요');return;}
     if(!r.lv.voxels.some(function(b){return b.t===1||b.t===2;})){toast('지면 블록을 배치하세요');return;}
-    if(NET.on){ api('POST','/api/igplay/levels',{title:r.lv.title,genre:r.lv.genre,difficulty:r.lv.difficulty,voxels:r.lv.voxels,spawn:r.lv.spawn,desc:r.lv.desc})
+    if(NET.on){ api('POST','/api/igplay/levels',{title:r.lv.title,genre:r.lv.genre,difficulty:r.lv.difficulty,voxels:r.lv.voxels,spawn:r.lv.spawn,desc:r.lv.desc,props:r.lv.props})
       .then(function(resp){ toast('서버 업로드 완료'); netLoaded=false; netLoadLevels().then(function(){ go('watch/'+resp.level.id); }); })
       .catch(function(e){ toast('업로드 실패: '+e.message); }); return; }
     db.myLevels.push(r.lv); saveDB(); toast('업로드 완료'); go('watch/'+r.lv.id); };
@@ -946,6 +1008,21 @@ function renderEditor(m){
       if(data.spawn)setSpawn(data.spawn.x|0,data.spawn.y|0,data.spawn.z|0);
       if(data.title&&document.getElementById('edtitle'))document.getElementById('edtitle').value=data.title;
       toast('임포트 완료 ('+vox.length+' 블록)'); }catch(err){ toast('JSON 파싱 실패'); } };
+    rd.readAsText(f); e.target.value=''; };
+  // webmax OBJ 임포트 → 메시 프롭(복셀화 없음). 시작 지점 근처에 배치.
+  document.getElementById('edobj').onchange=function(e){ var f=e.target.files&&e.target.files[0]; if(!f)return; var rd=new FileReader();
+    rd.onload=function(){ try{
+      var parsed=parseOBJ(rd.result); if(!parsed){toast('OBJ 파싱 실패(정점/면 없음)');return;}
+      if(parsed.verts>40000){toast('모델이 너무 큽니다(정점 4만 초과)');return;}
+      var g=parsed.geometry; var size=normalizeGeo(g,4); // 4칸 크기로 정규화
+      var px=Math.min(GS-2,spawn.x+3)+0.5, pz=Math.min(GS-2,spawn.z)+0.5, py=1;
+      var mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0xb0b8c4})); mesh.position.set(px,py,pz); scene.add(mesh);
+      // verts/faces를 레벨 저장형으로 추출
+      var posArr=g.attributes.position.array; var verts=[], faces=[];
+      for(var i=0;i<posArr.length;i+=3){ verts.push([+posArr[i].toFixed(3),+posArr[i+1].toFixed(3),+posArr[i+2].toFixed(3)]); faces.push(i/3); }
+      edProps.push({ mesh:mesh, data:{ verts:verts, faces:faces, pos:{x:px,y:py,z:pz}, scale:1, color:0xb0b8c4, size:{w:size.w,h:size.h,d:size.d}, collide:true } });
+      toast('3D 모델 배치 완료 ('+parsed.tris+' 삼각형)');
+    }catch(err){ toast('OBJ 처리 오류: '+err.message); } };
     rd.readAsText(f); e.target.value=''; };
 
   activeSession={ dispose:function(){ cancelAnimationFrame(raf); ro.disconnect(); try{renderer.dispose();}catch(e){} } };
