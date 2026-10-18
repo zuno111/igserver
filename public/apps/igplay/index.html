@@ -651,6 +651,51 @@ function postComment(id){ var inp=document.getElementById('cin'); var v=inp.valu
 function shareLevel(id){ var url=location.origin+location.pathname+'#watch/'+id;
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(function(){toast('링크를 복사했습니다');},function(){toast(url);}); } else toast(url); }
 
+/* ---------------- 복셀 지형 메시 (face culling + 병합) ----------------
+   인접 복셀에 가려진 면은 버리고, 노출된 면만 하나의 BufferGeometry로 합친다.
+   개별 큐브 N개(12N 삼각형)보다 폴리곤이 크게 줄고 드로우콜도 1~2회로 끝난다. */
+function buildVoxelMesh(voxels, solids, group){
+  var FACES=[
+    {n:[1,0,0],  v:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]]},   // +x
+    {n:[-1,0,0], v:[[0,0,1],[0,1,1],[0,1,0],[0,0,0]]},   // -x
+    {n:[0,1,0],  v:[[0,1,0],[0,1,1],[1,1,1],[1,1,0]]},   // +y (top)
+    {n:[0,-1,0], v:[[0,0,0],[1,0,0],[1,0,1],[0,0,1]]},   // -y
+    {n:[0,0,1],  v:[[1,0,1],[1,1,1],[0,1,1],[0,0,1]]},   // +z
+    {n:[0,0,-1], v:[[0,0,0],[0,1,0],[1,1,0],[1,0,0]]}    // -z
+  ];
+  function has(x,y,z){ return !!solids[x+','+y+','+z]; }
+  function hx(c){ return [((c>>16)&255)/255,((c>>8)&255)/255,(c&255)/255]; }
+  var pos=[], nor=[], col=[], idx=[], vcount=0, faceCount=0;
+  voxels.forEach(function(b){
+    if(b.t!==1&&b.t!==2)return;
+    var base=BLOCKCOL[b.t], rgb;
+    for(var f=0;f<6;f++){
+      var F=FACES[f], nx=b.x+F.n[0], ny=b.y+F.n[1], nz=b.z+F.n[2];
+      if(has(nx,ny,nz))continue; // 가려진 면 스킵
+      // 윗면은 살짝 밝게(음영)
+      var shade=F.n[1]>0?1.12:(F.n[1]<0?0.7:(F.n[0]!==0?0.9:0.82));
+      rgb=hx(base);
+      for(var q=0;q<4;q++){
+        var vv=F.v[q];
+        pos.push(b.x+vv[0], b.y+vv[1], b.z+vv[2]);
+        nor.push(F.n[0],F.n[1],F.n[2]);
+        col.push(Math.min(1,rgb[0]*shade),Math.min(1,rgb[1]*shade),Math.min(1,rgb[2]*shade));
+      }
+      idx.push(vcount,vcount+1,vcount+2, vcount,vcount+2,vcount+3);
+      vcount+=4; faceCount++;
+    }
+  });
+  if(!pos.length)return {tris:0,faces:0};
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  g.setIndex(idx);
+  var mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true}));
+  mesh._isWorld=true; group.add(mesh);
+  return {tris:faceCount*2, faces:faceCount};
+}
+
 /* ---------------- Three.js player engine ---------------- */
 function startPlayer(lv){
   var canvas=document.getElementById('glcv'); var cont=document.getElementById('pl');
@@ -669,13 +714,15 @@ function startPlayer(lv){
   var matCache={};
   function mat(t){ if(!matCache[t])matCache[t]=new THREE.MeshLambertMaterial({color:BLOCKCOL[t]}); return matCache[t]; }
   var gm=new THREE.Group(); scene.add(gm);
+  lv.voxels.forEach(function(b){ if(b.t===1||b.t===2)solids[key(b.x,b.y,b.z)]=true; else if(b.t===3)coins.push(b); else if(b.t===4)goals.push(b); });
+  buildVoxelMesh(lv.voxels, solids, gm);
   lv.voxels.forEach(function(b){
-    if(b.t===1||b.t===2){ solids[key(b.x,b.y,b.z)]=true; var mesh=new THREE.Mesh(geo,mat(b.t)); mesh.position.set(b.x+0.5,b.y+0.5,b.z+0.5);
+    if(false){ var mesh=new THREE.Mesh(geo,mat(b.t)); mesh.position.set(b.x+0.5,b.y+0.5,b.z+0.5);
       // subtle top shade for ground
       gm.add(mesh);
       var edge=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:0.12})); edge.position.copy(mesh.position); gm.add(edge);
-    } else if(b.t===3){ coins.push(b); var cm=new THREE.Mesh(new THREE.OctahedronGeometry(0.28),new THREE.MeshLambertMaterial({color:0xffb02e,emissive:0x5a3c00})); cm.position.set(b.x+0.5,b.y+0.55,b.z+0.5); gm.add(cm); coinMeshes.push(cm); }
-    else if(b.t===4){ goals.push(b); var pillar=new THREE.Mesh(new THREE.BoxGeometry(0.9,1.4,0.9),new THREE.MeshLambertMaterial({color:0x27d4b8,emissive:0x064a40,transparent:true,opacity:0.92})); pillar.position.set(b.x+0.5,b.y+0.7,b.z+0.5); gm.add(pillar); goalMesh=pillar; }
+    } else if(b.t===3){ var cm=new THREE.Mesh(new THREE.OctahedronGeometry(0.28),new THREE.MeshLambertMaterial({color:0xffb02e,emissive:0x5a3c00})); cm.position.set(b.x+0.5,b.y+0.55,b.z+0.5); gm.add(cm); coinMeshes.push(cm); }
+    else if(b.t===4){ var pillar=new THREE.Mesh(new THREE.BoxGeometry(0.9,1.4,0.9),new THREE.MeshLambertMaterial({color:0x27d4b8,emissive:0x064a40,transparent:true,opacity:0.92})); pillar.position.set(b.x+0.5,b.y+0.7,b.z+0.5); gm.add(pillar); goalMesh=pillar; }
   });
   // player mesh (simple character block)
   var pg=new THREE.Group();
