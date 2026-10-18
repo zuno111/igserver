@@ -101,6 +101,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .hud .stat svg{opacity:.9}
 .hud .hint{position:absolute;left:12px;bottom:12px;background:rgba(7,10,16,.66);padding:6px 10px;border-radius:9px;font-size:11px;font-weight:500;color:#cfd7e2;font-family:var(--sans)}
 .ctrlbtn{position:absolute;pointer-events:auto;border-radius:50%;background:rgba(10,14,20,.6);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(3px);display:grid;place-items:center;color:#fff;-webkit-user-select:none;user-select:none;touch-action:none}
+.touchctrl{display:none}
+body.has-touch .touchctrl{display:grid}
 #joy{width:118px;height:118px;left:16px;bottom:16px}
 #joy .knob{width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.28);border:1px solid rgba(255,255,255,.4);transition:none}
 #jump{width:74px;height:74px;right:16px;bottom:22px;font-weight:700;font-size:13px;background:rgba(39,212,184,.22);border-color:rgba(39,212,184,.55)}
@@ -557,9 +559,9 @@ function renderWatch(m,id){
       '<div class="hud"><div class="row">'+
         '<div class="stat"><svg width="15" height="15" viewBox="0 0 24 24" fill="#ffb02e"><circle cx="12" cy="12" r="9"/></svg><span id="hCoin">0/'+coinCount(lv)+'</span></div>'+
         '<div class="stat"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="hTime">0:00.00</span></div></div>'+
-        '<div class="hint">WASD 이동 · Space 점프 · 화면 드래그로 시점 · R 재시작</div>'+
-        '<div class="ctrlbtn" id="joy"><div class="knob"></div></div>'+
-        '<div class="ctrlbtn" id="jump">점프</div>'+
+        '<div class="hint" id="ctrlHint"></div>'+
+        '<div class="ctrlbtn touchctrl" id="joy"><div class="knob"></div></div>'+
+        '<div class="ctrlbtn touchctrl" id="jump">점프</div>'+
         '<div class="overlay" id="startOv"><div class="ocard"><h3>'+esc(lv.title)+'</h3><p>'+coinCount(lv)+'개의 코인을 모아 골(청록 블록)에 도착하세요.</p><div class="obtns"><button class="btn brand big" id="playBtn">▶ 플레이</button></div></div></div>'+
       '</div>'+
     '</div>'+
@@ -672,12 +674,19 @@ function startPlayer(lv){
     coinMeshes.forEach(function(c){c.visible=true;}); yaw=Math.PI; pitch=0.62;
     var hc=document.getElementById('hCoin'); if(hc)hc.textContent='0/'+coinCount(lv);
   }
+  // 터치 기기 감지 → 터치 컨트롤 표시, PC는 키보드/마우스
+  var isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+  document.body.classList.toggle('has-touch',isTouch);
+  var hintEl=document.getElementById('ctrlHint');
+  if(hintEl)hintEl.textContent=isTouch?'왼쪽 조이스틱 이동 · 점프 버튼 · 화면 드래그로 시점':'WASD·방향키 이동 · Space 점프 · 마우스 드래그(또는 Q/E)로 시점 · R 재시작';
   // input
   var keys={}, joy={x:0,y:0,on:false};
-  function kd(e){ keys[e.key.toLowerCase()]=true; if(e.key===' ')e.preventDefault(); if(e.key.toLowerCase()==='r'&&state==='play')reset(); }
-  function ku(e){ keys[e.key.toLowerCase()]=false; }
+  var MOVEKEY={w:'w',s:'s',a:'a',d:'d',arrowup:'w',arrowdown:'s',arrowleft:'a',arrowright:'d'};
+  function kd(e){ var k=e.key.toLowerCase(); if(MOVEKEY[k]){ keys[MOVEKEY[k]]=true; if(k.indexOf('arrow')===0)e.preventDefault(); } keys[k]=true;
+    if(e.key===' ')e.preventDefault(); if(k==='r'&&state==='play')reset(); }
+  function ku(e){ var k=e.key.toLowerCase(); if(MOVEKEY[k])keys[MOVEKEY[k]]=false; keys[k]=false; }
   window.addEventListener('keydown',kd); window.addEventListener('keyup',ku);
-  // look drag on canvas
+  // look drag on canvas (마우스/터치 공통) + PC 데스크톱은 포인터락 옵션
   var lookId=null,lx=0,ly=0;
   canvas.addEventListener('pointerdown',function(e){ lookId=e.pointerId; lx=e.clientX; ly=e.clientY; canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointermove',function(e){ if(e.pointerId!==lookId)return; yaw-=(e.clientX-lx)*0.006; pitch-=(e.clientY-ly)*0.006; pitch=Math.max(0.12,Math.min(1.35,pitch)); lx=e.clientX; ly=e.clientY; });
@@ -714,6 +723,8 @@ function startPlayer(lv){
 
   var last=performance.now(), acc=0, STEP=1/60, raf;
   function step(dt){
+    // 키보드 시점 회전(PC): Q/E 좌우, 위/아래는 드래그로
+    if(keys['q'])yaw+=2.2*dt; if(keys['e'])yaw-=2.2*dt;
     // movement intent
     var ix=0,iz=0;
     if(keys['w'])iz-=1; if(keys['s'])iz+=1; if(keys['a'])ix-=1; if(keys['d'])ix+=1;
@@ -882,8 +893,8 @@ function renderWatchFor(m,lv,isTest){
     '<div class="player" id="pl"><canvas id="glcv"></canvas>'+
     '<div class="hud"><div class="row"><div class="stat"><svg width="15" height="15" viewBox="0 0 24 24" fill="#ffb02e"><circle cx="12" cy="12" r="9"/></svg><span id="hCoin">0/'+coinCount(lv)+'</span></div>'+
     '<div class="stat"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="hTime">0:00.00</span></div></div>'+
-    '<div class="hint">테스트 플레이 · WASD · Space · R 재시작</div>'+
-    '<div class="ctrlbtn" id="joy"><div class="knob"></div></div><div class="ctrlbtn" id="jump">점프</div>'+
+    '<div class="hint" id="ctrlHint">테스트 플레이</div>'+
+    '<div class="ctrlbtn touchctrl" id="joy"><div class="knob"></div></div><div class="ctrlbtn touchctrl" id="jump">점프</div>'+
     '<div class="overlay" id="startOv"><div class="ocard"><h3>테스트 플레이</h3><p>저장 전 레벨을 플레이해봅니다.</p><div class="obtns"><button class="btn brand big" id="playBtn">▶ 플레이</button></div></div></div></div></div>'+
     '<div style="display:flex;gap:10px;margin-top:16px"><button class="btn" onclick="go(\'create\')">◀ 에디터로</button></div>'+
   '</div></div>';
