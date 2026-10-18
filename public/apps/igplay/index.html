@@ -271,10 +271,13 @@ function updateWallet(){ var w=document.getElementById('iscBal'); if(w)w.textCon
 function isBoosted(id){ if(NET.on){ var l=getLevel(id); return l&&(l.boostedUntil||0)>Date.now(); } return (db.boosts[id]||0)>Date.now(); }
 
 /* ---- 서버 연동 (igServer). 미연결 시 전부 로컬 동작(폴백) ---- */
-var NET={on:false, base:'', key:'', token:'', uid:'', name:''};
-(function(){ try{ var c=JSON.parse(localStorage.getItem('igplay_srv')||'null'); if(c&&c.base&&c.key&&c.token){ NET.base=c.base; NET.key=c.key; NET.token=c.token; NET.uid=c.uid||''; NET.name=c.name||''; NET.on=true; } }catch(e){}
-  // igServer에서 서빙될 때 주입되는 기본 설정(window.IGPLAY_API) 지원
-  try{ if(!NET.on && window.IGPLAY_API && window.IGPLAY_API.base && window.IGPLAY_API.key){ NET.base=window.IGPLAY_API.base; NET.key=window.IGPLAY_API.key; } }catch(e){}
+var NET={on:false, base:'', key:'', token:'', uid:'', name:'', auto:false};
+(function(){
+  // igServer에서 서빙되면 주소/공개키가 자동 주입됨 → 사용자는 계정 로그인만
+  try{ if(window.IGPLAY_API && window.IGPLAY_API.base && window.IGPLAY_API.key){ NET.base=window.IGPLAY_API.base; NET.key=window.IGPLAY_API.key; NET.auto=true; } }catch(e){}
+  try{ var c=JSON.parse(localStorage.getItem('igplay_srv')||'null'); if(c&&c.base&&c.key&&c.token){
+    // 자동 주입된 주소가 있으면 그걸 우선(서버 주소 변경 대응), 키/토큰은 저장분 사용
+    if(!NET.auto){ NET.base=c.base; NET.key=c.key; } NET.token=c.token; NET.uid=c.uid||''; NET.name=c.name||''; NET.on=true; } }catch(e){}
 })();
 function netSave(){ try{ localStorage.setItem('igplay_srv', JSON.stringify({base:NET.base,key:NET.key,token:NET.token,uid:NET.uid,name:NET.name})); }catch(e){} }
 function netClear(){ NET.on=false; NET.token=''; netLevels=[]; netLoaded=false; try{ localStorage.removeItem('igplay_srv'); }catch(e){} }
@@ -541,8 +544,9 @@ function openServerDialog(){
     '<h3 style="font-size:19px;margin:0 0 4px">서버 연결 (igServer)</h3>'+
     '<p style="margin:0 0 14px">연결하면 계정·레벨·랭킹·ISC가 서버에 저장되어 모든 기기·사용자와 공유됩니다. 미연결 시 이 브라우저에만 저장됩니다.</p>'+
     (connected?'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px">현재 <b style="color:var(--accent)">'+esc(NET.name||NET.uid)+'</b> 으로 연결됨<br><span style="color:var(--muted)">'+esc(NET.base)+'</span></div><div class="obtns"><button class="btn" id="svClose">닫기</button><button class="btn" id="svOut" style="color:var(--danger)">연결 해제</button></div>':
-    ('<input id="svBase" class="svi" placeholder="서버 주소 (예: https://내서버:8787)" value="'+esc(NET.base||'')+'">'+
-     '<input id="svKey" class="svi" placeholder="프로젝트 키 (igk_...)" value="'+esc(NET.key||'')+'">'+
+    ((NET.auto
+      ? '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:var(--muted)">이 서버에 자동 연결됩니다. 계정만 로그인하세요.</div><input id="svBase" type="hidden" value="'+esc(NET.base)+'"><input id="svKey" type="hidden" value="'+esc(NET.key)+'">'
+      : '<input id="svBase" class="svi" placeholder="서버 주소 (예: https://내서버:8787)" value="'+esc(NET.base||'')+'"><input id="svKey" class="svi" placeholder="프로젝트 키 (igk_...)" value="'+esc(NET.key||'')+'">')+
      '<input id="svEmail" class="svi" placeholder="이메일" autocomplete="username">'+
      '<input id="svPw" class="svi" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password">'+
      '<input id="svName" class="svi" placeholder="닉네임 (가입 시)">'+

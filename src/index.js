@@ -19,6 +19,7 @@ import fileRoutes from './routes/files.js';
 import adminRoutes, { ensureAdmin } from './routes/admin.js';
 import igplayRoutes from './routes/igplay.js';
 import igmarketRoutes from './routes/igmarket.js';
+import { ensureIgPlay, igplayInject } from './provision.js';
 
 const MODE = process.env.MODE || 'standalone';
 
@@ -31,6 +32,7 @@ async function main() {
 
   await initRepo();
   await ensureAdmin(); // 관리자 계정/시스템 프로젝트 보장
+  await ensureIgPlay(); // igPlay 프로젝트 자동 프로비전(주소/키 자동 주입용)
 
   const app = express();
   app.disable('x-powered-by');
@@ -89,6 +91,8 @@ async function main() {
   // 관리 대시보드
   app.use('/admin', express.static(path.join(config.root, 'public/admin')));
   // 각 프로젝트의 프론트엔드: public/apps/<slug>/ 에 올리면 /app/<slug>/ 로 서비스
+  // igPlay 페이지는 주소/공개키를 주입해 반환(정적 서빙보다 먼저)
+  app.use('/app', igplayInject);
   app.use('/app', express.static(path.join(config.root, 'public/apps')));
   // 루트 → 대시보드로
   app.get('/', (_req, res) => res.redirect('/admin/'));
