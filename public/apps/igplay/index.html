@@ -642,6 +642,7 @@ function renderWatch(m,id){
     if(NET.on){ api('POST','/api/igplay/tip',{levelId:lv.id,amount:10}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast('크리에이터에게 10 ISC 후원'); }).catch(function(e){ toast(e.message); }); return; }
     if(spend(10)){ db.tips[lv.id]=(db.tips[lv.id]||0)+10; saveDB(); toast('크리에이터에게 10 ISC 후원'); } else toast('ISC가 부족합니다'); };
   var lb=document.getElementById('listBtn'); if(lb)lb.onclick=function(){ listLevelDialog(lv); };
+  if(lb&&lb.parentNode)loadCreatorToken(lv.creatorId, lb.parentNode);
   // player
   startPlayer(lv);
 }
@@ -1084,12 +1085,13 @@ function renderChannel(m){
   var html='<div class="wrap"><div class="chead"><div class="ava" style="background:'+avaColor(nick)+'">'+esc(nick.charAt(0))+'</div>'+
     '<div><h1>'+esc(nick)+'</h1><div class="s">@'+esc((NET.on?(NET.name||'me'):(db.nick||'guest')).toLowerCase())+' · 업로드 '+mine.length+' · 클리어 '+cleared.length+(NET.on?' · 서버':'')+'</div>'+
     '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn brand" onclick="go(\'create\')">+ 레벨 만들기</button>'+
-    (NET.on?'<button class="btn" id="chInvest">채널 투자 모집</button>':(db.nick?'':'<button class="btn" onclick="login()">닉네임 설정</button>'))+'</div></div></div>';
+    (NET.on?'<button class="btn" id="chInvest">채널 투자 모집</button><button class="btn" id="chToken">내 토큰 발행</button>':(db.nick?'':'<button class="btn" onclick="login()">닉네임 설정</button>'))+'</div></div></div>';
   html+='<div class="ctabs">'+[['all','전체'],['mine','내 레벨'],['cleared','클리어'],['liked','좋아요']].map(function(t){return '<button class="ctab'+(t[0]===chanTab?' on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
   html+='<div class="grid" id="cfeed"></div></div>';
   m.innerHTML=html;
   m.querySelectorAll('.ctab').forEach(function(t){ t.onclick=function(){ chanTab=t.getAttribute('data-t'); renderChannel(m); }; });
   var ci=document.getElementById('chInvest'); if(ci)ci.onclick=function(){ listChannelDialog(nick); };
+  var ct=document.getElementById('chToken'); if(ct)ct.onclick=function(){ issueTokenDialog(); };
   if(NET.on && !netLoaded){ netLoadLevels().then(function(){ renderChannel(m); }); }
   var list= chanTab==='mine'?mine : chanTab==='liked'?liked : chanTab==='cleared'?cleared : mine.concat(liked.filter(function(l){return mine.indexOf(l)<0;}));
   var feed=document.getElementById('cfeed');
@@ -1271,6 +1273,45 @@ function listChannelDialog(nick){
   wrap.querySelector('#chO').onclick=function(){ var g=Math.round(+wrap.querySelector('#chGoal').value||0); if(g<1){toast('목표 금액을 입력하세요');return;}
     api('POST','/api/igmarket/listings',{kind:'channel',title:nick+' 채널',mode:'invest',goal:g,desc:wrap.querySelector('#chDesc').value.trim()})
       .then(function(){ toast('채널 투자 모집 등록 완료'); close(); go('market'); }).catch(function(e){ toast(e.message); }); };
+}
+
+// 창작자 토큰 발행
+function issueTokenDialog(){
+  if(!NET.on){ toast('서버 연결이 필요합니다'); openServerDialog(); return; }
+  var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;text-align:left"><h3 style="font-size:18px">내 토큰 발행</h3><p>팬이 ISC로 매수하는 창작자 토큰입니다. 심볼은 2~10자 영문 대문자/숫자.</p>'+
+    '<input id="tkSym" placeholder="심볼 (예: JOON)" maxlength="10" style="width:100%;text-transform:uppercase;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:9px">'+
+    '<input id="tkNm" placeholder="토큰 이름 (예: 준호코인)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:9px">'+
+    '<input id="tkPr" type="number" min="1" placeholder="1토큰당 가격(ISC)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:14px">'+
+    '<div id="tkMsg" style="color:var(--danger);font-size:12.5px;min-height:16px"></div><div class="obtns"><button class="btn" id="tkC">취소</button><button class="btn brand" id="tkO">발행</button></div></div>';
+  document.body.appendChild(wrap);
+  function close(){ wrap.remove(); } wrap.querySelector('#tkC').onclick=close; wrap.onclick=function(e){ if(e.target===wrap)close(); };
+  wrap.querySelector('#tkO').onclick=function(){ var sym=wrap.querySelector('#tkSym').value.trim().toUpperCase(), nm=wrap.querySelector('#tkNm').value.trim(), pr=Math.round(+wrap.querySelector('#tkPr').value||0);
+    var msg=wrap.querySelector('#tkMsg');
+    if(!/^[A-Z][A-Z0-9]{1,9}$/.test(sym)){ msg.textContent='심볼은 2~10자 영문 대문자/숫자(첫 글자 영문)여야 합니다.'; return; }
+    if(pr<1){ msg.textContent='가격을 입력하세요.'; return; }
+    api('POST','/api/igtoken/tokens',{symbol:sym,name:nm||sym,priceIsc:pr}).then(function(){ toast(sym+' 토큰 발행 완료'); close(); go('market'); }).catch(function(e){ msg.textContent=e.message; }); };
+}
+// 창작자 토큰 매수
+function buyTokenDialog(tok){
+  var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;text-align:left"><h3 style="font-size:18px">'+esc(tok.name)+' ('+esc(tok.symbol)+') 매수</h3><p>1토큰 = '+fmt(tok.priceIsc)+' ISC · 보유자 '+tok.holders+'명 · 발행량 '+fmt(tok.supply)+'</p>'+
+    '<input id="tbQty" type="number" min="1" value="1" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:8px">'+
+    '<div id="tbCost" style="color:var(--muted);font-size:13px;margin-bottom:12px"></div><div class="obtns"><button class="btn" id="tbC">취소</button><button class="btn brand" id="tbO">매수</button></div></div>';
+  document.body.appendChild(wrap);
+  var q=wrap.querySelector('#tbQty'), cost=wrap.querySelector('#tbCost');
+  function upd(){ cost.textContent='총 '+fmt(Math.max(1,Math.round(+q.value||0))*tok.priceIsc)+' ISC'; } q.oninput=upd; upd();
+  function close(){ wrap.remove(); } wrap.querySelector('#tbC').onclick=close; wrap.onclick=function(e){ if(e.target===wrap)close(); };
+  wrap.querySelector('#tbO').onclick=function(){ var qty=Math.max(1,Math.round(+q.value||0));
+    api('POST','/api/igtoken/tokens/'+tok.symbol+'/buy',{qty:qty}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast(tok.symbol+' '+qty+'개 매수 (보유 '+r.balance+')'); close(); }).catch(function(e){ toast(e.message); }); };
+}
+// 특정 창작자의 토큰이 있으면 매수 버튼 노출(워치에서 사용)
+function loadCreatorToken(creatorId, containerEl){
+  if(!NET.on||!containerEl)return;
+  api('GET','/api/igtoken/tokens').then(function(r){ var t=(r.tokens||[]).filter(function(x){return x.ownerId===creatorId;})[0]; if(!t)return;
+    var b=document.createElement('button'); b.className='pill'; b.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9h6M9 12h6M10 15h4"/></svg>'+esc(t.symbol)+' 매수';
+    b.onclick=function(){ buyTokenDialog(t); }; containerEl.appendChild(b);
+  }).catch(function(){});
 }
 
 /* ============================= boot ============================= */

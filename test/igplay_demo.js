@@ -207,6 +207,33 @@ async function run() {
   r = await j('GET', '/api/igmarket/myshares', { key, token: player });
   ok('내 지분 조회(누적 20)', r.status === 200 && r.data.shares.some((s) => s.amount === 20));
 
+  // ===== igToken (창작자 커스텀 토큰) =====
+  // 잘못된 심볼 거부
+  r = await j('POST', '/api/igtoken/tokens', { key, token: creator, body: { symbol: 'isc', name: 'x', priceIsc: 5 } });
+  ok('예약어/소문자 심볼 거부', r.status === 400);
+  // 토큰 발행
+  r = await j('POST', '/api/igtoken/tokens', { key, token: creator, body: { symbol: 'JOON', name: '준호코인', priceIsc: 5, desc: '팬 토큰' } });
+  ok('토큰 발행', r.status === 201 && r.data.token?.symbol === 'JOON' && r.data.token.priceIsc === 5, JSON.stringify(r.data.token));
+  // 중복 심볼 거부
+  r = await j('POST', '/api/igtoken/tokens', { key, token: creator, body: { symbol: 'JOON', name: 'dup', priceIsc: 9 } });
+  ok('중복 심볼 거부(409)', r.status === 409);
+  // 팬(player)이 토큰 매수 (5 ISC × 3 = 15)
+  r = await j('GET', '/api/igplay/wallet', { key, token: player });
+  const tbBefore = r.data.wallet.balance;
+  r = await j('POST', '/api/igtoken/tokens/JOON/buy', { key, token: player, body: { qty: 3 } });
+  ok('토큰 매수(3개)', r.status === 200 && r.data.balance === 3 && r.data.supply === 3, JSON.stringify(r.data));
+  r = await j('GET', '/api/igplay/wallet', { key, token: player });
+  ok('매수 ISC 차감(15)', r.data.wallet.balance === tbBefore - 15, JSON.stringify(r.data.wallet));
+  // 토큰 상세에 내 잔액 반영
+  r = await j('GET', '/api/igtoken/tokens/JOON', { key, token: player });
+  ok('토큰 보유 잔액 반영', r.status === 200 && r.data.token.myBalance === 3 && r.data.token.holders === 1, JSON.stringify(r.data.token));
+  // 내 보유 목록
+  r = await j('GET', '/api/igtoken/holdings', { key, token: player });
+  ok('내 보유 토큰 목록', r.status === 200 && r.data.holdings.some((h) => h.symbol === 'JOON' && h.amount === 3));
+  // 잔액 초과 매수 거부
+  r = await j('POST', '/api/igtoken/tokens/JOON/buy', { key, token: player, body: { qty: 100000 } });
+  ok('잔액 초과 토큰 매수 거부(402)', r.status === 402);
+
   // 보안: 제네릭 /api/data 로 ISC 내부 컬렉션 쓰기 차단
   r = await j('POST', '/api/data/_isc_wallet', { key, token: player, body: { balance: 999999 } });
   ok('내부 컬렉션(_isc_wallet) 쓰기 차단(403)', r.status === 403, JSON.stringify(r.data));
