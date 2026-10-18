@@ -226,6 +226,45 @@ router.post('/like', requireUser, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ===================== 광고 (CustomAdSDK 워터폴) =====================
+// 하우스애드 1순위(서버 저장) → 없으면 프론트가 외부 네트워크 폴백.
+// 보상형: 시청 완료를 서버가 검증(최소 시청시간+쿨다운)하고 ISC 적립.
+const AD_REWARD = 20;              // 보상형 1회 ISC
+const AD_COOLDOWN_MS = 90 * 1000;  // 보상형 적립 쿨다운
+const AD_MIN_WATCH_MS = 4000;      // 최소 시청 시간(서버 검증)
+const HOUSE_ADS = [
+  { id: 'cutroom', title: '컷룸 - 브라우저 영상 편집기', body: '설치 없이 바로 쓰는 온라인 편집기', cta: '써보기', color: '#3aa0ff' },
+  { id: 'layerroom', title: '레이어룸 - 온라인 이미지 편집', body: '포토샵 없이 브라우저에서 편집', cta: '열기', color: '#27d4b8' },
+  { id: 'webmax', title: '3ds webmax - 브라우저 3D 모델링', body: '설치 없이 3D 제작·렌더', cta: '시작', color: '#9b6bff' },
+];
+// 하우스애드 목록 (관리자가 올린 커스텀 광고 우선, 없으면 기본 셀프프로모션)
+router.get('/ads', optionalUser, async (req, res, next) => {
+  try {
+    const rows = await getRepo().queryRecords(req.project.id, '_ads', { limit: 20, sort: 'created_at:desc' });
+    const custom = rows.map((r) => ({ id: r.doc_id, ...r.data }));
+    res.json({ ads: custom.length ? custom : HOUSE_ADS, rewardAmount: AD_REWARD });
+  } catch (e) { next(e); }
+});
+// 보상형 시청 완료 → ISC 적립 (서버 검증)
+router.post('/ads/reward', requireUser, async (req, res, next) => {
+  try {
+    const { watchedMs } = req.body || {};
+    if (typeof watchedMs !== 'number' || watchedMs < AD_MIN_WATCH_MS) {
+      return res.status(400).json({ error: 'too_short', message: '광고를 끝까지 시청해야 합니다.' });
+    }
+    const pid = req.project.id, uid = req.user.uid, repo = getRepo();
+    const stamp = await repo.getRecord(pid, '_ad_cooldown', uid);
+    const last = stamp?.data?.ts || 0;
+    if (Date.now() - last < AD_COOLDOWN_MS) {
+      const wait = Math.ceil((AD_COOLDOWN_MS - (Date.now() - last)) / 1000);
+      return res.status(429).json({ error: 'cooldown', message: `${wait}초 후 다시 시청할 수 있습니다.`, wait });
+    }
+    await repo.putRecord({ project_id: pid, collection: '_ad_cooldown', doc_id: uid, data: { ts: Date.now() }, owner_id: uid });
+    const w = await credit(pid, uid, AD_REWARD, 'ad_reward', null);
+    res.json({ ok: true, reward: AD_REWARD, wallet: w });
+  } catch (e) { next(e); }
+});
+
 // ===================== 지갑 / 상점 =====================
 router.get('/wallet', requireUser, async (req, res, next) => {
   try {

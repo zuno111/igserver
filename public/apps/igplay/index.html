@@ -281,6 +281,46 @@ async function netLoadLevels(){ try{ var r=await api('GET','/api/igplay/levels')
 async function netWallet(){ if(!NET.on)return null; try{ var r=await api('GET','/api/igplay/wallet'); if(r.wallet){ db.isc=r.wallet.balance; db.skins=r.wallet.skins; db.skin=r.wallet.skin; saveDB(); updateWallet(); } return r.wallet; }catch(e){ return null; } }
 function updateSrvBtn(){ var l=document.getElementById('srvLbl'); if(l)l.textContent=NET.on?'연결됨':'서버'; var b=document.getElementById('srvBtn'); if(b)b.classList.toggle('on',NET.on); }
 
+/* ---- CustomAdSDK 웹 광고 레이어 (하우스애드 1순위 → 보상형 ISC 적립) ---- */
+var HOUSE_ADS_LOCAL=[
+  {id:'cutroom',title:'컷룸 — 브라우저 영상 편집기',body:'설치 없이 바로 쓰는 온라인 편집기',cta:'써보기',color:'#3aa0ff'},
+  {id:'layerroom',title:'레이어룸 — 온라인 이미지 편집',body:'포토샵 없이 브라우저에서 편집',cta:'열기',color:'#27d4b8'},
+  {id:'webmax',title:'3ds webmax — 브라우저 3D 모델링',body:'설치 없이 3D 제작·렌더',cta:'시작',color:'#9b6bff'}
+];
+var AD_REWARD_LOCAL=20, AD_LAST=0, AD_COOLDOWN=90000;
+function pickAd(ads){ return ads[Math.floor(Math.random()*ads.length)]; }
+// 보상형 광고 시청 모달. 끝까지 보면 ISC 적립.
+function showRewardAd(onDone){
+  var now=Date.now();
+  if(!NET.on && now-AD_LAST<AD_COOLDOWN){ toast(Math.ceil((AD_COOLDOWN-(now-AD_LAST))/1000)+'초 후 다시 볼 수 있습니다'); return; }
+  function run(ads, reward){
+    var ad=pickAd(ads||HOUSE_ADS_LOCAL); var dur=5; var t0=Date.now();
+    var ov=document.createElement('div'); ov.className='overlay'; ov.style.position='fixed'; ov.style.zIndex='85';
+    ov.innerHTML='<div class="ocard" style="background:'+ad.color+';border-radius:18px;padding:0;max-width:360px;overflow:hidden;text-align:left">'+
+      '<div style="padding:26px 22px 20px;color:#07100e">'+
+        '<div style="font-size:11px;font-weight:700;letter-spacing:1px;opacity:.7;text-transform:uppercase;margin-bottom:10px">AD · STUDIO ig</div>'+
+        '<div style="font-size:21px;font-weight:700;line-height:1.3;margin-bottom:8px">'+esc(ad.title)+'</div>'+
+        '<div style="font-size:14px;opacity:.85;margin-bottom:18px">'+esc(ad.body)+'</div>'+
+        '<div style="display:inline-block;background:rgba(7,16,14,.85);color:#fff;padding:10px 18px;border-radius:10px;font-weight:700;font-size:14px">'+esc(ad.cta)+' ▶</div>'+
+      '</div>'+
+      '<div style="background:rgba(7,16,14,.9);padding:14px 20px;display:flex;align-items:center;gap:12px">'+
+        '<div style="flex:1;height:5px;background:rgba(255,255,255,.2);border-radius:3px;overflow:hidden"><div id="adbar" style="height:100%;width:0;background:#ffb02e;transition:width .1s linear"></div></div>'+
+        '<span id="adsec" style="color:#fff;font-family:\'IBM Plex Mono\',monospace;font-weight:600;font-size:13px">'+dur+'</span>'+
+        '<button id="adskip" style="background:none;border:1px solid rgba(255,255,255,.3);color:#9aa;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600" disabled>보상받기</button>'+
+      '</div></div>';
+    document.body.appendChild(ov);
+    var bar=ov.querySelector('#adbar'), sec=ov.querySelector('#adsec'), skip=ov.querySelector('#adskip');
+    var iv=setInterval(function(){ var el=(Date.now()-t0)/1000; var p=Math.min(1,el/dur); bar.style.width=(p*100)+'%'; sec.textContent=Math.max(0,Math.ceil(dur-el));
+      if(p>=1){ clearInterval(iv); sec.textContent='✓'; skip.disabled=false; skip.style.color='#ffb02e'; skip.style.borderColor='#ffb02e'; skip.textContent='+'+reward+' ISC 받기'; } },100);
+    skip.onclick=function(){ if(skip.disabled)return; var watched=Date.now()-t0; ov.remove();
+      if(NET.on){ api('POST','/api/igplay/ads/reward',{watchedMs:watched}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast('+'+r.reward+' ISC 적립'); if(onDone)onDone(); }).catch(function(e){ toast(e.message); }); }
+      else { AD_LAST=Date.now(); earn(reward); toast('+'+reward+' ISC 적립'); if(onDone)onDone(); }
+    };
+  }
+  if(NET.on){ api('GET','/api/igplay/ads').then(function(r){ run(r.ads,r.rewardAmount||AD_REWARD_LOCAL); }).catch(function(){ run(HOUSE_ADS_LOCAL,AD_REWARD_LOCAL); }); }
+  else run(HOUSE_ADS_LOCAL,AD_REWARD_LOCAL);
+}
+
 function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove('show');},1900); }
 function avaColor(seed){ var h=0; for(var i=0;i<seed.length;i++)h=(h*31+seed.charCodeAt(i))%360; return 'hsl('+h+',62%,58%)'; }
 function fmt(n){ n=Math.round(n); if(n>=10000)return (n/10000).toFixed(n>=100000?0:1).replace(/\.0$/,'')+'만'; if(n>=1000)return (n/1000).toFixed(1).replace(/\.0$/,'')+'천'; return ''+n; }
@@ -680,7 +720,7 @@ function startPlayer(lv){
     if(joy.on){ ix+=joy.x; iz+=joy.y; }
     var len=Math.hypot(ix,iz); if(len>1){ix/=len;iz/=len;}
     var fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-    var right=new THREE.Vector3(fwd.z,0,-fwd.x);
+    var right=new THREE.Vector3(-fwd.z,0,fwd.x);
     var mvx=(fwd.x*(-iz)+right.x*ix), mvz=(fwd.z*(-iz)+right.z*ix);
     var ml=Math.hypot(mvx,mvz); if(ml>0){ mvx=mvx/ml*MOVE*dt; mvz=mvz/ml*MOVE*dt; }
     // X
@@ -898,10 +938,11 @@ function renderShop(m){
   html+='<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:24px;flex-wrap:wrap">'+
     '<div class="ava" style="width:46px;height:46px;background:linear-gradient(135deg,#ffb02e,#ff8a3c);color:#1a1304;font-weight:700">ISC</div>'+
     '<div><div style="color:var(--muted);font-size:12px">보유 잔액</div><div style="font-family:var(--mono);font-size:24px;font-weight:600;color:var(--brand)">'+fmt(db.isc||0)+' ISC</div></div>'+
-    '<div style="margin-left:auto;color:var(--faint);font-size:12px;max-width:260px">플레이 +'+EARN.play+' · 클리어 +'+EARN.clear+' · 첫 클리어 보너스 +'+EARN.firstClear+'. 창작자는 자신의 레벨이 플레이될 때 적립됩니다.</div></div>';
+    '<button class="btn brand" id="adRewardBtn" style="margin-left:auto"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M4 6h16v12H4z"/><path d="M10 9l5 3-5 3z"/></svg>광고 보고 ISC 받기</button></div>';
   html+='<h3 style="font-size:16px;margin:0 0 14px">플레이어 스킨</h3><div class="grid" id="skins"></div>';
   html+='<h3 style="font-size:16px;margin:30px 0 14px">내 레벨 부스트</h3><div id="boostwrap"></div></div>';
   m.innerHTML=html;
+  var arb=document.getElementById('adRewardBtn'); if(arb)arb.onclick=function(){ showRewardAd(function(){ renderShop(m); }); };
   var sk=document.getElementById('skins');
   SKINS.forEach(function(s){
     var owned=db.skins.indexOf(s.id)>=0, on=db.skin===s.id;

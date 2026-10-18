@@ -133,6 +133,21 @@ async function run() {
   r = await j('POST', '/api/igplay/boost', { key, token: player, body: { levelId } });
   ok('비owner 부스트 거부', r.status === 403);
 
+  // 광고: 하우스애드 목록
+  r = await j('GET', '/api/igplay/ads', { key });
+  ok('하우스애드 목록', r.status === 200 && Array.isArray(r.data.ads) && r.data.ads.length > 0 && typeof r.data.rewardAmount === 'number');
+  // 보상형: 너무 짧으면 거부
+  r = await j('POST', '/api/igplay/ads/reward', { key, token: player, body: { watchedMs: 1000 } });
+  ok('짧은 시청 보상 거부(400)', r.status === 400);
+  // 보상형: 정상 시청 → ISC 적립
+  r = await j('GET', '/api/igplay/wallet', { key, token: player });
+  const beforeAd = r.data.wallet.balance;
+  r = await j('POST', '/api/igplay/ads/reward', { key, token: player, body: { watchedMs: 5000 } });
+  ok('광고 보상 적립(+20)', r.status === 200 && r.data.reward === 20 && r.data.wallet.balance === beforeAd + 20, JSON.stringify(r.data));
+  // 보상형: 쿨다운 즉시 재시청 거부(429)
+  r = await j('POST', '/api/igplay/ads/reward', { key, token: player, body: { watchedMs: 5000 } });
+  ok('광고 보상 쿨다운(429)', r.status === 429, JSON.stringify(r.data));
+
   // 보안: 제네릭 /api/data 로 ISC 내부 컬렉션 쓰기 차단
   r = await j('POST', '/api/data/_isc_wallet', { key, token: player, body: { balance: 999999 } });
   ok('내부 컬렉션(_isc_wallet) 쓰기 차단(403)', r.status === 403, JSON.stringify(r.data));
