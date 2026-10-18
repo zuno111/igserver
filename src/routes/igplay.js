@@ -245,6 +245,27 @@ router.get('/ads', optionalUser, async (req, res, next) => {
     res.json({ ads: custom.length ? custom : HOUSE_ADS, rewardAmount: AD_REWARD });
   } catch (e) { next(e); }
 });
+// 하우스애드 등록/삭제 (프로젝트 오너=첫 가입자 또는 서버키). 간단히 role==='admin' 또는 서버키 허용.
+function canManage(req) { return req.projectAuth === 'secret' || req.projectAuth === 'scoped' || (req.user && req.user.role === 'admin'); }
+router.post('/ads', requireUser, async (req, res, next) => {
+  try {
+    if (!canManage(req)) return res.status(403).json({ error: 'forbidden', message: '광고 등록 권한이 없습니다.' });
+    const { title, body, cta, color, url } = req.body || {};
+    if (!title || !body) return res.status(400).json({ error: 'bad_ad', message: '제목과 내용이 필요합니다.' });
+    const id = randomId('ad_');
+    const data = { title: String(title).slice(0, 60), body: String(body).slice(0, 120), cta: String(cta || '보기').slice(0, 20), color: /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : '#3aa0ff', url: String(url || '').slice(0, 300) };
+    await getRepo().putRecord({ project_id: req.project.id, collection: '_ads', doc_id: id, data, owner_id: req.user.uid });
+    res.status(201).json({ ad: { id, ...data } });
+  } catch (e) { next(e); }
+});
+router.delete('/ads/:id', requireUser, async (req, res, next) => {
+  try {
+    if (!canManage(req)) return res.status(403).json({ error: 'forbidden' });
+    await getRepo().deleteRecord(req.project.id, '_ads', req.params.id, { hard: true });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 // 보상형 시청 완료 → ISC 적립 (서버 검증)
 router.post('/ads/reward', requireUser, async (req, res, next) => {
   try {

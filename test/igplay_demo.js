@@ -46,6 +46,7 @@ async function run() {
   r = await j('POST', '/admin/api/projects', { token: adminToken, body: { name: 'igPlay 테스트', slug: 'igplay-test' } });
   ok('프로젝트 생성', r.status === 201 && !!r.data.project?.api_key);
   const key = r.data.project.api_key;
+  const secretKey = r.data.project.secret_key;
 
   // 크리에이터 + 플레이어 가입
   r = await j('POST', '/api/auth/signup', { key, body: { email: `creator_${Date.now()}@t.com`, password: 'pw12345', name: '크리에이터' } });
@@ -133,9 +134,21 @@ async function run() {
   r = await j('POST', '/api/igplay/boost', { key, token: player, body: { levelId } });
   ok('비owner 부스트 거부', r.status === 403);
 
-  // 광고: 하우스애드 목록
+  // 광고: 하우스애드 목록(기본 셀프프로모션)
   r = await j('GET', '/api/igplay/ads', { key });
   ok('하우스애드 목록', r.status === 200 && Array.isArray(r.data.ads) && r.data.ads.length > 0 && typeof r.data.rewardAmount === 'number');
+  // 일반 유저는 광고 등록 불가
+  r = await j('POST', '/api/igplay/ads', { key, token: player, body: { title: '해킹광고', body: 'x' } });
+  ok('일반 유저 광고 등록 거부(403)', r.status === 403);
+  // 서버키(secret)로 커스텀 광고 등록 → 목록 1순위
+  r = await j('POST', '/api/igplay/ads', { key: secretKey, body: { title: 'STUDIO ig 신작', body: '지금 플레이', cta: '시작', color: '#ffb02e' } });
+  ok('서버키 커스텀 광고 등록', r.status === 201 && !!r.data.ad?.id, JSON.stringify(r.data));
+  const adId = r.data.ad?.id;
+  r = await j('GET', '/api/igplay/ads', { key });
+  ok('커스텀 광고가 목록 1순위', r.status === 200 && r.data.ads[0].title === 'STUDIO ig 신작');
+  // 광고 삭제
+  r = await j('DELETE', '/api/igplay/ads/' + adId, { key: secretKey });
+  ok('광고 삭제', r.status === 200);
   // 보상형: 너무 짧으면 거부
   r = await j('POST', '/api/igplay/ads/reward', { key, token: player, body: { watchedMs: 1000 } });
   ok('짧은 시청 보상 거부(400)', r.status === 400);

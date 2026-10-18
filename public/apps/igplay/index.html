@@ -171,6 +171,13 @@ body.has-touch .touchctrl{display:grid}
 .edfoot input.t{flex:1;min-width:150px}
 .edfoot .spacer{flex:1}
 
+.adbanner{display:flex;align-items:center;gap:14px;background:linear-gradient(100deg,color-mix(in srgb,var(--adc) 22%,var(--surface)),var(--surface));border:1px solid var(--adc);border-radius:14px;padding:13px 16px;cursor:pointer;margin-bottom:18px}
+.adbanner:hover{border-color:var(--fg)}
+.adbanner .adtag{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.5px;background:var(--adc);color:#07100e;padding:3px 7px;border-radius:6px}
+.adbanner .adtxt{flex:1;min-width:0}
+.adbanner .adt{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.adbanner .adb{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.adbanner .adcta{flex:0 0 auto;font-weight:700;font-size:13px;color:var(--adc)}
 .empty{text-align:center;padding:60px 20px;color:var(--muted)}
 .empty svg{color:var(--faint);margin-bottom:14px}
 .empty h3{color:var(--fg);margin:0 0 6px;font-size:17px}
@@ -291,6 +298,19 @@ var HOUSE_ADS_LOCAL=[
 ];
 var AD_REWARD_LOCAL=20, AD_LAST=0, AD_COOLDOWN=90000;
 function pickAd(ads){ return ads[Math.floor(Math.random()*ads.length)]; }
+var adCache=null;
+function loadAds(cb){ if(adCache){cb(adCache);return;} if(NET.on){ api('GET','/api/igplay/ads').then(function(r){ adCache=r.ads&&r.ads.length?r.ads:HOUSE_ADS_LOCAL; cb(adCache); }).catch(function(){ cb(HOUSE_ADS_LOCAL); }); } else cb(HOUSE_ADS_LOCAL); }
+// 가로 배너 광고 (피드/워치 삽입용)
+function bannerAdHTML(ad){
+  return '<div class="adbanner" style="--adc:'+ad.color+'"><span class="adtag">AD</span>'+
+    '<div class="adtxt"><div class="adt">'+esc(ad.title)+'</div><div class="adb">'+esc(ad.body)+'</div></div>'+
+    '<span class="adcta">'+esc(ad.cta||'보기')+' ▶</span></div>';
+}
+function insertBanner(container, where){
+  loadAds(function(ads){ var ad=pickAd(ads); var d=document.createElement('div'); d.innerHTML=bannerAdHTML(ad);
+    var el=d.firstChild; if(ad.url)el.onclick=function(){ window.open(ad.url,'_blank'); };
+    if(where==='prepend'&&container.firstChild)container.insertBefore(el,container.firstChild); else container.appendChild(el); });
+}
 // 보상형 광고 시청 모달. 끝까지 보면 ISC 적립.
 function showRewardAd(onDone){
   var now=Date.now();
@@ -448,6 +468,8 @@ function renderHome(m,route){
   html+='<div class="grid" id="feed"></div></div>';
   m.innerHTML=html;
   m.querySelectorAll('.chip').forEach(function(c){ c.onclick=function(){ feedFilter=c.getAttribute('data-g'); renderHome(m,route); }; });
+  var wrapEl=m.querySelector('.wrap'); var chipsEl=m.querySelector('.chips');
+  if(wrapEl&&chipsEl){ var bslot=document.createElement('div'); wrapEl.insertBefore(bslot,chipsEl.nextSibling); insertBanner(bslot,'append'); }
   var feed=document.getElementById('feed');
   var list=lv.filter(function(l){return feedFilter==='전체'||l.genre===feedFilter;});
   list.sort(function(a,b){return (isBoosted(b.id)?1:0)-(isBoosted(a.id)?1:0);});
@@ -589,6 +611,9 @@ function renderWatch(m,id){
   recs.forEach(function(l){ var b=document.createElement('button'); b.className='srec'; b.onclick=function(){go('watch/'+l.id);};
     b.innerHTML='<div class="st"><canvas width="150" height="94"></canvas></div><div class="si"><div class="t">'+esc(l.title)+'</div><div class="s">'+esc(l.creator)+'<br>플레이 '+fmt(playCount(l))+'회</div></div>';
     drawThumb(b.querySelector('canvas'),l); rc.appendChild(b); });
+  // 워치 배너 광고 (설명과 댓글 사이)
+  var cmtEl=m.querySelector('.comments');
+  if(cmtEl){ var wb=document.createElement('div'); cmtEl.parentNode.insertBefore(wb,cmtEl); insertBanner(wb,'append'); }
   // comments
   renderComments(id);
   document.getElementById('cbtn').onclick=function(){ postComment(id); };
@@ -951,8 +976,11 @@ function renderShop(m){
     '<div><div style="color:var(--muted);font-size:12px">보유 잔액</div><div style="font-family:var(--mono);font-size:24px;font-weight:600;color:var(--brand)">'+fmt(db.isc||0)+' ISC</div></div>'+
     '<button class="btn brand" id="adRewardBtn" style="margin-left:auto"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px"><path d="M4 6h16v12H4z"/><path d="M10 9l5 3-5 3z"/></svg>광고 보고 ISC 받기</button></div>';
   html+='<h3 style="font-size:16px;margin:0 0 14px">플레이어 스킨</h3><div class="grid" id="skins"></div>';
-  html+='<h3 style="font-size:16px;margin:30px 0 14px">내 레벨 부스트</h3><div id="boostwrap"></div></div>';
+  html+='<h3 style="font-size:16px;margin:30px 0 14px">내 레벨 부스트</h3><div id="boostwrap"></div>';
+  if(NET.on) html+='<h3 style="font-size:16px;margin:30px 0 14px">하우스애드 관리 <span style="color:var(--faint);font-size:12px;font-weight:400">(관리자)</span></h3><div id="adminwrap"></div>';
+  html+='</div>';
   m.innerHTML=html;
+  if(NET.on) renderAdAdmin(document.getElementById('adminwrap'), m);
   var arb=document.getElementById('adRewardBtn'); if(arb)arb.onclick=function(){ showRewardAd(function(){ renderShop(m); }); };
   var sk=document.getElementById('skins');
   SKINS.forEach(function(s){
@@ -978,6 +1006,34 @@ function renderShop(m){
       if(NET.on){ api('POST','/api/igplay/boost',{levelId:l.id}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} netLoaded=false; toast('부스트 적용'); netLoadLevels().then(function(){ renderShop(m); }); }).catch(function(e){ toast(e.message); }); return; }
       if(spend(50)){ db.boosts[l.id]=Date.now()+864e5; saveDB(); toast('부스트 적용'); renderShop(m);} else toast('ISC가 부족합니다'); };
     bw.appendChild(d); });
+}
+
+// 하우스애드 관리 UI (관리자 role 또는 서버키 세션). 일반 유저는 등록 시 403이 떠서 안내.
+function renderAdAdmin(el, m){
+  if(!el)return;
+  el.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    '<input id="adT" placeholder="광고 제목" style="flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--fg);outline:none">'+
+    '<input id="adB" placeholder="설명" style="flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--fg);outline:none">'+
+    '<input id="adC" placeholder="버튼(써보기)" style="width:110px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--fg);outline:none">'+
+    '<input id="adU" placeholder="링크 URL(선택)" style="flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--fg);outline:none">'+
+    '<button class="btn brand" id="adAdd">등록</button></div></div>'+
+    '<div id="adList"></div>';
+  document.getElementById('adAdd').onclick=function(){
+    var title=document.getElementById('adT').value.trim(), body=document.getElementById('adB').value.trim();
+    if(!title||!body){toast('제목과 설명을 입력하세요');return;}
+    api('POST','/api/igplay/ads',{title:title,body:body,cta:document.getElementById('adC').value.trim()||'보기',url:document.getElementById('adU').value.trim(),color:'#3aa0ff'})
+      .then(function(){ adCache=null; toast('광고 등록 완료'); renderShop(m); })
+      .catch(function(e){ toast(e.status===403?'관리자 권한이 필요합니다':e.message); });
+  };
+  var lst=document.getElementById('adList');
+  api('GET','/api/igplay/ads').then(function(r){ var ads=r.ads||[];
+    ads.forEach(function(a){ if(!a.id)return; var d=document.createElement('div'); d.className='rrow';
+      d.innerHTML='<div class="who">'+esc(a.title)+' <span style="color:var(--muted);font-weight:400;font-size:12px">'+esc(a.body)+'</span></div><button class="btn" data-del="'+a.id+'" style="color:var(--danger)">삭제</button>';
+      d.querySelector('[data-del]').onclick=function(){ api('DELETE','/api/igplay/ads/'+a.id).then(function(){ adCache=null; toast('삭제됨'); renderShop(m); }).catch(function(e){ toast(e.message); }); };
+      lst.appendChild(d); });
+    if(!ads.some(function(a){return a.id;})) lst.innerHTML='<div style="color:var(--faint);font-size:13px">등록된 커스텀 광고가 없습니다. 기본 셀프프로모션이 노출됩니다.</div>';
+  }).catch(function(){});
 }
 
 /* ============================= boot ============================= */
