@@ -1077,16 +1077,20 @@ function renderWatchFor(m,lv,isTest){
 /* ============================= CHANNEL ============================= */
 var chanTab='all';
 function renderChannel(m){
-  var nick=db.nick||'게스트'; var mine=db.myLevels;
+  var nick=me();
+  var mine=NET.on ? netLevels.filter(function(l){return l.creatorId===NET.uid;}) : db.myLevels;
   var liked=allLevels().filter(function(l){return db.likes[l.id];});
-  var cleared=allLevels().filter(function(l){return (db.times[l.id]||[]).some(function(t){return t.n===nick;});});
-  var html='<div class="wrap"><div class="chead"><div class="ava" style="background:'+avaColor(nick)+'">'+nick.charAt(0)+'</div>'+
-    '<div><h1>'+esc(nick)+'</h1><div class="s">@'+(db.nick?esc(db.nick.toLowerCase()):'guest')+' · 업로드 '+mine.length+' · 클리어 '+cleared.length+'</div>'+
-    '<div style="margin-top:10px;display:flex;gap:8px"><button class="btn brand" onclick="go(\'create\')">+ 레벨 만들기</button>'+(db.nick?'':'<button class="btn" onclick="login()">닉네임 설정</button>')+'</div></div></div>';
+  var cleared=allLevels().filter(function(l){return (db.times[l.id]||[]).some(function(t){return (t.n||t.name)===nick;});});
+  var html='<div class="wrap"><div class="chead"><div class="ava" style="background:'+avaColor(nick)+'">'+esc(nick.charAt(0))+'</div>'+
+    '<div><h1>'+esc(nick)+'</h1><div class="s">@'+esc((NET.on?(NET.name||'me'):(db.nick||'guest')).toLowerCase())+' · 업로드 '+mine.length+' · 클리어 '+cleared.length+(NET.on?' · 서버':'')+'</div>'+
+    '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn brand" onclick="go(\'create\')">+ 레벨 만들기</button>'+
+    (NET.on?'<button class="btn" id="chInvest">채널 투자 모집</button>':(db.nick?'':'<button class="btn" onclick="login()">닉네임 설정</button>'))+'</div></div></div>';
   html+='<div class="ctabs">'+[['all','전체'],['mine','내 레벨'],['cleared','클리어'],['liked','좋아요']].map(function(t){return '<button class="ctab'+(t[0]===chanTab?' on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
   html+='<div class="grid" id="cfeed"></div></div>';
   m.innerHTML=html;
   m.querySelectorAll('.ctab').forEach(function(t){ t.onclick=function(){ chanTab=t.getAttribute('data-t'); renderChannel(m); }; });
+  var ci=document.getElementById('chInvest'); if(ci)ci.onclick=function(){ listChannelDialog(nick); };
+  if(NET.on && !netLoaded){ netLoadLevels().then(function(){ renderChannel(m); }); }
   var list= chanTab==='mine'?mine : chanTab==='liked'?liked : chanTab==='cleared'?cleared : mine.concat(liked.filter(function(l){return mine.indexOf(l)<0;}));
   var feed=document.getElementById('cfeed');
   if(!list.length){ feed.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg><h3>아직 콘텐츠가 없습니다</h3><p>만들기로 첫 블록 레벨을 올려보세요.</p></div>'; return; }
@@ -1252,6 +1256,21 @@ function listLevelDialog(lv){
   wrap.querySelector('#mO').onclick=function(){ var v=Math.round(+val.value||0); if(v<1){toast('금액을 입력하세요');return;}
     var body={kind:'level',refId:lv.id,title:lv.title,cover:lv.cover||null,mode:mode}; if(mode==='sale')body.price=v; else body.goal=v;
     api('POST','/api/igmarket/listings',body).then(function(){ toast('마켓 등록 완료'); close(); go('market'); }).catch(function(e){ toast(e.message); }); };
+}
+
+// 채널을 마켓에 투자 매물로 등록
+function listChannelDialog(nick){
+  if(!NET.on){ toast('서버 연결이 필요합니다'); openServerDialog(); return; }
+  var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;text-align:left"><h3 style="font-size:18px">채널 투자 모집</h3><p>'+esc(nick)+' 채널의 성장에 투자받습니다. 모금액은 창작 활동에 쓰입니다.</p>'+
+    '<input id="chGoal" type="number" min="1" placeholder="목표 모금액(ISC)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:10px">'+
+    '<input id="chDesc" placeholder="소개(선택)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:14px">'+
+    '<div class="obtns"><button class="btn" id="chC">취소</button><button class="btn brand" id="chO">등록</button></div></div>';
+  document.body.appendChild(wrap);
+  function close(){ wrap.remove(); } wrap.querySelector('#chC').onclick=close; wrap.onclick=function(e){ if(e.target===wrap)close(); };
+  wrap.querySelector('#chO').onclick=function(){ var g=Math.round(+wrap.querySelector('#chGoal').value||0); if(g<1){toast('목표 금액을 입력하세요');return;}
+    api('POST','/api/igmarket/listings',{kind:'channel',title:nick+' 채널',mode:'invest',goal:g,desc:wrap.querySelector('#chDesc').value.trim()})
+      .then(function(){ toast('채널 투자 모집 등록 완료'); close(); go('market'); }).catch(function(e){ toast(e.message); }); };
 }
 
 /* ============================= boot ============================= */
