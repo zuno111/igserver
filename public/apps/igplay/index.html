@@ -398,6 +398,13 @@ function coinCount(lv){ var c=0; lv.voxels.forEach(function(b){if(b.t===3)c++;})
 function playCount(lv){ return (lv.plays||0)+(db.plays[lv.id]||0); }
 function likeCount(lv){ return (lv.likes||0)+(db.likes[lv.id]?1:0); }
 
+// 커버 이미지가 있으면 캔버스 대신 img로 교체(레이어룸 PNG 썸네일)
+function setThumbImage(thumbEl, src, canvasEl){
+  if(!thumbEl)return; var im=new Image(); im.onload=function(){ if(canvasEl)canvasEl.style.display='none';
+    var existing=thumbEl.querySelector('img.cover'); if(existing)existing.remove();
+    im.className='cover'; im.style.cssText='width:100%;height:100%;object-fit:cover;display:block'; thumbEl.insertBefore(im,thumbEl.firstChild); };
+  im.onerror=function(){ if(canvasEl&&thumbEl._lv)drawThumb(canvasEl,thumbEl._lv); }; im.src=src;
+}
 /* ============================= thumbnails (top-down minimap) ============================= */
 function drawThumb(cv,lv){
   var ctx=cv.getContext('2d'); var W=cv.width,H=cv.height;
@@ -488,7 +495,7 @@ function makeCard(l){
      '<div class="mtext"><div class="ctitle">'+esc(l.title)+'</div>'+
      '<div class="csub">'+esc(l.creator)+(l.verified?' ✔':'')+'</div>'+
      '<div class="csub"><span class="vf">플레이 '+fmt(playCount(l))+'회</span> · '+l.genre+'</div></div></div>';
-  var cv=c.querySelector('canvas'); drawThumb(cv,l);
+  var cv=c.querySelector('canvas'); if(l.cover){ setThumbImage(c.querySelector('.thumb'),l.cover,cv); } else drawThumb(cv,l);
   return c;
 }
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -610,7 +617,7 @@ function renderWatch(m,id){
   var rc=document.getElementById('recs');
   recs.forEach(function(l){ var b=document.createElement('button'); b.className='srec'; b.onclick=function(){go('watch/'+l.id);};
     b.innerHTML='<div class="st"><canvas width="150" height="94"></canvas></div><div class="si"><div class="t">'+esc(l.title)+'</div><div class="s">'+esc(l.creator)+'<br>플레이 '+fmt(playCount(l))+'회</div></div>';
-    drawThumb(b.querySelector('canvas'),l); rc.appendChild(b); });
+    if(l.cover)setThumbImage(b.querySelector('.st'),l.cover,b.querySelector('canvas')); else drawThumb(b.querySelector('canvas'),l); rc.appendChild(b); });
   // 워치 배너 광고 (설명과 댓글 사이)
   var cmtEl=m.querySelector('.comments');
   if(cmtEl){ var wb=document.createElement('div'); cmtEl.parentNode.insertBefore(wb,cmtEl); insertBanner(wb,'append'); }
@@ -921,6 +928,7 @@ function renderEditor(m){
       '<div class="spacer"></div>'+
       '<label class="btn" style="cursor:pointer">에셋 임포트<input id="edimport" type="file" accept=".json,.vox,application/json" hidden></label>'+
       '<label class="btn" style="cursor:pointer" title="webmax 3D 모델(OBJ)을 메시 그대로 배치">3D 임포트(OBJ)<input id="edobj" type="file" accept=".obj" hidden></label>'+
+      '<label class="btn" style="cursor:pointer" title="레이어룸 이미지(PNG)를 레벨 커버로 사용">커버 이미지<input id="edcover" type="file" accept="image/*" hidden></label>'+
       '<button class="btn" id="edtest">▶ 테스트</button>'+
       '<button class="btn brand" id="edsave">업로드</button>'+
     '</div></div>';
@@ -943,6 +951,7 @@ function renderEditor(m){
   var geo=new THREE.BoxGeometry(1,1,1); var edgeGeo=new THREE.EdgesGeometry(geo);
   var voxels={}; // key -> {t,mesh,edge}
   var edProps=[]; // 에디터 메시 프롭 목록 {mesh, data}
+  var edCover=null; // 레이어룸 커버 이미지(data URL)
   var spawn={x:3,y:1,z:3}; var spawnMarker=null;
   function key(x,y,z){return x+','+y+','+z;}
   function matFor(t){ return new THREE.MeshLambertMaterial({color:BLOCKCOL[t]||0xffffff}); }
@@ -990,14 +999,14 @@ function renderEditor(m){
   function buildLevel(){ var c=collect();
     var lv={ id:'my-'+Date.now(), title:document.getElementById('edtitle').value.trim()||'새 블록 레벨',
       creator:me(), creatorId:'me_'+(db.nick||'guest'), genre:document.getElementById('edgenre').value, difficulty:document.getElementById('eddiff').value,
-      plays:0, likes:0, desc:'에디터로 제작한 레벨입니다.', voxels:c.vox, spawn:spawn, props:edProps.map(function(p){return p.data;}), mine:true };
+      plays:0, likes:0, desc:'에디터로 제작한 레벨입니다.', voxels:c.vox, spawn:spawn, props:edProps.map(function(p){return p.data;}), cover:edCover, mine:true };
     return {lv:lv,hasGoal:c.hasGoal}; }
   document.getElementById('edtest').onclick=function(){ var r=buildLevel(); if(!r.hasGoal){toast('골 블록을 1개 이상 배치하세요');return;} window._testLevel=r.lv; teardown();
     // render a temporary watch using the test level
     renderWatchTemp(r.lv); };
   document.getElementById('edsave').onclick=function(){ var r=buildLevel(); if(!r.hasGoal){toast('골 블록을 1개 이상 배치하세요');return;}
     if(!r.lv.voxels.some(function(b){return b.t===1||b.t===2;})){toast('지면 블록을 배치하세요');return;}
-    if(NET.on){ api('POST','/api/igplay/levels',{title:r.lv.title,genre:r.lv.genre,difficulty:r.lv.difficulty,voxels:r.lv.voxels,spawn:r.lv.spawn,desc:r.lv.desc,props:r.lv.props})
+    if(NET.on){ api('POST','/api/igplay/levels',{title:r.lv.title,genre:r.lv.genre,difficulty:r.lv.difficulty,voxels:r.lv.voxels,spawn:r.lv.spawn,desc:r.lv.desc,props:r.lv.props,cover:r.lv.cover})
       .then(function(resp){ toast('서버 업로드 완료'); netLoaded=false; netLoadLevels().then(function(){ go('watch/'+resp.level.id); }); })
       .catch(function(e){ toast('업로드 실패: '+e.message); }); return; }
     db.myLevels.push(r.lv); saveDB(); toast('업로드 완료'); go('watch/'+r.lv.id); };
@@ -1024,6 +1033,13 @@ function renderEditor(m){
       toast('3D 모델 배치 완료 ('+parsed.tris+' 삼각형)');
     }catch(err){ toast('OBJ 처리 오류: '+err.message); } };
     rd.readAsText(f); e.target.value=''; };
+  // 레이어룸 이미지 → 레벨 커버. 640px로 리사이즈 + JPEG 압축(용량 방지).
+  document.getElementById('edcover').onchange=function(e){ var f=e.target.files&&e.target.files[0]; if(!f)return;
+    var img=new Image(); img.onload=function(){ var MX=640; var s=Math.min(1,MX/Math.max(img.width,img.height));
+      var w=Math.round(img.width*s), h=Math.round(img.height*s); var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h); edCover=cv.toDataURL('image/jpeg',0.82);
+      toast('커버 이미지 설정 완료 ('+w+'×'+h+')'); URL.revokeObjectURL(img.src); };
+    img.onerror=function(){ toast('이미지 로드 실패'); }; img.src=URL.createObjectURL(f); e.target.value=''; };
 
   activeSession={ dispose:function(){ cancelAnimationFrame(raf); ro.disconnect(); try{renderer.dispose();}catch(e){} } };
 }

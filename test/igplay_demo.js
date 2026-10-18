@@ -77,6 +77,12 @@ async function run() {
   r = await j('GET', '/api/igplay/levels/' + propId, { key });
   ok('프롭 데이터 보존(verts/faces)', r.status === 200 && r.data.level.props[0].faces.length === 3 && r.data.level.props[0].verts.length === 3, JSON.stringify(r.data.level.props[0]));
 
+  // 레이어룸 커버 이미지(data URL) 저장·반환
+  const coverLvl = sampleLevel('커버 포함 레벨');
+  coverLvl.cover = 'data:image/jpeg;base64,/9j/TESTCOVER==';
+  r = await j('POST', '/api/igplay/levels', { key, token: creator, body: coverLvl });
+  ok('커버 이미지 레벨 업로드', r.status === 201 && r.data.level?.cover === coverLvl.cover, JSON.stringify(r.data.level?.cover));
+
   // 플레이어 지갑 초기값(120)
   r = await j('GET', '/api/igplay/wallet', { key, token: player });
   ok('지갑 초기 잔액 120', r.status === 200 && r.data.wallet.balance === 120, JSON.stringify(r.data.wallet));
