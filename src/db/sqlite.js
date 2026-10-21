@@ -4,7 +4,7 @@ import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
-import { applyIncs } from '../util.js';
+import { applyIncs, normalizeFilters, normalizeSort } from '../util.js';
 
 // pkg/SEA 단독 실행파일 안에서는 네이티브 .node 바인딩을 바이너리 옆에서 직접 로드한다.
 // SEA에서는 addon 객체를 직접 넘겨 better-sqlite3 내부 require를 우회한다.
@@ -127,6 +127,7 @@ export function createSqliteRepo(config) {
   const OPS = { eq: '=', ne: '!=', gt: '>', gte: '>=', lt: '<', lte: '<=' };
   const okField = (f) => typeof f === 'string' && /^[A-Za-z0-9_.]{1,64}$/.test(f);
   function buildWhere(filters) {
+    filters = normalizeFilters(filters);
     const clauses = [], params = [];
     for (const f of filters || []) {
       if (!okField(f.field)) continue;
@@ -137,6 +138,7 @@ export function createSqliteRepo(config) {
     return { sql: clauses.length ? ' AND ' + clauses.join(' AND ') : '', params };
   }
   function buildOrder(sort) {
+    sort = normalizeSort(sort);
     if (!sort || !okField(sort.field)) return ' ORDER BY updated_at DESC';
     const dir = sort.dir === 'asc' ? 'ASC' : 'DESC';
     if (sort.field === 'updated_at' || sort.field === 'created_at') return ` ORDER BY ${sort.field} ${dir}`;

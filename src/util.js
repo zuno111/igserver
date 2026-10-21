@@ -27,6 +27,27 @@ export function applyIncs(data, incs) {
   return out;
 }
 
+// 필터/정렬 정규화: 호출부가 객체형({field,op,value}/{field,dir})이든
+// 축약형(배열 ['f','op','v'], 문자열 'field:dir')이든 드라이버가 모두 받게 통일한다.
+//   filters: [['kind','eq','x']] 또는 [{field:'kind',op:'eq',value:'x'}]
+//   sort:    'created_at:desc' 또는 {field:'created_at',dir:'desc'}
+export function normalizeFilters(filters) {
+  if (!filters) return undefined;
+  const arr = Array.isArray(filters) ? filters : [filters];
+  const out = [];
+  for (const f of arr) {
+    if (Array.isArray(f)) { if (f[0]) out.push({ field: f[0], op: f[1] || 'eq', value: f[2] }); }
+    else if (f && typeof f === 'object' && f.field) out.push({ field: f.field, op: f.op || 'eq', value: f.value });
+  }
+  return out;
+}
+export function normalizeSort(sort) {
+  if (!sort) return undefined;
+  if (typeof sort === 'string') { const [field, dir] = sort.split(':'); return field ? { field, dir: dir === 'asc' ? 'asc' : 'desc' } : undefined; }
+  if (typeof sort === 'object' && sort.field) return { field: sort.field, dir: sort.dir === 'asc' ? 'asc' : 'desc' };
+  return undefined;
+}
+
 // inc 입력 정규화: {field,by} 또는 {fields:{...}} 또는 {inc:{...}} → {field:delta}
 const OK_FIELD = /^[A-Za-z0-9_.]{1,64}$/;
 export function normalizeIncs(body) {

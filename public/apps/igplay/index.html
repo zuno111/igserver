@@ -444,6 +444,7 @@ function render(){
   else if(r.name==='ranking'){ renderRanking(m); }
   else if(r.name==='shop'){ renderShop(m); }
   else if(r.name==='market'){ renderMarket(m); }
+  else if(r.name==='store'){ renderStore(m); }
   else renderHome(m,r.name);
 }
 window.addEventListener('hashchange',render);
@@ -455,6 +456,7 @@ var NAVS=[['home','추천','M3 11l9-8 9 8M5 10v10h14V10'],
           ['ranking','랭킹','M6 21V9M12 21V4M18 21v-7'],
           ['shop','상점','M4 8h16l-1.3 11a2 2 0 01-2 1.8H7.3a2 2 0 01-2-1.8zM8 8V6a4 4 0 018 0v2'],
           ['market','마켓','M3 3h18v4H3zM5 7v13h14V7M9 11h6'],
+          ['store','스토어','M3 9l2-5h14l2 5M3 9h18l-1.5 11H4.5zM9 13h6'],
           ['channel','내 채널','M12 8a4 4 0 100-8 4 4 0 000 8M4 21c0-4 4-6 8-6s8 2 8 6']];
 function buildNav(active){
   var n=document.getElementById('nav'); n.innerHTML='';
@@ -1250,6 +1252,130 @@ function renderAdAdmin(el, m){
 
 /* ============================= MARKET (igMarket) ============================= */
 var mktTab='all';
+/* ============================= 스토어(통합 콘텐츠 마켓) ============================= */
+// 게임·앱·3D에셋·이미지·음원·영상·문서를 하나의 스토어에서 올리고 받는다. ISC 결제/무료/광고해제/토큰 홀더.
+var storeTab='all';
+var STORE_KINDS=[['all','전체'],['game','게임'],['app','앱'],['asset3d','3D에셋'],['image','이미지'],['music','음원'],['video','영상'],['doc','문서'],['mine','내 보관함']];
+var STORE_KIND_LABEL={game:'게임',level:'레벨',app:'앱',asset3d:'3D에셋',image:'이미지',music:'음원',video:'영상',doc:'문서',bundle:'번들'};
+function storeAccessBadge(it){
+  if(it.access==='paid') return '<span class="vf" style="color:var(--brand)">'+fmt(it.price)+' ISC</span>';
+  if(it.access==='ad') return '<span class="vf" style="color:var(--accent)">광고</span>';
+  if(it.access==='token') return '<span class="vf" style="color:var(--accent)">'+esc(it.gateSymbol||'')+' '+it.gateMin+'개</span>';
+  return '<span class="vf" style="color:var(--ok,#2ec27e)">무료</span>';
+}
+function renderStore(m){
+  if(!NET.on){ m.innerHTML='<div class="wrap"><div class="sechead"><h2>스토어</h2><p>게임·앱·3D·이미지·음원·영상·문서를 올리고 받기</p></div><div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l2-5h14l2 5M3 9h18l-1.5 11H4.5z"/></svg><h3>서버 연결이 필요합니다</h3><p>스토어 이용은 서버 계정이 필요합니다. 상단 "서버"에서 연결하세요.</p><button class="btn brand" style="margin-top:12px" onclick="openServerDialog()">서버 연결</button></div></div>'; return; }
+  var html='<div class="wrap"><div class="sechead" style="display:flex;justify-content:space-between;align-items:flex-start"><div><h2>스토어</h2><p>게임·앱·3D·이미지·음원·영상·문서를 ISC로 거래</p></div><button class="btn brand" id="stPub">올리기</button></div>';
+  html+='<div style="margin:8px 0 12px"><input id="stQ" placeholder="제목·태그 검색" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--fg);outline:none"></div>';
+  html+='<div class="chips">'+STORE_KINDS.map(function(t){return '<button class="chip'+(t[0]===storeTab?' on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
+  html+='<div id="stlist">불러오는 중…</div></div>';
+  m.innerHTML=html;
+  m.querySelector('#stPub').onclick=function(){ publishStoreDialog(m); };
+  m.querySelectorAll('.chip').forEach(function(c){ c.onclick=function(){ storeTab=c.getAttribute('data-t'); renderStore(m); }; });
+  var qi=m.querySelector('#stQ'); qi.onkeydown=function(e){ if(e.key==='Enter') loadStore(m,qi.value.trim()); };
+  loadStore(m,'');
+}
+function loadStore(m,q){
+  var lst=document.getElementById('stlist'); if(!lst)return;
+  if(storeTab==='mine'){
+    api('GET','/api/igstore/library').then(function(r){
+      var owned=r.owned||[], pub=r.published||[];
+      var h='';
+      h+='<div class="sechead" style="margin-top:4px"><h2 style="font-size:16px">받은 콘텐츠 '+owned.length+'</h2></div>';
+      if(!owned.length) h+='<div class="empty"><p>받은 콘텐츠가 없습니다.</p></div>'; else { h+='<div class="grid" id="stOwned"></div>'; }
+      h+='<div class="sechead" style="margin-top:16px"><h2 style="font-size:16px">내가 올린 콘텐츠 '+pub.length+'</h2></div>';
+      if(!pub.length) h+='<div class="empty"><p>올린 콘텐츠가 없습니다.</p></div>'; else { h+='<div class="grid" id="stPubbed"></div>'; }
+      lst.innerHTML=h;
+      var g1=document.getElementById('stOwned'); if(g1) owned.forEach(function(it){ g1.appendChild(storeCard(it,m)); });
+      var g2=document.getElementById('stPubbed'); if(g2) pub.forEach(function(it){ g2.appendChild(storeCard(it,m)); });
+    }).catch(function(){ lst.innerHTML='<div class="empty"><p>불러오기 실패</p></div>'; });
+    return;
+  }
+  var qs=[]; if(storeTab!=='all') qs.push('kind='+storeTab); if(q) qs.push('q='+encodeURIComponent(q));
+  api('GET','/api/igstore/catalog'+(qs.length?'?'+qs.join('&'):'')).then(function(r){
+    var items=r.items||[];
+    if(!items.length){ lst.innerHTML='<div class="empty"><h3>콘텐츠가 없습니다</h3><p>오른쪽 위 "올리기"로 첫 콘텐츠를 등록해보세요.</p></div>'; return; }
+    lst.innerHTML='<div class="grid"></div>'; var grid=lst.querySelector('.grid');
+    items.forEach(function(it){ grid.appendChild(storeCard(it,m)); });
+  }).catch(function(){ lst.innerHTML='<div class="empty"><p>불러오기 실패</p></div>'; });
+}
+function storeCard(it,m){
+  var c=document.createElement('div'); c.className='card'; c.style.cursor='default';
+  var owned=it.entitled||it.mine;
+  var btn;
+  if(owned) btn='<button class="btn" style="width:100%;margin-top:8px" data-open="1">'+(it.mine?'내 콘텐츠 · 열기':'열기/다운로드')+'</button>';
+  else if(it.access==='paid') btn='<button class="btn brand" style="width:100%;margin-top:8px" data-buy="1">구매 · '+fmt(it.price)+' ISC</button>';
+  else if(it.access==='ad') btn='<button class="btn accent" style="width:100%;margin-top:8px" data-ad="1">광고 보고 받기</button>';
+  else if(it.access==='token') btn='<button class="btn accent" style="width:100%;margin-top:8px" data-tok="1">'+esc(it.gateSymbol||'')+' '+it.gateMin+'개로 해제</button>';
+  else btn='<button class="btn brand" style="width:100%;margin-top:8px" data-free="1">무료 받기</button>';
+  c.innerHTML='<div class="thumb">'+(it.cover?'<img src="'+it.cover+'" style="width:100%;height:100%;object-fit:cover">':'<div style="display:grid;place-items:center;height:100%;color:var(--faint);font-size:12px">'+esc(STORE_KIND_LABEL[it.kind]||it.kind)+'</div>')+
+    '<span class="plv"><b style="background:var(--brand)"></b>'+esc(STORE_KIND_LABEL[it.kind]||it.kind)+'</span></div>'+
+    '<div class="meta"><div class="ava" style="background:'+avaColor(it.ownerId||'x')+'">'+(it.creator||'?').charAt(0)+'</div><div class="mtext">'+
+    '<div class="ctitle">'+esc(it.title)+'</div>'+
+    '<div class="csub">'+esc(it.creator||'익명')+' · '+storeAccessBadge(it)+(it.downloads?(' · 받음 '+fmt(it.downloads)):'')+'</div>'+
+    btn+'</div></div>';
+  var bind=function(sel,fn){ var b=c.querySelector(sel); if(b)b.onclick=fn; };
+  bind('[data-open]',function(){ storeDownload(it); });
+  bind('[data-free]',function(){ api('POST','/api/igstore/catalog/'+it.id+'/claim',{}).then(function(){ toast('받기 완료'); renderStore(m); }).catch(function(e){ toast(e.message); }); });
+  bind('[data-tok]',function(){ api('POST','/api/igstore/catalog/'+it.id+'/claim',{}).then(function(){ toast('토큰 해제 완료'); renderStore(m); }).catch(function(e){ toast(e.message||'토큰이 부족합니다'); }); });
+  bind('[data-buy]',function(){ api('POST','/api/igstore/catalog/'+it.id+'/buy',{}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast('구매 완료'); renderStore(m); }).catch(function(e){ toast(e.message); }); });
+  bind('[data-ad]',function(){ storeAdWatch(it,m); });
+  return c;
+}
+// 소유 콘텐츠 열기/다운로드
+function storeDownload(it){
+  api('GET','/api/igstore/catalog/'+it.id+'/download').then(function(r){
+    var url=r.externalUrl||r.fileUrl;
+    if(!url){ toast('연결된 파일이 없습니다'); return; }
+    if(r.fileUrl && NET.base) url=NET.base.replace(/\/$/,'')+r.fileUrl;
+    window.open(url,'_blank'); toast('열기: '+esc(r.title||''));
+  }).catch(function(e){ toast(e.message); });
+}
+// 광고 시청 후 해제(서버가 최소 시청시간 검증)
+function storeAdWatch(it,m){
+  var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
+  var sec=5;
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;text-align:center"><h3 style="font-size:18px">광고 시청</h3><p style="margin:10px 0">잠시 광고를 시청하면 콘텐츠가 열립니다.</p><div id="adCnt" style="font-size:34px;font-weight:700;color:var(--brand);margin:8px 0">'+sec+'</div><div class="obtns" style="justify-content:center"><button class="btn" id="adCancel">취소</button></div></div>';
+  document.body.appendChild(wrap);
+  var t0=Date.now(); var cnt=wrap.querySelector('#adCnt');
+  wrap.querySelector('#adCancel').onclick=function(){ clearInterval(iv); wrap.remove(); };
+  var iv=setInterval(function(){ sec--; if(cnt)cnt.textContent=sec>0?sec:'완료'; if(sec<=0){ clearInterval(iv);
+    api('POST','/api/igstore/catalog/'+it.id+'/adview',{watchedMs:Date.now()-t0}).then(function(){ wrap.remove(); toast('해제 완료'); renderStore(m); }).catch(function(e){ wrap.remove(); toast(e.message); });
+  } },1000);
+}
+// 콘텐츠 올리기(발행)
+function publishStoreDialog(m){
+  if(!NET.on){ toast('서버 연결이 필요합니다'); openServerDialog(); return; }
+  var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
+  var inputS='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:10px';
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:22px;text-align:left;max-width:460px;max-height:86vh;overflow:auto">'+
+    '<h3 style="font-size:18px;margin-bottom:12px">콘텐츠 올리기</h3>'+
+    '<select id="pKind" style="'+inputS+'"><option value="game">게임</option><option value="app">앱</option><option value="asset3d">3D에셋(GLB/OBJ)</option><option value="image">이미지</option><option value="music">음원</option><option value="video">영상</option><option value="doc">문서/프리셋</option><option value="bundle">번들</option></select>'+
+    '<input id="pTitle" placeholder="제목" style="'+inputS+'">'+
+    '<textarea id="pDesc" placeholder="설명(선택)" rows="2" style="'+inputS+';resize:vertical"></textarea>'+
+    '<input id="pUrl" placeholder="콘텐츠 링크(https://... 다운로드/실행 주소)" style="'+inputS+'">'+
+    '<input id="pTags" placeholder="태그(쉼표로 구분, 선택)" style="'+inputS+'">'+
+    '<label style="font-size:13px;color:var(--faint)">공개 방식</label>'+
+    '<select id="pAccess" style="'+inputS+';margin-top:4px"><option value="free">무료</option><option value="paid">ISC 유료</option><option value="ad">광고 보고 무료</option><option value="token">토큰 홀더 전용</option></select>'+
+    '<div id="pPaid" style="display:none"><input id="pPrice" type="number" min="1" placeholder="가격(ISC)" style="'+inputS+'"></div>'+
+    '<div id="pTok" style="display:none"><input id="pSym" placeholder="토큰 심볼(예: JOON)" style="'+inputS+'"><input id="pMin" type="number" min="1" placeholder="최소 보유 수량" style="'+inputS+'"></div>'+
+    '<div class="obtns"><button class="btn" id="pC">취소</button><button class="btn brand" id="pO">올리기</button></div></div>';
+  document.body.appendChild(wrap);
+  var acc=wrap.querySelector('#pAccess');
+  acc.onchange=function(){ wrap.querySelector('#pPaid').style.display=acc.value==='paid'?'block':'none'; wrap.querySelector('#pTok').style.display=acc.value==='token'?'block':'none'; };
+  function close(){ wrap.remove(); } wrap.querySelector('#pC').onclick=close; wrap.onclick=function(e){ if(e.target===wrap)close(); };
+  wrap.querySelector('#pO').onclick=function(){
+    var title=wrap.querySelector('#pTitle').value.trim(); if(!title){ toast('제목을 입력하세요'); return; }
+    var url=wrap.querySelector('#pUrl').value.trim();
+    var body={kind:wrap.querySelector('#pKind').value,title:title,desc:wrap.querySelector('#pDesc').value.trim(),access:acc.value};
+    if(url){ if(!/^https?:\/\//.test(url)){ toast('링크는 http(s)로 시작해야 합니다'); return; } body.externalUrl=url; }
+    var tags=wrap.querySelector('#pTags').value.trim(); if(tags) body.tags=tags.split(',').map(function(s){return s.trim();}).filter(Boolean);
+    if(acc.value==='paid'){ var pr=Math.round(+wrap.querySelector('#pPrice').value||0); if(pr<1){ toast('가격을 입력하세요'); return; } body.price=pr; }
+    if(acc.value==='token'){ var sym=wrap.querySelector('#pSym').value.trim().toUpperCase(); var mn=Math.round(+wrap.querySelector('#pMin').value||0); if(!sym){ toast('토큰 심볼을 입력하세요'); return; } body.gateSymbol=sym; body.gateMin=mn||1; }
+    api('POST','/api/igstore/catalog',body).then(function(){ toast('올리기 완료'); close(); storeTab='mine'; renderStore(m); }).catch(function(e){ toast(e.message); });
+  };
+}
+
 function renderMarket(m){
   if(!NET.on){ m.innerHTML='<div class="wrap"><div class="sechead"><h2>마켓</h2><p>레벨·프로젝트를 ISC로 거래·투자</p></div><div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h18v4H3zM5 7v13h14V7"/></svg><h3>서버 연결이 필요합니다</h3><p>마켓 거래·투자는 서버 계정이 필요합니다. 상단 "서버"에서 연결하세요.</p><button class="btn brand" style="margin-top:12px" onclick="openServerDialog()">서버 연결</button></div></div>'; return; }
   var html='<div class="wrap"><div class="sechead"><h2>마켓</h2><p>레벨·프로젝트를 ISC로 거래·투자</p></div>';

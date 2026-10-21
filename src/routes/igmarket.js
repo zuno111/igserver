@@ -13,7 +13,9 @@ import { randomId } from '../config.js';
 import { credit, debit, getWallet } from '../isc.js';
 
 const router = Router();
-const KINDS = ['level', 'channel', 'project'];
+// igStore 통합: 레벨/채널/프로젝트 + 모든 카탈로그 콘텐츠(게임·앱·3D에셋·이미지·음원·영상·문서·번들)를 거래/투자 대상으로.
+const CATALOG_KINDS = ['game', 'app', 'asset3d', 'image', 'music', 'video', 'doc', 'bundle'];
+const KINDS = ['level', 'channel', 'project', ...CATALOG_KINDS];
 const MODES = ['sale', 'invest'];
 const FEE_RATE = 0.05; // 거래 수수료 5% (플랫폼 소각/보관)
 
@@ -53,13 +55,14 @@ router.post('/listings', requireUser, async (req, res, next) => {
     if (!MODES.includes(mode)) return res.status(400).json({ error: 'bad_mode' });
     if (!title) return res.status(400).json({ error: 'bad_title', message: '제목이 필요합니다.' });
     const pid = req.project.id, uid = req.user.uid, repo = getRepo();
-    // 레벨 매물이면 소유권 검증(자기 레벨만)
-    if (kind === 'level' && refId) {
-      const lv = await repo.getRecord(pid, 'levels', refId);
-      if (lv && lv.owner_id !== uid) return res.status(403).json({ error: 'not_owner', message: '본인 레벨만 등록할 수 있습니다.' });
-      // 중복 등록 방지
+    // 소유권 검증: 레벨은 levels, 카탈로그 콘텐츠는 catalog에서 본인 것만 등록 가능
+    const ownColl = kind === 'level' ? 'levels' : (CATALOG_KINDS.includes(kind) ? 'catalog' : null);
+    if (ownColl && refId) {
+      const src = await repo.getRecord(pid, ownColl, refId);
+      if (src && src.owner_id !== uid) return res.status(403).json({ error: 'not_owner', message: '본인 콘텐츠만 등록할 수 있습니다.' });
+      // 중복 등록 방지(열린 매물)
       const dup = await repo.queryRecords(pid, 'listings', { limit: 1, filters: [['refId', 'eq', refId]] });
-      if (dup.length && (dup[0].data.status || 'open') === 'open') return res.status(409).json({ error: 'already_listed', message: '이미 마켓에 등록된 레벨입니다.' });
+      if (dup.length && (dup[0].data.status || 'open') === 'open') return res.status(409).json({ error: 'already_listed', message: '이미 마켓에 등록된 콘텐츠입니다.' });
     }
     const id = randomId('mk_');
     const data = {
@@ -98,10 +101,11 @@ router.post('/listings/:id/buy', requireUser, async (req, res, next) => {
     if (!after) return res.status(402).json({ error: 'insufficient', message: 'ISC가 부족합니다.' });
     const sellerGet = Math.round(price * (1 - FEE_RATE));
     await credit(pid, rec.owner_id, sellerGet, 'mkt_sold', req.params.id);
-    // 레벨 소유권 이전
-    if (rec.data.kind === 'level' && rec.data.refId) {
-      const lv = await repo.getRecord(pid, 'levels', rec.data.refId);
-      if (lv) { lv.data.creator = req.user.name || '익명'; await repo.putRecord({ project_id: pid, collection: 'levels', doc_id: rec.data.refId, data: lv.data, owner_id: uid }); }
+    // 소유권 이전: 레벨은 levels, 카탈로그 콘텐츠는 catalog
+    const transColl = rec.data.kind === 'level' ? 'levels' : (CATALOG_KINDS.includes(rec.data.kind) ? 'catalog' : null);
+    if (transColl && rec.data.refId) {
+      const src = await repo.getRecord(pid, transColl, rec.data.refId);
+      if (src) { src.data.creator = req.user.name || '익명'; await repo.putRecord({ project_id: pid, collection: transColl, doc_id: rec.data.refId, data: src.data, owner_id: uid }); }
     }
     rec.data.status = 'sold';
     await repo.putRecord({ project_id: pid, collection: 'listings', doc_id: req.params.id, data: rec.data, owner_id: rec.owner_id });

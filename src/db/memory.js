@@ -1,6 +1,6 @@
 // 메모리 드라이버. better-sqlite3 설치가 막힌 환경에서도 서버가 뜨게 하는 폴백.
 // 재시작하면 데이터가 날아가므로 데모/테스트용. 인터페이스는 sqlite와 동일.
-import { applyIncs } from '../util.js';
+import { applyIncs, normalizeFilters, normalizeSort } from '../util.js';
 function getField(obj, path) { return String(path).split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj); }
 function matchOne(v, op, val) {
   switch (op) {
@@ -15,10 +15,12 @@ function matchOne(v, op, val) {
   }
 }
 function applyFilters(arr, filters) {
+  filters = normalizeFilters(filters);
   if (!filters || !filters.length) return arr;
   return arr.filter((r) => filters.every((f) => matchOne(getField(r.data, f.field), f.op, f.value)));
 }
 function applySort(arr, sort) {
+  sort = normalizeSort(sort);
   if (!sort || !sort.field) return arr.sort((a, b) => b.updated_at - a.updated_at);
   const dir = sort.dir === 'asc' ? 1 : -1;
   const key = (r) => (sort.field === 'updated_at' || sort.field === 'created_at') ? r[sort.field] : getField(r.data, sort.field);

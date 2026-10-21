@@ -274,6 +274,88 @@ async function run() {
   r = await j('GET', '/api/igtoken/tokens/JOON/tier', { key, token: player });
   ok('홀더 티어 계산(5개→BRONZE)', r.status === 200 && r.data.tier === 'BRONZE', JSON.stringify(r.data));
 
+  // ===================== igStore 통합 콘텐츠 마켓 =====================
+  console.log('--- igStore(통합 콘텐츠 마켓) ---');
+  // 1) 무료 이미지 발행 → 플레이어가 받기 → 다운로드
+  r = await j('POST', '/api/igstore/catalog', { key, token: creator, body: { kind: 'image', title: '무료 배경 이미지', access: 'free', externalUrl: 'https://example.com/bg.png', tags: ['배경', '무료'] } });
+  ok('무료 콘텐츠 발행', r.status === 201 && r.data.item?.kind === 'image' && r.data.item.mine === true, JSON.stringify(r.data));
+  const freeId = r.data.item?.id;
+  // 지원하지 않는 종류 거부
+  r = await j('POST', '/api/igstore/catalog', { key, token: creator, body: { kind: 'nope', title: 'x' } });
+  ok('잘못된 종류 발행 거부(400)', r.status === 400);
+  // 받기 전 다운로드 차단
+  r = await j('GET', '/api/igstore/catalog/' + freeId + '/download', { key, token: player });
+  ok('미소유 다운로드 차단(403)', r.status === 403);
+  // 무료 받기 → 소유권
+  r = await j('POST', '/api/igstore/catalog/' + freeId + '/claim', { key, token: player });
+  ok('무료 받기 성공', r.status === 200 && r.data.via === 'free', JSON.stringify(r.data));
+  r = await j('GET', '/api/igstore/catalog/' + freeId + '/download', { key, token: player });
+  ok('소유 후 다운로드 페이로드 수령', r.status === 200 && r.data.externalUrl === 'https://example.com/bg.png');
+
+  // 2) 유료 3D에셋 발행 → 구매(ISC 결제) → 창작자 적립
+  let wc = (await j('GET', '/api/igplay/wallet', { key, token: creator })).data.wallet.balance;
+  let wp = (await j('GET', '/api/igplay/wallet', { key, token: player })).data.wallet.balance;
+  r = await j('POST', '/api/igstore/catalog', { key, token: creator, body: { kind: 'asset3d', title: '유료 로봇 모델', access: 'paid', price: 20, externalUrl: 'https://example.com/robot.glb' } });
+  ok('유료 콘텐츠 발행', r.status === 201 && r.data.item.access === 'paid' && r.data.item.price === 20);
+  const paidId = r.data.item.id;
+  // 미소유자 목록에서 페이로드 숨김
+  r = await j('GET', '/api/igstore/catalog/' + paidId, { key, token: player });
+  ok('미소유자에게 페이로드 숨김', r.status === 200 && r.data.item.hasPayload === true && r.data.item.externalUrl === undefined, JSON.stringify(r.data.item));
+  // 본인 구매 금지
+  r = await j('POST', '/api/igstore/catalog/' + paidId + '/buy', { key, token: creator });
+  ok('본인 콘텐츠 구매 금지(400)', r.status === 400);
+  // 구매
+  r = await j('POST', '/api/igstore/catalog/' + paidId + '/buy', { key, token: player });
+  ok('유료 구매 성공', r.status === 200 && r.data.via === 'paid', JSON.stringify(r.data));
+  let wp2 = (await j('GET', '/api/igplay/wallet', { key, token: player })).data.wallet.balance;
+  let wc2 = (await j('GET', '/api/igplay/wallet', { key, token: creator })).data.wallet.balance;
+  ok('구매자 20 ISC 차감', wp2 === wp - 20, `${wp}->${wp2}`);
+  ok('창작자 수수료 5% 제외 적립(+19)', wc2 === wc + 19, `${wc}->${wc2}`);
+  // 중복 구매 차단
+  r = await j('POST', '/api/igstore/catalog/' + paidId + '/buy', { key, token: player });
+  ok('중복 구매 차단(409)', r.status === 409);
+
+  // 3) 광고 해제 영상 발행 → 짧은 시청 거부 → 끝까지 시청 후 해제
+  r = await j('POST', '/api/igstore/catalog', { key, token: creator, body: { kind: 'video', title: '광고보고 받는 영상', access: 'ad', externalUrl: 'https://example.com/clip.mp4' } });
+  const adItemId = r.data.item.id;
+  ok('광고 해제 콘텐츠 발행', r.status === 201 && r.data.item.access === 'ad');
+  r = await j('POST', '/api/igstore/catalog/' + adItemId + '/adview', { key, token: player, body: { watchedMs: 500 } });
+  ok('짧은 광고 시청 거부(400)', r.status === 400);
+  r = await j('POST', '/api/igstore/catalog/' + adItemId + '/adview', { key, token: player, body: { watchedMs: 5000 } });
+  ok('광고 끝까지 시청 후 해제', r.status === 200 && r.data.via === 'ad');
+
+  // 4) 토큰 홀더 게이팅 발행(JOON 3개 이상) → 보유자 받기 / 미보유자 차단
+  r = await j('POST', '/api/igstore/catalog', { key, token: creator, body: { kind: 'doc', title: '홀더 전용 프리셋', access: 'token', gateSymbol: 'JOON', gateMin: 3, externalUrl: 'https://example.com/preset.json' } });
+  const tokId = r.data.item.id;
+  ok('토큰 게이팅 콘텐츠 발행', r.status === 201 && r.data.item.gateSymbol === 'JOON' && r.data.item.gateMin === 3);
+  // player는 JOON 5개 보유 → 획득 성공
+  r = await j('POST', '/api/igstore/catalog/' + tokId + '/claim', { key, token: player });
+  ok('홀더 획득 성공', r.status === 200 && r.data.via === 'token', JSON.stringify(r.data));
+  // noholder는 0개 → 차단
+  r = await j('POST', '/api/igstore/catalog/' + tokId + '/claim', { key, token: noholder });
+  ok('미보유자 토큰 게이팅 차단(403)', r.status === 403 && r.data.error === 'need_token', JSON.stringify(r.data));
+
+  // 5) 둘러보기(종류 필터·검색)
+  r = await j('GET', '/api/igstore/catalog?kind=asset3d', { key });
+  ok('종류 필터(asset3d)', r.status === 200 && r.data.items.length >= 1 && r.data.items.every((i) => i.kind === 'asset3d'));
+  r = await j('GET', '/api/igstore/catalog?q=' + encodeURIComponent('배경'), { key });
+  ok('검색(태그/제목)', r.status === 200 && r.data.items.some((i) => i.id === freeId));
+
+  // 6) 내 라이브러리(획득 + 발행)
+  r = await j('GET', '/api/igstore/library', { key, token: player });
+  ok('내 라이브러리(획득 4건)', r.status === 200 && r.data.owned.length === 4, JSON.stringify(r.data.owned.map((o) => o.title)));
+  r = await j('GET', '/api/igstore/library', { key, token: creator });
+  ok('내 발행 목록(4건)', r.status === 200 && r.data.published.length === 4);
+
+  // 7) igMarket에 카탈로그 콘텐츠 매물 등록 → 거래로 소유권 이전
+  r = await j('POST', '/api/igmarket/listings', { key, token: creator, body: { kind: 'asset3d', refId: paidId, title: '로봇 모델 판매', mode: 'sale', price: 5 } });
+  ok('카탈로그 콘텐츠 마켓 등록', r.status === 201 && r.data.listing.kind === 'asset3d', JSON.stringify(r.data));
+  const mkId = r.data.listing.id;
+  r = await j('POST', '/api/igmarket/listings/' + mkId + '/buy', { key, token: player });
+  ok('카탈로그 매물 구매(소유권 이전)', r.status === 200 && r.data.ok === true, JSON.stringify(r.data));
+  r = await j('GET', '/api/igstore/catalog/' + paidId, { key, token: player });
+  ok('구매 후 카탈로그 소유자=구매자', r.status === 200 && r.data.item.mine === true, JSON.stringify({mine:r.data.item.mine}));
+
   // 보안: 제네릭 /api/data 로 ISC 내부 컬렉션 쓰기 차단
   r = await j('POST', '/api/data/_isc_wallet', { key, token: player, body: { balance: 999999 } });
   ok('내부 컬렉션(_isc_wallet) 쓰기 차단(403)', r.status === 403, JSON.stringify(r.data));

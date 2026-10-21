@@ -21,6 +21,7 @@ import adminRoutes, { ensureAdmin } from './routes/admin.js';
 import igplayRoutes from './routes/igplay.js';
 import igmarketRoutes from './routes/igmarket.js';
 import igtokenRoutes from './routes/igtoken.js';
+import igstoreRoutes from './routes/igstore.js';
 import messengerRoutes from './routes/messenger.js';
 import { ensureIgPlay, igplayInject } from './provision.js';
 import { ensureMessenger, messengerInject } from './provision_messenger.js';
@@ -90,6 +91,7 @@ async function main() {
   app.use('/api/igplay', enforceKeyScope, igplayRoutes);
   app.use('/api/igmarket', enforceKeyScope, igmarketRoutes);
   app.use('/api/igtoken', enforceKeyScope, igtokenRoutes);
+  app.use('/api/igstore', enforceKeyScope, igstoreRoutes);
   app.use('/api/messenger', enforceKeyScope, messengerRoutes);
   // 프로젝트 자기 정보 / 사용량 조회
   app.get('/api/project', (req, res) => res.json({ project: { id: req.project.id, name: req.project.name, slug: req.project.slug } }));

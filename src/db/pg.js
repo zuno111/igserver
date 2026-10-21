@@ -1,7 +1,7 @@
 // PostgreSQL 드라이버. 여러 노드가 같은 DB를 바라보며 수평 확장할 때 사용.
 // DATABASE_URL 환경변수 설정 시 자동 선택. 인터페이스는 sqlite/memory와 동일.
 import pg from 'pg';
-import { applyIncs } from '../util.js';
+import { applyIncs, normalizeFilters, normalizeSort } from '../util.js';
 
 // 서버측 쿼리 빌더 (JSONB 필드 필터/정렬)
 const PGOPS = { eq: '=', ne: '!=', gt: '>', gte: '>=', lt: '<', lte: '<=' };
@@ -11,6 +11,7 @@ function jsonPath(field) { // a.b.c → data#>>'{a,b,c}'
   return `data#>>'{${parts.join(',')}}'`;
 }
 function pgWhere(filters, params) {
+  filters = normalizeFilters(filters);
   let sql = '';
   for (const f of filters || []) {
     if (!okField(f.field)) continue;
@@ -22,6 +23,7 @@ function pgWhere(filters, params) {
   return sql;
 }
 function pgOrder(sort) {
+  sort = normalizeSort(sort);
   if (!sort || !okField(sort.field)) return ' ORDER BY updated_at DESC';
   const dir = sort.dir === 'asc' ? 'ASC' : 'DESC';
   if (sort.field === 'updated_at' || sort.field === 'created_at') return ` ORDER BY ${sort.field} ${dir}`;
