@@ -176,6 +176,34 @@
         subscribe(room, onMessage, opts = {}) { return api.subscribe(room, (m) => { if (m.type === 'message') onMessage(m); }, opts); },
         listen(myUid, onInbox) { return api.subscribe('u:' + myUid, (m) => { if (m.type === 'inbox') onInbox(m); }); },
       },
+
+      // ---- igStore (통합 콘텐츠 마켓) ----
+      // 어떤 STUDIO ig 툴이든 산출물을 스토어에 발행·판매·배포한다. 종류: game/level/app/asset3d/image/music/video/doc/bundle.
+      store: {
+        // 둘러보기: catalog({ kind, q, sort }) → items[]
+        async catalog({ kind, q, sort } = {}) {
+          const qs = new URLSearchParams(); if (kind) qs.set('kind', kind); if (q) qs.set('q', q); if (sort) qs.set('sort', sort);
+          return (await req('GET', '/api/igstore/catalog' + (qs.toString() ? '?' + qs : ''), { auth: false })).items;
+        },
+        async item(id) { return (await req('GET', '/api/igstore/catalog/' + id)).item; },
+        // 발행(메타만): publish({ kind, title, desc, access, price, gateSymbol, gateMin, externalUrl, fileId, cover, tags, source })
+        async publish(meta) { return (await req('POST', '/api/igstore/catalog', { body: meta })).item; },
+        // 파일 발행: 실제 파일(blob)을 업로드해 연결까지 한 번에. publishFile(blob, filename, { kind, title, ... })
+        async publishFile(blob, filename, meta = {}) {
+          const f = await api.upload(blob, filename);
+          const payload = Object.assign({ title: meta.title || f.filename, externalUrl: f.url }, meta);
+          delete payload.fileId;
+          return this.publish(payload);
+        },
+        async update(id, patch) { return (await req('PATCH', '/api/igstore/catalog/' + id, { body: patch })).item; },
+        async close(id) { return req('POST', '/api/igstore/catalog/' + id + '/close'); },
+        // 획득/구매/광고해제
+        async claim(id) { return req('POST', '/api/igstore/catalog/' + id + '/claim'); },
+        async buy(id) { return req('POST', '/api/igstore/catalog/' + id + '/buy'); },
+        async adview(id, watchedMs) { return req('POST', '/api/igstore/catalog/' + id + '/adview', { body: { watchedMs } }); },
+        async download(id) { return req('GET', '/api/igstore/catalog/' + id + '/download'); },
+        async library() { return req('GET', '/api/igstore/library'); },
+      },
     };
     return api;
   }

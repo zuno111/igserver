@@ -347,6 +347,19 @@ async function run() {
   r = await j('GET', '/api/igstore/library', { key, token: creator });
   ok('내 발행 목록(4건)', r.status === 200 && r.data.published.length === 4);
 
+  // 6.5) SDK 실제 경로: 파일 업로드 → externalUrl로 발행 → 받기 → 다운로드(=publishFile 흐름)
+  {
+    const up = await fetch(BASE + '/api/files?filename=model.glb', { method: 'POST', headers: { 'X-Project-Key': key, Authorization: 'Bearer ' + creator, 'Content-Type': 'model/gltf-binary' }, body: Buffer.from('glTF-binary-bytes-demo') });
+    const upj = await up.json();
+    ok('파일 업로드(SDK upload)', up.status === 201 && !!upj.file?.url, JSON.stringify(upj));
+    r = await j('POST', '/api/igstore/catalog', { key, token: creator, body: { kind: 'asset3d', title: '업로드한 모델', access: 'free', externalUrl: upj.file.url } });
+    ok('업로드 파일로 발행(publishFile)', r.status === 201 && r.data.item.hasPayload === true);
+    const upId = r.data.item.id;
+    await j('POST', '/api/igstore/catalog/' + upId + '/claim', { key, token: player });
+    r = await j('GET', '/api/igstore/catalog/' + upId + '/download', { key, token: player });
+    ok('업로드 파일 다운로드 링크 수령', r.status === 200 && r.data.externalUrl === upj.file.url, JSON.stringify(r.data));
+  }
+
   // 7) igMarket에 카탈로그 콘텐츠 매물 등록 → 거래로 소유권 이전
   r = await j('POST', '/api/igmarket/listings', { key, token: creator, body: { kind: 'asset3d', refId: paidId, title: '로봇 모델 판매', mode: 'sale', price: 5 } });
   ok('카탈로그 콘텐츠 마켓 등록', r.status === 201 && r.data.listing.kind === 'asset3d', JSON.stringify(r.data));

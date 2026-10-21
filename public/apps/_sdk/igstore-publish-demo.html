@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>igStore 발행 위젯 데모</title>
+<style>
+  :root{--bg:#0f1319;--fg:#e9edf2;--muted:#9aa6b3;--line:#2a3340;--brand:#3aa0ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Malgun Gothic","맑은 고딕","Noto Sans KR",system-ui,sans-serif;font-style:normal}
+  .wrap{max-width:720px;margin:0 auto;padding:28px 18px 120px}
+  h1{font-size:22px;margin:0 0 6px}
+  p.sub{color:var(--muted);margin:0 0 20px}
+  .box{background:#161a20;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
+  input,textarea{width:100%;background:#0f1319;border:1px solid var(--line);border-radius:10px;padding:11px 13px;color:var(--fg);outline:none;font:inherit;font-style:normal}
+  textarea{resize:vertical;min-height:120px}
+  code{background:#0f1319;border:1px solid var(--line);border-radius:6px;padding:2px 6px;color:#7fd6ff}
+  pre{background:#0f1319;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;color:#cdd6e0}
+  .cfg{display:flex;gap:8px}.cfg>*{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>igStore 발행 위젯 데모</h1>
+  <p class="sub">아래 내용을 작성하고 오른쪽 아래 "igStore에 올리기" 버튼을 누르면, 실제로 파일로 업로드되어 스토어에 발행됩니다. 이 위젯은 어떤 STUDIO ig 툴에나 스크립트 두 줄로 붙습니다.</p>
+
+  <div class="box">
+    <label>서버 연결 (igServer 주소 / 프로젝트 공개키)</label>
+    <div class="cfg">
+      <input id="cfgBase" placeholder="https://내서버:8787">
+      <input id="cfgKey" placeholder="igk_...">
+    </div>
+    <p class="sub" style="margin:8px 0 0">igPlay 페이지에 붙이면 주소·키가 자동 주입되어 이 입력이 필요 없습니다. 데모에서는 직접 넣고 아래 "위젯 켜기"를 누르세요.</p>
+    <button id="cfgGo" style="margin-top:10px;background:var(--brand);color:#fff;border:none;border-radius:10px;padding:10px 16px;font:600 14px inherit;cursor:pointer">위젯 켜기</button>
+  </div>
+
+  <div class="box">
+    <label>발행할 내용 (이 텍스트가 .txt 파일로 업로드되어 "문서" 콘텐츠로 올라갑니다)</label>
+    <textarea id="content">여기에 내용을 쓰면 파일로 업로드되어 스토어에 발행됩니다.</textarea>
+  </div>
+
+  <div class="box">
+    <label>각 툴에 붙이는 방법 (두 줄)</label>
+<pre>&lt;script src="/app/_sdk/igclient.js"&gt;&lt;/script&gt;
+&lt;script src="/app/_sdk/igstore-publish.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  IGStorePublish.init({
+    base: location.origin, key: 'igk_...',   // igPlay에선 자동 주입
+    kind: 'asset3d',                          // webmax→asset3d, 레이어룸→image, 컷룸→video, IG Sound→music, GAE→asset3d/game
+    getContent: async () =&gt; ({ blob: await exportGLB(), filename: 'model.glb' })
+  });
+&lt;/script&gt;</pre>
+  </div>
+</div>
+
+<script src="./igclient.js"></script>
+<script src="./igstore-publish.js"></script>
+<script>
+  // igPlay처럼 주입된 설정이 있으면 자동 사용
+  try { if (window.IGPLAY_API && window.IGPLAY_API.base) { document.getElementById('cfgBase').value = window.IGPLAY_API.base; document.getElementById('cfgKey').value = window.IGPLAY_API.key; } } catch(e){}
+  function boot(){
+    var base = document.getElementById('cfgBase').value.trim() || location.origin;
+    var key = document.getElementById('cfgKey').value.trim();
+    if(!key){ alert('프로젝트 공개키(igk_...)를 입력하세요'); return; }
+    IGStorePublish.init({
+      base: base, key: key, kind: 'doc', defaultTitle: '데모 문서',
+      getContent: async function(){
+        var txt = document.getElementById('content').value;
+        return { blob: new Blob([txt], {type:'text/plain'}), filename: 'demo.txt' };
+      },
+      onPublished: function(item){ console.log('발행됨', item); }
+    });
+  }
+  document.getElementById('cfgGo').onclick = boot;
+</script>
+</body>
+</html>
