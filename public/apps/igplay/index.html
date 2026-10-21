@@ -495,6 +495,7 @@ function makeCard(l){
    '<div class="thumb"><canvas width="248" height="155"></canvas>'+
      '<span class="plv"><b style="background:'+dc+'"></b>'+diff+'</span>'+
      (isBoosted(l.id)?'<span class="plv" style="left:auto;right:8px;background:rgba(255,176,46,.92);color:#1a1304">★ 부스트</span>':'')+
+     (l.gateSymbol?'<span class="plv" style="left:auto;right:8px;top:auto;bottom:8px;background:rgba(155,107,255,.92);color:#fff">🔒 '+esc(l.gateSymbol)+'</span>':'')+
      '<span class="dur">'+coinCount(l)+' 코인</span></div>'+
    '<div class="meta"><div class="ava" style="background:'+avaColor(l.creatorId)+'">'+l.creator.charAt(0)+'</div>'+
      '<div class="mtext"><div class="ctitle">'+esc(l.title)+'</div>'+
@@ -584,6 +585,22 @@ function openServerDialog(){
 /* ============================= WATCH + PLAYER ============================= */
 function renderWatch(m,id){
   var lv=getLevel(id); if(!lv){ m.innerHTML='<div class="wrap"><div class="empty"><h3>레벨을 찾을 수 없습니다</h3></div></div>'; return; }
+  // 홀더 전용 레벨: 서버에서 잠금 확인
+  if(NET.on && lv.gateSymbol){
+    api('GET','/api/igplay/levels/'+id).then(function(r){
+      if(r.level&&r.level.locked){ renderLockedLevel(m,r.level); } else { if(r.level&&r.level.voxels&&r.level.voxels.length)lv.voxels=r.level.voxels; renderWatchBody(m,id,lv); }
+    }).catch(function(){ renderWatchBody(m,id,lv); });
+    return;
+  }
+  renderWatchBody(m,id,lv);
+}
+function renderLockedLevel(m,l){
+  m.innerHTML='<div class="wrap"><div class="empty" style="padding:60px 20px"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="var(--violet,#9b6bff)" stroke-width="1.5"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>'+
+    '<h3>토큰 홀더 전용 레벨</h3><p>'+esc(l.gateSymbol)+' 토큰 '+fmt(l.gateMin)+'개 이상 보유자만 플레이할 수 있습니다.</p>'+
+    '<button class="btn brand" id="lockBuy" style="margin-top:14px">'+esc(l.gateSymbol)+' 토큰 매수</button> <button class="btn" onclick="go(\'home\')">돌아가기</button></div></div>';
+  var b=document.getElementById('lockBuy'); if(b)b.onclick=function(){ api('GET','/api/igtoken/tokens/'+l.gateSymbol).then(function(r){ if(r.token)buyTokenDialog(r.token); else toast('토큰 정보를 찾을 수 없습니다'); }).catch(function(e){ toast(e.message); }); };
+}
+function renderWatchBody(m,id,lv){
   db.plays[id]=(db.plays[id]||0)+1; saveDB();
   var liked=!!db.likes[id], subbed=!!db.subs[lv.creatorId];
   var recs=allLevels().filter(function(l){return l.id!==id;});
@@ -938,6 +955,7 @@ function renderEditor(m){
       '<label class="btn" style="cursor:pointer">에셋 임포트<input id="edimport" type="file" accept=".json,.vox,application/json" hidden></label>'+
       '<label class="btn" style="cursor:pointer" title="webmax 3D 모델(OBJ)을 메시 그대로 배치">3D 임포트(OBJ)<input id="edobj" type="file" accept=".obj" hidden></label>'+
       '<label class="btn" style="cursor:pointer" title="레이어룸 이미지(PNG)를 레벨 커버로 사용">커버 이미지<input id="edcover" type="file" accept="image/*" hidden></label>'+
+      '<button class="btn" id="edgate" title="토큰 홀더 전용 레벨로 설정">홀더 전용</button>'+
       '<button class="btn" id="edtest">▶ 테스트</button>'+
       '<button class="btn brand" id="edsave">업로드</button>'+
     '</div></div>';
@@ -1005,17 +1023,19 @@ function renderEditor(m){
 
   function collect(){ var vox=[]; var hasGoal=false; for(var k in voxels){ var v=voxels[k]; var p=v.mesh.position; vox.push(L(Math.floor(p.x),Math.floor(p.y),Math.floor(p.z),v.t)); if(v.t===4)hasGoal=true; }
     return {vox:vox,hasGoal:hasGoal}; }
+  var edGate={symbol:null,min:0}; // 홀더 전용 게이트
   function buildLevel(){ var c=collect();
     var lv={ id:'my-'+Date.now(), title:document.getElementById('edtitle').value.trim()||'새 블록 레벨',
       creator:me(), creatorId:'me_'+(db.nick||'guest'), genre:document.getElementById('edgenre').value, difficulty:document.getElementById('eddiff').value,
-      plays:0, likes:0, desc:'에디터로 제작한 레벨입니다.', voxels:c.vox, spawn:spawn, props:edProps.map(function(p){return p.data;}), cover:edCover, mine:true };
+      plays:0, likes:0, desc:'에디터로 제작한 레벨입니다.', voxels:c.vox, spawn:spawn, props:edProps.map(function(p){return p.data;}), cover:edCover,
+      gateSymbol:edGate.symbol, gateMin:edGate.min, mine:true };
     return {lv:lv,hasGoal:c.hasGoal}; }
   document.getElementById('edtest').onclick=function(){ var r=buildLevel(); if(!r.hasGoal){toast('골 블록을 1개 이상 배치하세요');return;} window._testLevel=r.lv; teardown();
     // render a temporary watch using the test level
     renderWatchTemp(r.lv); };
   document.getElementById('edsave').onclick=function(){ var r=buildLevel(); if(!r.hasGoal){toast('골 블록을 1개 이상 배치하세요');return;}
     if(!r.lv.voxels.some(function(b){return b.t===1||b.t===2;})){toast('지면 블록을 배치하세요');return;}
-    if(NET.on){ api('POST','/api/igplay/levels',{title:r.lv.title,genre:r.lv.genre,difficulty:r.lv.difficulty,voxels:r.lv.voxels,spawn:r.lv.spawn,desc:r.lv.desc,props:r.lv.props,cover:r.lv.cover})
+    if(NET.on){ api('POST','/api/igplay/levels',{title:r.lv.title,genre:r.lv.genre,difficulty:r.lv.difficulty,voxels:r.lv.voxels,spawn:r.lv.spawn,desc:r.lv.desc,props:r.lv.props,cover:r.lv.cover,gateSymbol:r.lv.gateSymbol,gateMin:r.lv.gateMin})
       .then(function(resp){ toast('서버 업로드 완료'); netLoaded=false; netLoadLevels().then(function(){ go('watch/'+resp.level.id); }); })
       .catch(function(e){ toast('업로드 실패: '+e.message); }); return; }
     db.myLevels.push(r.lv); saveDB(); toast('업로드 완료'); go('watch/'+r.lv.id); };
@@ -1049,6 +1069,21 @@ function renderEditor(m){
       cv.getContext('2d').drawImage(img,0,0,w,h); edCover=cv.toDataURL('image/jpeg',0.82);
       toast('커버 이미지 설정 완료 ('+w+'×'+h+')'); URL.revokeObjectURL(img.src); };
     img.onerror=function(){ toast('이미지 로드 실패'); }; img.src=URL.createObjectURL(f); e.target.value=''; };
+  // 홀더 전용 게이트 설정
+  document.getElementById('edgate').onclick=function(){
+    if(!NET.on){ toast('홀더 전용은 서버 연결이 필요합니다'); return; }
+    var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
+    wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;text-align:left"><h3 style="font-size:18px">토큰 홀더 전용</h3><p>특정 토큰을 일정 수량 이상 보유한 사람만 플레이할 수 있게 합니다. 비워두면 전체 공개.</p>'+
+      '<input id="gSym" placeholder="토큰 심볼 (예: JOON)" maxlength="10" style="width:100%;text-transform:uppercase;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:9px" value="'+esc(edGate.symbol||'')+'">'+
+      '<input id="gMin" type="number" min="1" placeholder="최소 보유량" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:14px" value="'+(edGate.min||'')+'">'+
+      '<div class="obtns"><button class="btn" id="gClear">해제</button><button class="btn brand" id="gOk">설정</button></div></div>';
+    document.body.appendChild(wrap);
+    function close(){ wrap.remove(); } wrap.onclick=function(e){ if(e.target===wrap)close(); };
+    wrap.querySelector('#gClear').onclick=function(){ edGate.symbol=null; edGate.min=0; document.getElementById('edgate').classList.remove('on'); toast('전체 공개로 설정'); close(); };
+    wrap.querySelector('#gOk').onclick=function(){ var s=wrap.querySelector('#gSym').value.trim().toUpperCase(), mn=Math.round(+wrap.querySelector('#gMin').value||0);
+      if(!/^[A-Z][A-Z0-9]{1,9}$/.test(s)||mn<1){ toast('심볼과 최소 보유량을 올바르게 입력하세요'); return; }
+      edGate.symbol=s; edGate.min=mn; document.getElementById('edgate').classList.add('on'); toast('홀더 전용: '+s+' '+mn+'개 이상'); close(); };
+  };
 
   activeSession={ dispose:function(){ cancelAnimationFrame(raf); ro.disconnect(); try{renderer.dispose();}catch(e){} } };
 }
@@ -1292,18 +1327,52 @@ function issueTokenDialog(){
     if(pr<1){ msg.textContent='가격을 입력하세요.'; return; }
     api('POST','/api/igtoken/tokens',{symbol:sym,name:nm||sym,priceIsc:pr}).then(function(){ toast(sym+' 토큰 발행 완료'); close(); go('market'); }).catch(function(e){ msg.textContent=e.message; }); };
 }
-// 창작자 토큰 매수
+var TIERCOL={DIAMOND:'#8fd0ff',GOLD:'#ffb02e',SILVER:'#c6ced8',BRONZE:'#c8824a'};
+// 창작자 토큰 매수 + 홀더 혜택
 function buyTokenDialog(tok){
+  var isOwner=tok.ownerId===NET.uid;
   var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
-  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;text-align:left"><h3 style="font-size:18px">'+esc(tok.name)+' ('+esc(tok.symbol)+') 매수</h3><p>1토큰 = '+fmt(tok.priceIsc)+' ISC · 보유자 '+tok.holders+'명 · 발행량 '+fmt(tok.supply)+'</p>'+
-    '<input id="tbQty" type="number" min="1" value="1" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:8px">'+
-    '<div id="tbCost" style="color:var(--muted);font-size:13px;margin-bottom:12px"></div><div class="obtns"><button class="btn" id="tbC">취소</button><button class="btn brand" id="tbO">매수</button></div></div>';
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:22px;text-align:left;max-width:400px;width:100%">'+
+    '<h3 style="font-size:18px;margin:0 0 2px">'+esc(tok.name)+' <span style="color:var(--brand)">'+esc(tok.symbol)+'</span></h3>'+
+    '<p style="margin:0 0 6px">1토큰 = '+fmt(tok.priceIsc)+' ISC · 보유자 '+tok.holders+'명 · 발행량 '+fmt(tok.supply)+'</p>'+
+    '<div id="tbTier" style="font-size:12px;margin-bottom:10px;min-height:16px"></div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:6px"><input id="tbQty" type="number" min="1" value="1" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--fg);outline:none"><button class="btn brand" id="tbO">매수</button></div>'+
+    '<div id="tbCost" style="color:var(--muted);font-size:13px;margin-bottom:14px"></div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h4 style="margin:0;font-size:14px">홀더 혜택</h4>'+(isOwner?'<button class="btn" id="tbAddPerk" style="padding:5px 10px;font-size:12px">+ 혜택 게시</button>':'')+'</div>'+
+    '<div id="tbPerks" style="font-size:13px;color:var(--muted)">불러오는 중…</div>'+
+    '<div class="obtns" style="margin-top:16px"><button class="btn" id="tbC">닫기</button></div></div>';
   document.body.appendChild(wrap);
   var q=wrap.querySelector('#tbQty'), cost=wrap.querySelector('#tbCost');
   function upd(){ cost.textContent='총 '+fmt(Math.max(1,Math.round(+q.value||0))*tok.priceIsc)+' ISC'; } q.oninput=upd; upd();
   function close(){ wrap.remove(); } wrap.querySelector('#tbC').onclick=close; wrap.onclick=function(e){ if(e.target===wrap)close(); };
+  function refresh(){ loadTier(); loadPerks(); }
+  function loadTier(){ api('GET','/api/igtoken/tokens/'+tok.symbol+'/tier').then(function(r){ var el=wrap.querySelector('#tbTier');
+    if(r.tier){ el.innerHTML='내 보유 <b style="color:var(--fg)">'+fmt(r.balance)+'</b> · <span style="background:'+(TIERCOL[r.tier]||'#888')+';color:#0d1017;font-weight:700;padding:2px 8px;border-radius:6px">'+r.tier+'</span>'; }
+    else el.innerHTML='<span style="color:var(--faint)">아직 보유하지 않음</span>'; }).catch(function(){}); }
+  function loadPerks(){ api('GET','/api/igtoken/tokens/'+tok.symbol+'/perks').then(function(r){ var el=wrap.querySelector('#tbPerks'); var perks=r.perks||[];
+    if(!perks.length){ el.innerHTML='<span style="color:var(--faint)">아직 등록된 혜택이 없습니다.</span>'; return; }
+    el.innerHTML=''; perks.forEach(function(p){ var d=document.createElement('div'); d.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px';
+      d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:var(--fg)">'+esc(p.title)+'</b><span style="font-size:11px;color:'+(p.unlocked?'var(--accent)':'var(--faint)')+'">'+(p.unlocked?'✓ 해제':'🔒 '+p.minHold+'개 필요')+'</span></div>'+
+        (p.unlocked?'<div style="margin-top:6px;color:var(--fg);word-break:break-word">'+esc(p.body)+'</div>':'');
+      el.appendChild(d); }); }).catch(function(){}); }
   wrap.querySelector('#tbO').onclick=function(){ var qty=Math.max(1,Math.round(+q.value||0));
-    api('POST','/api/igtoken/tokens/'+tok.symbol+'/buy',{qty:qty}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast(tok.symbol+' '+qty+'개 매수 (보유 '+r.balance+')'); close(); }).catch(function(e){ toast(e.message); }); };
+    api('POST','/api/igtoken/tokens/'+tok.symbol+'/buy',{qty:qty}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast(tok.symbol+' '+qty+'개 매수 (보유 '+r.balance+')'); refresh(); }).catch(function(e){ toast(e.message); }); };
+  var ap=wrap.querySelector('#tbAddPerk'); if(ap)ap.onclick=function(){ addPerkDialog(tok.symbol, refresh); };
+  refresh();
+}
+// 창작자: 홀더 혜택 게시
+function addPerkDialog(symbol, onDone){
+  var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='81';
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:22px;text-align:left"><h3 style="font-size:17px">'+esc(symbol)+' 홀더 혜택 게시</h3>'+
+    '<input id="pkT" placeholder="혜택 제목" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--fg);outline:none;margin-bottom:8px">'+
+    '<input id="pkM" type="number" min="1" value="1" placeholder="최소 보유 수량" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--fg);outline:none;margin-bottom:8px">'+
+    '<textarea id="pkB" placeholder="혜택 내용(코드·링크·공지 등)" style="width:100%;min-height:70px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--fg);outline:none;margin-bottom:14px;resize:vertical;font-family:inherit"></textarea>'+
+    '<div class="obtns"><button class="btn" id="pkC">취소</button><button class="btn brand" id="pkO">게시</button></div></div>';
+  document.body.appendChild(wrap);
+  function close(){ wrap.remove(); } wrap.querySelector('#pkC').onclick=close; wrap.onclick=function(e){ if(e.target===wrap)close(); };
+  wrap.querySelector('#pkO').onclick=function(){ var t=wrap.querySelector('#pkT').value.trim(), b=wrap.querySelector('#pkB').value.trim(), mn=Math.max(1,Math.round(+wrap.querySelector('#pkM').value||1));
+    if(!t||!b){toast('제목과 내용을 입력하세요');return;}
+    api('POST','/api/igtoken/tokens/'+symbol+'/perks',{minHold:mn,title:t,body:b,kind:'post'}).then(function(){ toast('혜택 게시 완료'); close(); if(onDone)onDone(); }).catch(function(e){ toast(e.message); }); };
 }
 // 특정 창작자의 토큰이 있으면 매수 버튼 노출(워치에서 사용)
 function loadCreatorToken(creatorId, containerEl){

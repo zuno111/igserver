@@ -37,8 +37,22 @@ function levelPublic(rec) {
     id: rec.doc_id, title: d.title, creator: d.creator, creatorId: rec.owner_id,
     genre: d.genre, difficulty: d.difficulty, voxels: d.voxels || [], props: d.props || [], cover: d.cover || null, spawn: d.spawn || null,
     desc: d.desc || '', plays: d.plays | 0, likes: d.likes | 0,
-    boostedUntil: d.boostedUntil || 0, created_at: rec.created_at,
+    boostedUntil: d.boostedUntil || 0, gateSymbol: d.gateSymbol || null, gateMin: d.gateMin | 0, created_at: rec.created_at,
   };
+}
+// 토큰 보유량 조회(게이팅 검증용)
+async function tokenBalance(pid, symbol, uid) {
+  if (!symbol || !uid) return 0;
+  const r = await getRepo().getRecord(pid, '_tok_bal', symbol + ':' + uid);
+  return r?.data?.amount || 0;
+}
+// 레벨 접근 가능 여부(게이트 없으면 항상 true, 제작자 본인은 항상 true)
+async function canAccess(pid, rec, user) {
+  const d = rec.data || {};
+  if (!d.gateSymbol || (d.gateMin | 0) <= 0) return true;
+  if (user && user.uid === rec.owner_id) return true;
+  if (!user) return false;
+  return (await tokenBalance(pid, d.gateSymbol, user.uid)) >= (d.gateMin | 0);
 }
 const GENRES = ['파쿠르', '수집', '입문', '어드벤처', '스피드런'];
 const DIFFS = ['쉬움', '보통', '어려움', '전문가'];
@@ -60,13 +74,18 @@ router.get('/levels/:id', optionalUser, async (req, res, next) => {
   try {
     const rec = await getRepo().getRecord(req.project.id, 'levels', req.params.id);
     if (!rec) return res.status(404).json({ error: 'not_found' });
-    res.json({ level: levelPublic(rec) });
+    const out = levelPublic(rec);
+    // 토큰 홀더 전용 게이트: 미달이면 잠금(voxels/props 숨김)
+    const access = await canAccess(req.project.id, rec, req.user);
+    out.locked = !access;
+    if (!access) { out.voxels = []; out.props = []; }
+    res.json({ level: out });
   } catch (e) { next(e); }
 });
 // 업로드
 router.post('/levels', requireUser, async (req, res, next) => {
   try {
-    const { title, genre, difficulty, voxels, spawn, desc, props, cover } = req.body || {};
+    const { title, genre, difficulty, voxels, spawn, desc, props, cover, gateSymbol, gateMin } = req.body || {};
     if (!title || typeof title !== 'string') return res.status(400).json({ error: 'bad_title', message: '제목이 필요합니다.' });
     if (!Array.isArray(voxels) || !voxels.length) return res.status(400).json({ error: 'bad_voxels', message: '블록 데이터가 필요합니다.' });
     if (!voxels.some((b) => b && (b.t === 1 || b.t === 2))) return res.status(400).json({ error: 'no_ground', message: '지면 블록이 필요합니다.' });
@@ -81,6 +100,8 @@ router.post('/levels', requireUser, async (req, res, next) => {
       cover: (typeof cover === 'string' && cover.length < 900000) ? cover : null,
       spawn: spawn || null, desc: String(desc || '').slice(0, 500),
       plays: 0, likes: 0, boostedUntil: 0,
+      gateSymbol: (typeof gateSymbol === 'string' && /^[A-Z][A-Z0-9]{1,9}$/.test(gateSymbol)) ? gateSymbol : null,
+      gateMin: (gateMin | 0) > 0 ? (gateMin | 0) : 0,
     };
     const rec = await repo.putRecord({ project_id: req.project.id, collection: 'levels', doc_id: id, data, owner_id: req.user.uid });
     broadcast(req.project.id, 'igplay:levels', { type: 'level_new', id, title: data.title, ts: Date.now() });
@@ -96,6 +117,10 @@ router.post('/events', requireUser, async (req, res, next) => {
     const pid = req.project.id, uid = req.user.uid, repo = getRepo();
     const lv = levelId ? await repo.getRecord(pid, 'levels', levelId) : null;
     const creatorId = lv ? lv.owner_id : null;
+    // 홀더 전용 레벨: 접근 불가면 적립/이벤트 차단
+    if (lv && !(await canAccess(pid, lv, req.user))) {
+      return res.status(403).json({ error: 'locked', message: '토큰 홀더 전용 레벨입니다.' });
+    }
     let reward = 0, first = false;
 
     if (type === 'play') {

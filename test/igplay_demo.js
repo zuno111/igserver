@@ -234,6 +234,46 @@ async function run() {
   r = await j('POST', '/api/igtoken/tokens/JOON/buy', { key, token: player, body: { qty: 100000 } });
   ok('잔액 초과 토큰 매수 거부(402)', r.status === 402);
 
+  // ===== 토큰 게이팅(홀더 전용 레벨) =====
+  // 크리에이터가 JOON 3개 이상 홀더 전용 레벨 업로드
+  const gated = sampleLevel('홀더 전용 레벨');
+  gated.gateSymbol = 'JOON'; gated.gateMin = 3;
+  r = await j('POST', '/api/igplay/levels', { key, token: creator, body: gated });
+  ok('게이트 레벨 업로드', r.status === 201 && r.data.level?.gateSymbol === 'JOON' && r.data.level.gateMin === 3, JSON.stringify({g:r.data.level?.gateSymbol,m:r.data.level?.gateMin}));
+  const gatedId = r.data.level?.id;
+  // player는 JOON 3개 보유 → 접근 가능(locked=false, voxels 존재)
+  r = await j('GET', '/api/igplay/levels/' + gatedId, { key, token: player });
+  ok('홀더(3개 보유) 접근 허용', r.status === 200 && r.data.level.locked === false && r.data.level.voxels.length > 0, JSON.stringify({locked:r.data.level.locked, vox:r.data.level.voxels.length}));
+  // 새 유저(미보유)는 잠금
+  r = await j('POST', '/api/auth/signup', { key, body: { email: `nohold_${Date.now()}@t.com`, password: 'pw12345', name: '미보유' } });
+  const noholder = r.data.token;
+  r = await j('GET', '/api/igplay/levels/' + gatedId, { key, token: noholder });
+  ok('미보유자 잠금(locked·voxels 숨김)', r.status === 200 && r.data.level.locked === true && r.data.level.voxels.length === 0, JSON.stringify({locked:r.data.level.locked, vox:r.data.level.voxels.length}));
+  // 미보유자 플레이 이벤트 차단(403)
+  r = await j('POST', '/api/igplay/events', { key, token: noholder, body: { type: 'play', levelId: gatedId } });
+  ok('미보유자 플레이 차단(403)', r.status === 403);
+  // 제작자 본인은 게이트 무관 접근
+  r = await j('GET', '/api/igplay/levels/' + gatedId, { key, token: creator });
+  ok('제작자 본인 접근 허용', r.status === 200 && r.data.level.locked === false);
+
+  // 홀더 혜택: 창작자가 게시(최소 보유 5)
+  r = await j('POST', '/api/igtoken/tokens/JOON/perks', { key, token: creator, body: { minHold: 5, title: '비밀 레벨 코드', body: 'SECRET-123', kind: 'code' } });
+  ok('홀더 혜택 게시', r.status === 201 && r.data.perk?.minHold === 5, JSON.stringify(r.data));
+  // 타인은 혜택 게시 불가
+  r = await j('POST', '/api/igtoken/tokens/JOON/perks', { key, token: player, body: { minHold: 1, title: 'x', body: 'y' } });
+  ok('비창작자 혜택 게시 거부(403)', r.status === 403);
+  // player는 3개 보유 → 혜택 잠금(내용 null)
+  r = await j('GET', '/api/igtoken/tokens/JOON/perks', { key, token: player });
+  ok('보유 부족 시 혜택 잠금', r.status === 200 && r.data.perks[0].unlocked === false && r.data.perks[0].body === null, JSON.stringify(r.data.perks[0]));
+  // player가 2개 더 매수 → 5개 → 혜택 해제
+  r = await j('POST', '/api/igtoken/tokens/JOON/buy', { key, token: player, body: { qty: 2 } });
+  ok('추가 매수(총 5)', r.status === 200 && r.data.balance === 5);
+  r = await j('GET', '/api/igtoken/tokens/JOON/perks', { key, token: player });
+  ok('보유 충족 시 혜택 해제(내용 노출)', r.status === 200 && r.data.perks[0].unlocked === true && r.data.perks[0].body === 'SECRET-123', JSON.stringify(r.data.perks[0]));
+  // 홀더 티어
+  r = await j('GET', '/api/igtoken/tokens/JOON/tier', { key, token: player });
+  ok('홀더 티어 계산(5개→BRONZE)', r.status === 200 && r.data.tier === 'BRONZE', JSON.stringify(r.data));
+
   // 보안: 제네릭 /api/data 로 ISC 내부 컬렉션 쓰기 차단
   r = await j('POST', '/api/data/_isc_wallet', { key, token: player, body: { balance: 999999 } });
   ok('내부 컬렉션(_isc_wallet) 쓰기 차단(403)', r.status === 403, JSON.stringify(r.data));

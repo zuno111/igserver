@@ -98,4 +98,58 @@ router.get('/holdings', requireUser, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ===================== 홀더 혜택 (토큰 효용) =====================
+// 창작자가 "N개 이상 보유 시 열람" 혜택(공지/코드/링크 등)을 게시 → 팬은 보유량 충족 시 열람.
+//   _tok_perk : 혜택 {symbol, minHold, title, body(혜택 내용), kind:'post'|'code'|'link'}
+async function requireTokenOwner(req, symbol) {
+  const rec = await getToken(req.project.id, symbol);
+  if (!rec) return { err: 404 };
+  if (rec.owner_id !== req.user.uid) return { err: 403 };
+  return { rec };
+}
+// 혜택 게시 (창작자 전용)
+router.post('/tokens/:symbol/perks', requireUser, async (req, res, next) => {
+  try {
+    const symbol = String(req.params.symbol || '').toUpperCase();
+    const chk = await requireTokenOwner(req, symbol);
+    if (chk.err) return res.status(chk.err).json({ error: chk.err === 404 ? 'not_found' : 'not_owner' });
+    const { minHold, title, body, kind } = req.body || {};
+    if (!title || !body) return res.status(400).json({ error: 'bad_perk', message: '제목과 내용이 필요합니다.' });
+    const id = randomId('pk_');
+    const data = { symbol, minHold: Math.max(1, minHold | 0), title: String(title).slice(0, 80), body: String(body).slice(0, 1000), kind: ['post', 'code', 'link'].includes(kind) ? kind : 'post', ts: Date.now() };
+    await getRepo().putRecord({ project_id: req.project.id, collection: '_tok_perk', doc_id: id, data, owner_id: req.user.uid });
+    res.status(201).json({ perk: { id, symbol: data.symbol, minHold: data.minHold, title: data.title, kind: data.kind } });
+  } catch (e) { next(e); }
+});
+// 혜택 목록 (보유량에 따라 잠금/해제. 내용은 충족 시에만 반환)
+router.get('/tokens/:symbol/perks', requireUser, async (req, res, next) => {
+  try {
+    const symbol = String(req.params.symbol || '').toUpperCase();
+    const pid = req.project.id, uid = req.user.uid;
+    const myBal = await getBal(pid, symbol, uid);
+    const rows = await getRepo().queryRecords(pid, '_tok_perk', { limit: 100, sort: 'created_at:desc', filters: [['symbol', 'eq', symbol]] });
+    const perks = rows.map((r) => {
+      const d = r.data; const unlocked = myBal >= (d.minHold | 0);
+      return { id: r.doc_id, title: d.title, minHold: d.minHold, kind: d.kind, unlocked, body: unlocked ? d.body : null };
+    });
+    res.json({ perks, myBalance: myBal });
+  } catch (e) { next(e); }
+});
+// 홀더 티어(배지) 계산: 보유량 → 티어명
+function tierOf(bal) {
+  if (bal >= 100) return 'DIAMOND';
+  if (bal >= 30) return 'GOLD';
+  if (bal >= 10) return 'SILVER';
+  if (bal >= 1) return 'BRONZE';
+  return null;
+}
+// 특정 토큰에서 내 홀더 티어
+router.get('/tokens/:symbol/tier', requireUser, async (req, res, next) => {
+  try {
+    const symbol = String(req.params.symbol || '').toUpperCase();
+    const bal = await getBal(req.project.id, symbol, req.user.uid);
+    res.json({ symbol, balance: bal, tier: tierOf(bal) });
+  } catch (e) { next(e); }
+});
+
 export default router;
