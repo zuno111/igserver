@@ -5,8 +5,8 @@
     baseUrl = baseUrl.replace(/\/$/, '');
     let token = (typeof localStorage !== 'undefined' && localStorage.getItem('ig_token_' + projectKey)) || '';
 
-    async function req(method, path, { body, raw, auth = true } = {}) {
-      const headers = { 'X-Project-Key': projectKey };
+    async function req(method, path, { body, raw, auth = true, headers: extra } = {}) {
+      const headers = { 'X-Project-Key': projectKey, ...(extra || {}) };
       if (auth && token) headers.Authorization = 'Bearer ' + token;
       let payload;
       if (raw !== undefined) { headers['Content-Type'] = 'application/octet-stream'; payload = raw; }
@@ -37,11 +37,26 @@
 
       // ---- 데이터 (범용 저장소) ----
       async create(collection, data) { return (await req('POST', '/api/data/' + collection, { body: data })).item; },
-      async put(collection, id, data) { return (await req('PUT', `/api/data/${collection}/${id}`, { body: data })).item; },
-      async get(collection, id) { return (await req('GET', `/api/data/${collection}/${id}`, { auth: false })).item; },
-      async list(collection, { private: priv = false, limit = 100, offset = 0, filter, sort, deleted = false, q } = {}) {
+      // put(collection, id, data, { rev }) — rev 지정 시 그 버전일 때만 수정(충돌 시 409 rev_conflict 에러)
+      async put(collection, id, data, { rev } = {}) {
+        const headers = rev != null ? { 'If-Match': String(rev) } : undefined;
+        return (await req('PUT', `/api/data/${collection}/${id}`, { body: data, headers })).item;
+      },
+      // 원자적 증감: inc('scores','u1',{점수:10}) 또는 inc('scores','u1','점수',10)
+      async inc(collection, id, fieldOrObj, by = 1) {
+        const body = typeof fieldOrObj === 'string' ? { field: fieldOrObj, by } : { fields: fieldOrObj };
+        return (await req('POST', `/api/data/${collection}/${id}/inc`, { body })).item;
+      },
+      // get(collection, id, { expand:['authorId:users'] }) — 참조 필드를 펼쳐 item._expand 에 담아줌
+      async get(collection, id, { expand } = {}) {
+        const qs = new URLSearchParams(); for (const e of expand || []) qs.append('expand', e);
+        const q = qs.toString();
+        return (await req('GET', `/api/data/${collection}/${id}${q ? '?' + q : ''}`, { auth: false })).item;
+      },
+      async list(collection, { private: priv = false, limit = 100, offset = 0, filter, sort, deleted = false, q, expand } = {}) {
         const qs = new URLSearchParams({ limit, offset }); if (priv) qs.set('scope', 'private'); if (deleted) qs.set('deleted', 'true'); if (q) qs.set('q', q);
         for (const f of filter || []) qs.append('filter', Array.isArray(f) ? f.join(':') : `${f.field}:${f.op}:${f.value}`);
+        for (const e of expand || []) qs.append('expand', e);
         if (sort) qs.set('sort', Array.isArray(sort) ? sort.join(':') : `${sort.field}:${sort.dir}`);
         return (await req('GET', `/api/data/${collection}?${qs}`)).items;
       },
@@ -106,6 +121,13 @@
       },
       // 현재 프로젝트 접속자 상세 조회 (REST)
       async presence() { return (await req('GET', '/api/project/presence')).online; },
+
+      // 실시간 데이터 구독: 컬렉션의 생성/수정/삭제를 실시간 수신.
+      // live('messages', (ev) => { ev.op, ev.id, ev.data }) — 내부적으로 'data:컬렉션' 방 구독.
+      // 비공개(_acl) 레코드 변경은 권한 있는 로그인 사용자에게만 전달된다.
+      live(collection, onChange, opts = {}) {
+        return this.subscribe('data:' + collection, (m) => { if (m.type === 'data_changed') onChange(m); }, opts);
+      },
     };
     return api;
   }

@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import { applyIncs } from '../util.js';
 
 // pkg/SEA 단독 실행파일 안에서는 네이티브 .node 바인딩을 바이너리 옆에서 직접 로드한다.
 // SEA에서는 addon 객체를 직접 넘겨 better-sqlite3 내부 require를 우회한다.
@@ -117,6 +118,7 @@ export function createSqliteRepo(config) {
   // 기존 DB 마이그레이션 (컬럼 없으면 추가)
   try { db.exec('ALTER TABLE projects ADD COLUMN secret_key TEXT'); } catch {}
   try { db.exec('ALTER TABLE records ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0'); } catch {}
+  try { db.exec('ALTER TABLE records ADD COLUMN rev INTEGER NOT NULL DEFAULT 0'); } catch {}
 
   const J = (o) => JSON.stringify(o ?? {});
   const P = (s) => { try { return JSON.parse(s); } catch { return {}; } };
@@ -212,14 +214,42 @@ export function createSqliteRepo(config) {
     // ---- records (범용 데이터 저장) ----
     async putRecord(r) {
       const now = Date.now();
-      const exists = db.prepare('SELECT created_at FROM records WHERE project_id=? AND collection=? AND doc_id=?')
+      const exists = db.prepare('SELECT created_at, rev FROM records WHERE project_id=? AND collection=? AND doc_id=?')
         .get(r.project_id, r.collection, r.doc_id);
-      db.prepare(`INSERT INTO records(project_id,collection,doc_id,data,owner_id,created_at,updated_at)
-        VALUES(@project_id,@collection,@doc_id,@data,@owner_id,@created_at,@updated_at)
-        ON CONFLICT(project_id,collection,doc_id) DO UPDATE SET data=@data,updated_at=@updated_at`)
+      // 낙관적 동시성: expectedRev가 주어지면 현재 rev와 일치할 때만 수정
+      if (r.expectedRev != null) {
+        const curRev = exists ? exists.rev : 0;
+        if (curRev !== Number(r.expectedRev)) {
+          const e = new Error('rev_conflict'); e.code = 'rev_conflict'; e.current = curRev; throw e;
+        }
+      }
+      const rev = (exists ? exists.rev : 0) + 1;
+      db.prepare(`INSERT INTO records(project_id,collection,doc_id,data,owner_id,created_at,updated_at,rev)
+        VALUES(@project_id,@collection,@doc_id,@data,@owner_id,@created_at,@updated_at,@rev)
+        ON CONFLICT(project_id,collection,doc_id) DO UPDATE SET data=@data,updated_at=@updated_at,rev=@rev`)
         .run({ project_id: r.project_id, collection: r.collection, doc_id: r.doc_id, data: J(r.data),
-          owner_id: r.owner_id ?? null, created_at: exists ? exists.created_at : now, updated_at: now });
+          owner_id: r.owner_id ?? null, created_at: exists ? exists.created_at : now, updated_at: now, rev });
       return this.getRecord(r.project_id, r.collection, r.doc_id);
+    },
+    // 원자적 증감 (트랜잭션). 동시 호출에도 값이 정확히 누적된다. 게임 점수·좋아요·재고 등.
+    async incRecord(projectId, collection, docId, incs, { ownerId = null, createIfMissing = true } = {}) {
+      const tx = db.transaction(() => {
+        const ex = recRow(db.prepare('SELECT * FROM records WHERE project_id=? AND collection=? AND doc_id=?')
+          .get(projectId, collection, docId));
+        if ((!ex || ex.deleted) && !createIfMissing) return null;
+        const base = (ex && !ex.deleted) ? ex.data : {};
+        const data = applyIncs({ ...base }, incs);
+        const now = Date.now();
+        const rev = (ex ? ex.rev : 0) + 1;
+        db.prepare(`INSERT INTO records(project_id,collection,doc_id,data,owner_id,created_at,updated_at,rev)
+          VALUES(@project_id,@collection,@doc_id,@data,@owner_id,@created_at,@updated_at,@rev)
+          ON CONFLICT(project_id,collection,doc_id) DO UPDATE SET data=@data,updated_at=@updated_at,rev=@rev,deleted=0`)
+          .run({ project_id: projectId, collection, doc_id: docId, data: J(data),
+            owner_id: ex ? (ex.owner_id ?? null) : ownerId, created_at: ex ? ex.created_at : now, updated_at: now, rev });
+        return recRow(db.prepare('SELECT * FROM records WHERE project_id=? AND collection=? AND doc_id=?')
+          .get(projectId, collection, docId));
+      });
+      return tx();
     },
     async getRecord(projectId, collection, docId) {
       return recRow(db.prepare('SELECT * FROM records WHERE project_id=? AND collection=? AND doc_id=?')

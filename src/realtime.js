@@ -136,13 +136,14 @@ function send(ws, obj) {
 }
 
 // 서버 코드(라우트)에서 방에 브로드캐스트. 데이터 변경 알림 등.
-export function broadcast(pid, room, payload) {
+// filter(ws)가 주어지면 통과한 소켓에만 보낸다(비공개 레코드 변경을 권한자에게만).
+export function broadcast(pid, room, payload, filter) {
   const key = roomKey(pid, room);
   const set = rooms.get(key);
   if (!set) return 0;
   metrics.broadcasts++;
   let n = 0;
-  for (const ws of set) { send(ws, payload); n++; }
+  for (const ws of set) { if (filter && !filter(ws)) continue; send(ws, payload); n++; }
   return n;
 }
 

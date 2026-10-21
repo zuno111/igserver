@@ -1,5 +1,6 @@
 // 메모리 드라이버. better-sqlite3 설치가 막힌 환경에서도 서버가 뜨게 하는 폴백.
 // 재시작하면 데이터가 날아가므로 데모/테스트용. 인터페이스는 sqlite와 동일.
+import { applyIncs } from '../util.js';
 function getField(obj, path) { return String(path).split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj); }
 function matchOne(v, op, val) {
   switch (op) {
@@ -69,8 +70,28 @@ export function createMemoryRepo() {
     async putRecord(r) {
       const k = rk(r.project_id, r.collection, r.doc_id);
       const ex = records.get(k);
+      // 낙관적 동시성: expectedRev 불일치면 충돌
+      if (r.expectedRev != null) {
+        const curRev = ex ? (ex.rev || 0) : 0;
+        if (curRev !== Number(r.expectedRev)) { const e = new Error('rev_conflict'); e.code = 'rev_conflict'; e.current = curRev; throw e; }
+      }
       const now = Date.now();
-      const rec = { ...r, created_at: ex ? ex.created_at : now, updated_at: now };
+      const rev = (ex ? (ex.rev || 0) : 0) + 1;
+      const rec = { project_id: r.project_id, collection: r.collection, doc_id: r.doc_id, data: r.data,
+        owner_id: r.owner_id ?? null, deleted: ex ? ex.deleted : 0, created_at: ex ? ex.created_at : now, updated_at: now, rev };
+      records.set(k, rec); return rec;
+    },
+    // 원자적 증감. Node는 단일 스레드라 동기 블록이 곧 원자적.
+    async incRecord(projectId, collection, docId, incs, { ownerId = null, createIfMissing = true } = {}) {
+      const k = rk(projectId, collection, docId);
+      const ex = records.get(k);
+      if ((!ex || ex.deleted) && !createIfMissing) return null;
+      const base = (ex && !ex.deleted) ? ex.data : {};
+      const data = applyIncs({ ...base }, incs);
+      const now = Date.now();
+      const rev = (ex ? (ex.rev || 0) : 0) + 1;
+      const rec = { project_id: projectId, collection, doc_id: docId, data,
+        owner_id: ex ? (ex.owner_id ?? null) : ownerId, deleted: 0, created_at: ex ? ex.created_at : now, updated_at: now, rev };
       records.set(k, rec); return rec;
     },
     async getRecord(p, c, d) { return records.get(rk(p, c, d)) || null; },

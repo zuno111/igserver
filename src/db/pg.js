@@ -1,6 +1,7 @@
 // PostgreSQL 드라이버. 여러 노드가 같은 DB를 바라보며 수평 확장할 때 사용.
 // DATABASE_URL 환경변수 설정 시 자동 선택. 인터페이스는 sqlite/memory와 동일.
 import pg from 'pg';
+import { applyIncs } from '../util.js';
 
 // 서버측 쿼리 빌더 (JSONB 필드 필터/정렬)
 const PGOPS = { eq: '=', ne: '!=', gt: '>', gte: '>=', lt: '<', lte: '<=' };
@@ -47,6 +48,7 @@ export async function createPgRepo(config) {
       data JSONB NOT NULL, owner_id TEXT, deleted INT NOT NULL DEFAULT 0, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL,
       PRIMARY KEY(project_id, collection, doc_id));
     ALTER TABLE records ADD COLUMN IF NOT EXISTS deleted INT NOT NULL DEFAULT 0;
+    ALTER TABLE records ADD COLUMN IF NOT EXISTS rev INT NOT NULL DEFAULT 0;
     CREATE INDEX IF NOT EXISTS idx_records_coll ON records(project_id, collection, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_records_owner ON records(project_id, collection, owner_id);
     CREATE TABLE IF NOT EXISTS files (
@@ -122,11 +124,46 @@ export async function createPgRepo(config) {
 
     async putRecord(r) {
       const now = Date.now();
-      await q(`INSERT INTO records(project_id,collection,doc_id,data,owner_id,created_at,updated_at)
-        VALUES($1,$2,$3,$4,$5,$6,$7)
-        ON CONFLICT(project_id,collection,doc_id) DO UPDATE SET data=$4,updated_at=$7`,
+      if (r.expectedRev != null) {
+        // 낙관적 동시성: 트랜잭션 안에서 현재 rev 확인 후 일치할 때만 수정
+        const c = await pool.connect();
+        try {
+          await c.query('BEGIN');
+          const ex = (await c.query('SELECT created_at, rev FROM records WHERE project_id=$1 AND collection=$2 AND doc_id=$3 FOR UPDATE', [r.project_id, r.collection, r.doc_id])).rows[0];
+          const curRev = ex ? ex.rev : 0;
+          if (curRev !== Number(r.expectedRev)) { await c.query('ROLLBACK'); const e = new Error('rev_conflict'); e.code = 'rev_conflict'; e.current = curRev; throw e; }
+          await c.query(`INSERT INTO records(project_id,collection,doc_id,data,owner_id,created_at,updated_at,rev)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+            ON CONFLICT(project_id,collection,doc_id) DO UPDATE SET data=$4,updated_at=$7,rev=$8`,
+            [r.project_id, r.collection, r.doc_id, r.data, r.owner_id, ex ? Number(ex.created_at) : now, now, curRev + 1]);
+          await c.query('COMMIT');
+        } catch (e) { try { await c.query('ROLLBACK'); } catch {} throw e; } finally { c.release(); }
+        return this.getRecord(r.project_id, r.collection, r.doc_id);
+      }
+      await q(`INSERT INTO records(project_id,collection,doc_id,data,owner_id,created_at,updated_at,rev)
+        VALUES($1,$2,$3,$4,$5,$6,$7,1)
+        ON CONFLICT(project_id,collection,doc_id) DO UPDATE SET data=$4,updated_at=$7,rev=records.rev+1`,
         [r.project_id, r.collection, r.doc_id, r.data, r.owner_id, now, now]);
       return this.getRecord(r.project_id, r.collection, r.doc_id);
+    },
+    // 원자적 증감 (SELECT ... FOR UPDATE 트랜잭션).
+    async incRecord(projectId, collection, docId, incs, { ownerId = null, createIfMissing = true } = {}) {
+      const c = await pool.connect();
+      try {
+        await c.query('BEGIN');
+        const ex = (await c.query('SELECT * FROM records WHERE project_id=$1 AND collection=$2 AND doc_id=$3 FOR UPDATE', [projectId, collection, docId])).rows[0];
+        if ((!ex || ex.deleted) && !createIfMissing) { await c.query('ROLLBACK'); return null; }
+        const base = (ex && !ex.deleted) ? ex.data : {};
+        const data = applyIncs({ ...base }, incs);
+        const now = Date.now();
+        const rev = (ex ? ex.rev : 0) + 1;
+        await c.query(`INSERT INTO records(project_id,collection,doc_id,data,owner_id,created_at,updated_at,rev,deleted)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,0)
+          ON CONFLICT(project_id,collection,doc_id) DO UPDATE SET data=$4,updated_at=$7,rev=$8,deleted=0`,
+          [projectId, collection, docId, data, ex ? ex.owner_id : ownerId, ex ? Number(ex.created_at) : now, now, rev]);
+        await c.query('COMMIT');
+      } catch (e) { try { await c.query('ROLLBACK'); } catch {} throw e; } finally { c.release(); }
+      return this.getRecord(projectId, collection, docId);
     },
     async getRecord(p, c, d) { return one(await q('SELECT * FROM records WHERE project_id=$1 AND collection=$2 AND doc_id=$3', [p, c, d])); },
     async queryRecords(p, c, { ownerId, limit = 100, offset = 0, filters, sort, deleted = false, q: qq } = {}) {
