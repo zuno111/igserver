@@ -243,6 +243,7 @@ body.has-touch .touchctrl{display:grid}
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 "use strict";
 /* ============================= store ============================= */
@@ -954,6 +955,7 @@ function renderEditor(m){
       '<div class="spacer"></div>'+
       '<label class="btn" style="cursor:pointer">에셋 임포트<input id="edimport" type="file" accept=".json,.vox,application/json" hidden></label>'+
       '<label class="btn" style="cursor:pointer" title="webmax 3D 모델(OBJ)을 메시 그대로 배치">3D 임포트(OBJ)<input id="edobj" type="file" accept=".obj" hidden></label>'+
+      '<label class="btn" style="cursor:pointer" title="언리얼/웹맥스 glTF(GLB/GLTF)를 메시 그대로 배치">GLB 임포트<input id="edglb" type="file" accept=".glb,.gltf" hidden></label>'+
       '<label class="btn" style="cursor:pointer" title="레이어룸 이미지(PNG)를 레벨 커버로 사용">커버 이미지<input id="edcover" type="file" accept="image/*" hidden></label>'+
       '<button class="btn" id="edgate" title="토큰 홀더 전용 레벨로 설정">홀더 전용</button>'+
       '<button class="btn" id="edtest">▶ 테스트</button>'+
@@ -1062,6 +1064,27 @@ function renderEditor(m){
       toast('3D 모델 배치 완료 ('+parsed.tris+' 삼각형)');
     }catch(err){ toast('OBJ 처리 오류: '+err.message); } };
     rd.readAsText(f); e.target.value=''; };
+  // GLB/GLTF 임포트(언리얼 glTF export 등) — GLTFLoader로 로드 후 메시 병합 → 프롭
+  document.getElementById('edglb').onchange=function(e){ var f=e.target.files&&e.target.files[0]; if(!f)return;
+    if(typeof THREE.GLTFLoader!=='function'){ toast('GLB 로더를 불러오지 못했습니다'); return; }
+    var rd=new FileReader();
+    rd.onload=function(){ try{
+      new THREE.GLTFLoader().parse(rd.result, '', function(gltf){
+        var posAll=[]; gltf.scene.updateMatrixWorld(true);
+        gltf.scene.traverse(function(o){ if(o.isMesh&&o.geometry){ var gg=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone(); gg.applyMatrix4(o.matrixWorld); var p=gg.attributes.position.array; for(var i=0;i<p.length;i++)posAll.push(p[i]); } });
+        if(!posAll.length){ toast('GLB에 메시가 없습니다'); return; }
+        if(posAll.length/3>120000){ toast('모델이 너무 큽니다(정점 12만 초과)'); return; }
+        var g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(posAll,3)); g.computeVertexNormals();
+        var size=normalizeGeo(g,4);
+        var px=Math.min(GS-2,spawn.x+3)+0.5, pz=Math.min(GS-2,spawn.z)+0.5, py=1;
+        var mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0xb0b8c4})); mesh.position.set(px,py,pz); scene.add(mesh);
+        var posArr=g.attributes.position.array; var verts=[], faces=[];
+        for(var i=0;i<posArr.length;i+=3){ verts.push([+posArr[i].toFixed(3),+posArr[i+1].toFixed(3),+posArr[i+2].toFixed(3)]); faces.push(i/3); }
+        edProps.push({ mesh:mesh, data:{ verts:verts, faces:faces, pos:{x:px,y:py,z:pz}, scale:1, color:0xb0b8c4, size:{w:size.w,h:size.h,d:size.d}, collide:true } });
+        toast('GLB 배치 완료 ('+(posArr.length/3)+' 정점)');
+      }, function(err){ toast('GLB 파싱 실패'); });
+    }catch(err){ toast('GLB 처리 오류: '+err.message); } };
+    rd.readAsArrayBuffer(f); e.target.value=''; };
   // 레이어룸 이미지 → 레벨 커버. 640px로 리사이즈 + JPEG 압축(용량 방지).
   document.getElementById('edcover').onchange=function(e){ var f=e.target.files&&e.target.files[0]; if(!f)return;
     var img=new Image(); img.onload=function(){ var MX=640; var s=Math.min(1,MX/Math.max(img.width,img.height));
