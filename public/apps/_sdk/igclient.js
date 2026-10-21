@@ -107,7 +107,7 @@
             const m = JSON.parse(e.data);
             if (m.type === 'presence' && opts.onPresence) opts.onPresence(m.members, m);
             else if (m.type === 'subscribed' && opts.onPresence && m.members) opts.onPresence(m.members, m);
-            else if (m.type === 'message' || m.type === 'data_changed') onMessage(m);
+            else if (m.type === 'message' || m.type === 'data_changed' || m.type === 'inbox') onMessage(m);
           } catch {}
         };
         ws.onclose = () => { if (!closed) setTimeout(() => api.subscribe(room, onMessage, opts), 2000); };
@@ -145,6 +145,36 @@
         async usage() { return req('GET', '/api/nas/usage'); },
         fileUrl(p) { return `${baseUrl}/api/nas/file?path=${encodeURIComponent(p)}&key=${projectKey}`; },
         async download(p) { const r = await fetch(`${baseUrl}/api/nas/file?path=${encodeURIComponent(p)}&key=${projectKey}`, { headers: token ? { Authorization: 'Bearer ' + token } : {} }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); },
+      },
+
+      // ---- 메신저 (가입 없이 기기 신원으로 메시지/파일) ----
+      messenger: {
+        // 기기 등록: deviceId는 localStorage에 자동 보관 → 재접속 시 같은 신원. 토큰도 세팅.
+        async register(name) {
+          let deviceId = null;
+          try { deviceId = localStorage.getItem('ig_device_' + projectKey); } catch {}
+          const r = await req('POST', '/api/messenger/register', { body: { deviceId, name }, auth: false });
+          try { localStorage.setItem('ig_device_' + projectKey, r.deviceId); } catch {}
+          setToken(r.token);
+          return { deviceId: r.deviceId, user: r.user };
+        },
+        deviceId() { try { return localStorage.getItem('ig_device_' + projectKey); } catch { return null; } },
+        async rooms() { return (await req('GET', '/api/messenger/rooms')).rooms; },
+        async createRoom(title) { return (await req('POST', '/api/messenger/rooms', { body: { title } })).room; },
+        async openDM(peerDeviceId) { return (await req('POST', '/api/messenger/dm', { body: { peerDeviceId } })).room; },
+        async send(room, text, file) { return (await req('POST', '/api/messenger/send', { body: { room, text, file } })).message; },
+        async history(room, { limit = 50, before } = {}) {
+          const qs = new URLSearchParams({ room, limit }); if (before) qs.set('before', before);
+          return (await req('GET', '/api/messenger/history?' + qs)).messages;
+        },
+        // 파일 첨부 전송: 파일 업로드(기존 files 재사용) 후 메시지로 보냄
+        async sendFile(room, blob, filename, text) {
+          const up = await api.upload(blob, filename);
+          return this.send(room, text || '', { id: up.id, name: up.filename, size: up.size, mime: up.mime });
+        },
+        // 실시간 수신: 방 메시지 구독. onMessage(msg). listen()은 개인함(새 메시지 알림) 구독.
+        subscribe(room, onMessage, opts = {}) { return api.subscribe(room, (m) => { if (m.type === 'message') onMessage(m); }, opts); },
+        listen(myUid, onInbox) { return api.subscribe('u:' + myUid, (m) => { if (m.type === 'inbox') onInbox(m); }); },
       },
     };
     return api;

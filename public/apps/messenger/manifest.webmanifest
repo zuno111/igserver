@@ -1,0 +1,15 @@
+{
+  "name": "ig 메신저",
+  "short_name": "ig메신저",
+  "description": "가입 없이 기기만으로 메시지와 파일을 주고받는 메신저",
+  "start_url": "/app/messenger/",
+  "scope": "/app/messenger/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "lang": "ko",
+  "icons": [
+    { "src": "/app/messenger/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

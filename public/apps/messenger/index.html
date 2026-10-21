@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>ig 메신저</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<link rel="manifest" href="/app/messenger/manifest.webmanifest">
+<style>
+  :root{ --bg:#0b1020; --panel:#141b32; --panel2:#1b2442; --line:#273152; --txt:#e8ecf7; --mut:#93a0c4; --accent:#5b8cff; --mine:#2b5bff; --ok:#38c172; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',system-ui,-apple-system,sans-serif;font-style:normal;background:var(--bg);color:var(--txt);height:100dvh;overflow:hidden}
+  button,input{font-family:inherit;font-style:normal}
+  .app{display:grid;grid-template-columns:320px 1fr;height:100dvh}
+  .side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+  .me{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .me .nm{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px}
+  .me .did{margin-top:6px;font-size:12px;color:var(--mut);word-break:break-all}
+  .me .did b{color:var(--accent)}
+  .acts{display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .acts button{flex:1;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:9px;cursor:pointer;font-size:13px}
+  .acts button:hover{border-color:var(--accent)}
+  .rooms{flex:1;overflow:auto}
+  .room{padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:10px;align-items:center}
+  .room:hover{background:var(--panel2)}
+  .room.on{background:var(--panel2);border-left:3px solid var(--accent)}
+  .av{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#3a4a82,#5b8cff);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+  .room .t{min-width:0;flex:1}
+  .room .t .rt{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .room .t .rl{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .room .bdg{background:var(--mine);color:#fff;border-radius:10px;font-size:11px;padding:1px 7px;min-width:18px;text-align:center}
+  .main{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  .top{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:700;display:flex;align-items:center;gap:10px}
+  .top .sub{font-size:12px;color:var(--mut);font-weight:400}
+  .msgs{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:10px}
+  .row{display:flex;flex-direction:column;max-width:72%}
+  .row.me{align-self:flex-end;align-items:flex-end}
+  .row .who{font-size:12px;color:var(--mut);margin:0 6px 3px}
+  .bub{background:var(--panel2);padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+  .row.me .bub{background:var(--mine)}
+  .bub a{color:#bcd0ff}
+  .row.me .bub a{color:#dde8ff}
+  .tm{font-size:11px;color:var(--mut);margin:3px 6px 0}
+  .file{display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit}
+  .file .ic{width:30px;height:30px;border-radius:8px;background:#0006;display:flex;align-items:center;justify-content:center}
+  .compose{padding:12px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:flex-end}
+  .compose textarea{flex:1;resize:none;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px;max-height:120px;min-height:42px}
+  .compose button{background:var(--mine);color:#fff;border:0;border-radius:12px;padding:0 18px;height:42px;cursor:pointer;font-size:14px;font-weight:600}
+  .icon-btn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);width:42px;height:42px;border-radius:12px;cursor:pointer;font-size:18px}
+  .empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--mut);text-align:center;padding:24px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#000a;border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:13px;opacity:0;transition:.2s;pointer-events:none}
+  .toast.on{opacity:1}
+  @media(max-width:720px){ .app{grid-template-columns:1fr} .side{display:flex} .main{display:none} body.chat .side{display:none} body.chat .main{display:flex} }
+  .back{display:none}
+  @media(max-width:720px){ .back{display:inline-block;background:none;border:0;color:var(--txt);font-size:20px;cursor:pointer;padding:0 4px 0 0} }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="me">
+      <div class="nm"><span id="myname">연결 중…</span><button id="rename" class="icon-btn" style="width:28px;height:28px;font-size:13px" title="이름 변경">✎</button></div>
+      <div class="did">내 기기 ID(친구에게 공유): <b id="mydid">…</b></div>
+    </div>
+    <div class="acts">
+      <button id="newdm">＋ 1:1 대화</button>
+      <button id="newgrp">＋ 그룹</button>
+    </div>
+    <div class="rooms" id="rooms"></div>
+  </aside>
+  <main class="main" id="main">
+    <div class="empty" id="empty">왼쪽에서 대화를 선택하거나<br>＋ 로 새 대화를 시작하세요.</div>
+    <div class="top" id="top" style="display:none"><button class="back" id="back">‹</button><span id="roomtitle"></span><span class="sub" id="roomsub"></span></div>
+    <div class="msgs" id="msgs" style="display:none"></div>
+    <div class="compose" id="compose" style="display:none">
+      <input type="file" id="fileinp" style="display:none">
+      <button class="icon-btn" id="attach" title="파일 첨부">📎</button>
+      <textarea id="text" rows="1" placeholder="메시지 입력…"></textarea>
+      <button id="send">전송</button>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="/app/_sdk/igclient.js"></script>
+<script>
+const CFG = window.IG_MSGR || { base: location.origin, key: new URLSearchParams(location.search).get('key') || '' };
+const ig = igClient(CFG.base, CFG.key);
+let me = null, cur = null, sub = null, unread = {};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const fmt = (ts) => { const d = new Date(ts); return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }); };
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),1800); }
+
+async function boot(){
+  if(!CFG.key){ $('myname').textContent='키 없음'; toast('프로젝트 키가 없습니다'); return; }
+  let name=''; try{ name=localStorage.getItem('ig_msgr_name')||''; }catch{}
+  const r = await ig.messenger.register(name||undefined);
+  me = r;
+  $('myname').textContent = r.user.name;
+  $('mydid').textContent = r.deviceId;
+  // 개인함: 어느 방이든 새 메시지 오면 목록 갱신 + 뱃지
+  ig.messenger.listen(me.user.id, (ev)=>{
+    if(!cur || ev.room!==cur.room){ unread[ev.room]=(unread[ev.room]||0)+1; }
+    loadRooms();
+  });
+  await loadRooms();
+}
+
+async function loadRooms(){
+  const rooms = await ig.messenger.rooms();
+  const box = $('rooms'); box.innerHTML='';
+  if(!rooms.length){ box.innerHTML='<div class="empty" style="height:auto;padding:30px">아직 대화가 없습니다.<br>＋ 로 시작하세요.</div>'; return; }
+  for(const rm of rooms){
+    const div=document.createElement('div');
+    div.className='room'+(cur&&cur.room===rm.room?' on':'');
+    const u=unread[rm.room]||0;
+    div.innerHTML=`<div class="av">${esc((rm.title||'방').slice(0,2))}</div>
+      <div class="t"><div class="rt">${esc(rm.title||'대화방')}</div><div class="rl">${esc(rm.lastText||'새 대화')}</div></div>
+      ${u?`<div class="bdg">${u}</div>`:''}`;
+    div.onclick=()=>openRoom(rm);
+    box.appendChild(div);
+  }
+}
+
+async function openRoom(rm){
+  cur = rm; unread[rm.room]=0;
+  document.body.classList.add('chat');
+  $('empty').style.display='none';
+  $('top').style.display='flex'; $('msgs').style.display='flex'; $('compose').style.display='flex';
+  $('roomtitle').textContent = rm.title||'대화방';
+  $('roomsub').textContent = rm.kind==='dm'?'1:1':'그룹';
+  loadRooms();
+  const msgs = await ig.messenger.history(rm.room,{limit:100});
+  renderAll(msgs);
+  if(sub) sub.close();
+  sub = ig.messenger.subscribe(rm.room, (m)=>{ appendMsg(m); });
+}
+
+function renderAll(list){ const box=$('msgs'); box.innerHTML=''; for(const m of list) appendMsg(m,true); box.scrollTop=box.scrollHeight; }
+function appendMsg(m, bulk){
+  const box=$('msgs'); const mine = m.from===me.user.id;
+  const row=document.createElement('div'); row.className='row'+(mine?' me':'');
+  let inner='';
+  if(!mine && cur.kind!=='dm') inner+=`<div class="who">${esc(m.name||'익명')}</div>`;
+  let body='';
+  if(m.file){ const url=`${CFG.base}/api/files/${m.file.id}?key=${CFG.key}`;
+    body=`<a class="file" href="${url}" target="_blank" download><span class="ic">📎</span><span>${esc(m.file.name)} <br><small>${(m.file.size/1024).toFixed(1)} KB</small></span></a>`;
+    if(m.text) body+=`<div style="margin-top:6px">${esc(m.text)}</div>`;
+  } else { body=esc(m.text); }
+  inner+=`<div class="bub">${body}</div><div class="tm">${fmt(m.ts)}</div>`;
+  row.innerHTML=inner; box.appendChild(row);
+  if(!bulk) box.scrollTop=box.scrollHeight;
+}
+
+async function doSend(){
+  const ta=$('text'); const t=ta.value.trim(); if(!t||!cur) return;
+  ta.value=''; ta.style.height='42px';
+  try{ await ig.messenger.send(cur.room, t); }catch(e){ toast('전송 실패'); }
+}
+$('send').onclick=doSend;
+$('text').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); doSend(); } });
+$('text').addEventListener('input',e=>{ e.target.style.height='42px'; e.target.style.height=Math.min(120,e.target.scrollHeight)+'px'; });
+$('attach').onclick=()=>$('fileinp').click();
+$('fileinp').onchange=async(e)=>{ const f=e.target.files[0]; if(!f||!cur) return; toast('업로드 중…');
+  try{ await ig.messenger.sendFile(cur.room, f, f.name); }catch(err){ toast('업로드 실패'); } e.target.value=''; };
+$('newdm').onclick=async()=>{ const pid=prompt('상대의 기기 ID를 입력하세요'); if(!pid) return;
+  try{ const rm=await ig.messenger.openDM(pid.trim()); await loadRooms(); openRoom(rm); }catch(e){ toast('상대를 찾을 수 없습니다'); } };
+$('newgrp').onclick=async()=>{ const title=prompt('그룹 이름'); if(!title) return;
+  const rm=await ig.messenger.createRoom(title.trim()); await loadRooms(); openRoom(rm); };
+$('rename').onclick=async()=>{ const n=prompt('표시할 이름', me.user.name); if(!n) return;
+  try{ localStorage.setItem('ig_msgr_name',n.trim()); }catch{} await ig.messenger.register(n.trim()); me.user.name=n.trim(); $('myname').textContent=n.trim(); toast('이름이 변경되었습니다'); };
+$('back').onclick=()=>{ document.body.classList.remove('chat'); if(sub){sub.close();sub=null;} cur=null; };
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('/app/messenger/sw.js').catch(()=>{}); }
+boot();
+</script>
+</body>
+</html>

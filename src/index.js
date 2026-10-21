@@ -21,7 +21,9 @@ import adminRoutes, { ensureAdmin } from './routes/admin.js';
 import igplayRoutes from './routes/igplay.js';
 import igmarketRoutes from './routes/igmarket.js';
 import igtokenRoutes from './routes/igtoken.js';
+import messengerRoutes from './routes/messenger.js';
 import { ensureIgPlay, igplayInject } from './provision.js';
+import { ensureMessenger, messengerInject } from './provision_messenger.js';
 
 const MODE = process.env.MODE || 'standalone';
 
@@ -35,6 +37,7 @@ async function main() {
   await initRepo();
   await ensureAdmin(); // 관리자 계정/시스템 프로젝트 보장
   await ensureIgPlay(); // igPlay 프로젝트 자동 프로비전(주소/키 자동 주입용)
+  await ensureMessenger(); // 메신저 프로젝트 자동 프로비전
 
   const app = express();
   app.disable('x-powered-by');
@@ -87,6 +90,7 @@ async function main() {
   app.use('/api/igplay', enforceKeyScope, igplayRoutes);
   app.use('/api/igmarket', enforceKeyScope, igmarketRoutes);
   app.use('/api/igtoken', enforceKeyScope, igtokenRoutes);
+  app.use('/api/messenger', enforceKeyScope, messengerRoutes);
   // 프로젝트 자기 정보 / 사용량 조회
   app.get('/api/project', (req, res) => res.json({ project: { id: req.project.id, name: req.project.name, slug: req.project.slug } }));
   app.get('/api/project/usage', async (req, res, next) => { try { res.json(await getUsage(getRepo(), req.project)); } catch (e) { next(e); } });
@@ -98,6 +102,7 @@ async function main() {
   // 각 프로젝트의 프론트엔드: public/apps/<slug>/ 에 올리면 /app/<slug>/ 로 서비스
   // igPlay 페이지는 주소/공개키를 주입해 반환(정적 서빙보다 먼저)
   app.use('/app', igplayInject);
+  app.use('/app', messengerInject);
   app.use('/app', express.static(path.join(config.root, 'public/apps')));
   // 루트 → 대시보드로
   app.get('/', (_req, res) => res.redirect('/admin/'));
