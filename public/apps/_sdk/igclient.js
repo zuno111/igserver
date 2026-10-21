@@ -128,6 +128,24 @@
       live(collection, onChange, opts = {}) {
         return this.subscribe('data:' + collection, (m) => { if (m.type === 'data_changed') onChange(m); }, opts);
       },
+
+      // ---- NAS (파일 저장·공유 서버) ----
+      nas: {
+        // 폴더 내용: { path, folders:[], files:[] }
+        async list(p = '/') { return req('GET', '/api/nas/list?path=' + encodeURIComponent(p)); },
+        async mkdir(p) { return (await req('POST', '/api/nas/folder', { body: { path: p } })).folder; },
+        // upload('/사진/a.jpg', blobOrArrayBuffer)
+        async upload(p, blob) { const buf = blob instanceof ArrayBuffer ? blob : (blob && blob.arrayBuffer ? await blob.arrayBuffer() : blob); return (await req('POST', '/api/nas/upload?path=' + encodeURIComponent(p), { raw: buf })).file; },
+        async meta(p) { return (await req('GET', '/api/nas/meta?path=' + encodeURIComponent(p))).item; },
+        async move(from, to) { return req('POST', '/api/nas/move', { body: { from, to } }); },
+        async remove(p) { return req('DELETE', '/api/nas/delete?path=' + encodeURIComponent(p)); },
+        // 공유 링크 발급(파일). expiresInSec 생략 시 무기한. 반환 file.share.url
+        async share(p, expiresInSec) { return (await req('POST', '/api/nas/share', { body: { path: p, expiresInSec } })).file; },
+        async unshare(p) { return req('DELETE', '/api/nas/share?path=' + encodeURIComponent(p)); },
+        async usage() { return req('GET', '/api/nas/usage'); },
+        fileUrl(p) { return `${baseUrl}/api/nas/file?path=${encodeURIComponent(p)}&key=${projectKey}`; },
+        async download(p) { const r = await fetch(`${baseUrl}/api/nas/file?path=${encodeURIComponent(p)}&key=${projectKey}`, { headers: token ? { Authorization: 'Bearer ' + token } : {} }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); },
+      },
     };
     return api;
   }

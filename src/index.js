@@ -16,6 +16,7 @@ import { createGateway, startWorkerHeartbeat } from './cluster.js';
 import authRoutes from './routes/auth.js';
 import dataRoutes from './routes/data.js';
 import fileRoutes from './routes/files.js';
+import nasRoutes from './routes/nas.js';
 import adminRoutes, { ensureAdmin } from './routes/admin.js';
 import igplayRoutes from './routes/igplay.js';
 import igmarketRoutes from './routes/igmarket.js';
@@ -78,6 +79,8 @@ async function main() {
   const apiLimit = rateLimit({ windowMs: config.rlWindowMs, max: config.rlMax, keyBy: 'ip' });
   // 파일 라우트는 raw 바디를 쓰므로 json 파서 전에 분기
   app.use('/api/files', apiLimit, resolveProject, projectRateLimit(), enforceKeyScope, fileRoutes);
+  // NAS(파일 저장·공유 서버): raw 업로드를 쓰므로 json 파서 전에 분기(files와 동일)
+  app.use('/api/nas', apiLimit, resolveProject, projectRateLimit(), enforceKeyScope, nasRoutes);
   app.use('/api', apiLimit, express.json({ limit: '1mb' }), resolveProject, projectRateLimit());
   app.use('/api/auth', authRoutes);
   app.use('/api/data', enforceKeyScope, dataRoutes);
