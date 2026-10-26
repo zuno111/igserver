@@ -917,12 +917,30 @@ var DB_KEY='igplay_v1';
 var db;
 function loadDB(){ try{var r=localStorage.getItem(DB_KEY); if(r)return norm(JSON.parse(r));}catch(e){}
   return norm({nick:null,likes:{},subs:{},comments:{},times:{},myLevels:[],plays:{}}); }
-function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; if(!d.catalog)d.catalog=[]; if(!d.shorts)d.shorts=defaultShorts(); if(!d.market)d.market=[]; if(!d.ownedStore)d.ownedStore=[]; return d; }
+function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; if(!d.catalog||!d.catalog.length)d.catalog=defaultCatalog(); if(!d.shorts||!d.shorts.length)d.shorts=defaultShorts(); if(!d.market)d.market=[]; if(!d.ownedStore)d.ownedStore=[]; return d; }
 function defaultShorts(){ return [
   {id:'sh_gn',title:'강남 월드 미리보기 🏙️',creator:'Voxel Street',youtubeId:'9bZkp7q19f0',likes:12800},
   {id:'sh_bb',title:'블록 파쿠르 하이라이트 🧱',creator:'파쿠르랩',youtubeId:'aqz-KE-bpKQ',likes:9400},
-  {id:'sh_zoo',title:'첫 레벨 플레이 영상 🎮',creator:'igPlay',youtubeId:'jNQXAC9IVRw',likes:5300}
+  {id:'sh_zoo',title:'첫 레벨 플레이 영상 🎮',creator:'igPlay',youtubeId:'jNQXAC9IVRw',likes:5300},
+  {id:'sh_me',title:'복셀 에디터 꿀팁 ✏️',creator:'빌더랩',youtubeId:'ZZ5LpwO-An4',likes:3100},
+  {id:'sh_cat',title:'캐릭터 커스터마이즈 🐱',creator:'igPlay',youtubeId:'kJQP7kiw5Fk',likes:2400}
 ]; }
+function defaultCatalog(){ var c='demo'; function it(k,t,cr,ac,p,tags){ return {id:'ci_seed_'+t.replace(/\s/g,'').slice(0,6)+Math.random().toString(36).slice(2,5),kind:k,title:t,desc:'',creator:cr,creatorId:c,ownerId:c,access:ac,price:p||0,gateSymbol:null,gateMin:0,externalUrl:null,tags:tags||[],cover:null,downloads:Math.floor(Math.random()*4000)}; }
+  return [
+    it('asset3d','로우폴리 빌딩팩 30종','Voxel Street','free',0,['3D','건물','도시']),
+    it('asset3d','캐릭터 메시팩 — 로봇/고양이','빌더랩','paid',120,['3D','캐릭터']),
+    it('image','복셀 텍스처 세트 48종','igPlay','ad',0,['텍스처','복셀']),
+    it('image','하늘·배경 이미지 20종','레이어룸','free',0,['배경','이미지']),
+    it('music','게임 BGM — 네온 시티 10곡','사운드IG','paid',150,['BGM','루프']),
+    it('music','효과음 팩 — 점프/코인/클리어','사운드IG','free',0,['SFX','효과음']),
+    it('game','강남 블록 러너 (리얼모드)','Voxel Street','free',0,['도시','리얼']),
+    it('doc','레벨 디자인 프리셋 모음','파쿠르랩','free',0,['프리셋','문서']),
+    it('video','월드 제작 튜토리얼 영상','igPlay','free',0,['튜토리얼'])
+  ];
+}
+// 랭킹 더미(로컬): 전역 클리어 기록 느낌
+function defaultRanking(){ var names=['블록마스터','VoxelKing','점프왕','서울러너','파쿠르퀸','코인헌터','시티빌더','하늘섬','네온','픽셀러'];
+  return names.map(function(n,i){ return {name:n, ms:18000+i*2400+Math.floor(Math.random()*1500), level:['강남 리얼 시티','블록 파쿠르 시즌 1','코인 러시','홍대 복셀 거리'][i%4]}; }); }
 function ytId(u){ if(!u)return ''; var m=String(u).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{6,})/); return m?m[1]:(/^[A-Za-z0-9_-]{6,}$/.test(u)?u:''); }
 function saveDB(){ try{localStorage.setItem(DB_KEY,JSON.stringify(db));}catch(e){} }
 db=loadDB();
@@ -1262,6 +1280,17 @@ function makeCard(l){
   return c;
 }
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+// 인앱 입력창(아티팩트 샌드박스에선 window.prompt 가 막히므로 이걸 사용)
+function askText(o){ o=o||{}; var ov=document.createElement('div'); ov.className='overlay'; ov.style.position='fixed'; ov.style.inset='0'; ov.style.zIndex='3000'; ov.style.display='grid'; ov.style.placeItems='center';
+  ov.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:20px;max-width:420px;width:92%;text-align:left">'+
+    '<h3 style="font-size:17px;margin-bottom:6px">'+esc(o.title||'입력')+'</h3>'+
+    (o.desc?'<p style="color:var(--muted);font-size:13px;margin:0 0 10px">'+esc(o.desc)+'</p>':'')+
+    '<input id="axIn" placeholder="'+esc(o.placeholder||'')+'" value="'+esc(o.value||'')+'" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;box-sizing:border-box">'+
+    '<div class="obtns" style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="axC">취소</button><button class="btn brand" id="axO">'+esc(o.ok||'확인')+'</button></div></div>';
+  document.body.appendChild(ov); var inp=ov.querySelector('#axIn'); setTimeout(function(){try{inp.focus();}catch(e){}},30);
+  function close(){ try{ov.remove();}catch(e){} } ov.querySelector('#axC').onclick=close; ov.onclick=function(e){ if(e.target===ov)close(); };
+  function ok(){ var v=inp.value.trim(); close(); if(o.onOk)o.onOk(v); } ov.querySelector('#axO').onclick=ok; inp.onkeydown=function(e){ if(e.key==='Enter')ok(); };
+}
 
 /* ============================= search ============================= */
 document.getElementById('q').addEventListener('keydown',function(e){
@@ -2051,6 +2080,8 @@ function renderRanking(m){
     return;
   }
   var lv=allLevels(); var groups=lv.map(function(l){ return {l:l,times:(db.times[l.id]||[]).slice().sort(function(a,b){return a.ms-b.ms;})}; }).filter(function(g){return g.times.length;});
+  if(!groups.length){ var dr=defaultRanking(); var byLevel={}; dr.forEach(function(r){ (byLevel[r.level]=byLevel[r.level]||[]).push({name:r.name,ms:r.ms}); });
+    groups=Object.keys(byLevel).map(function(title){ var l=lv.filter(function(x){return x.title===title;})[0]||{id:title,title:title}; return {l:l,times:byLevel[title].sort(function(a,b){return a.ms-b.ms;})}; }); }
   paintRanking(groups);
 }
 function paintRanking(groups){
@@ -2339,7 +2370,7 @@ function buildCityLocal(bbox,name,mode){ return cityFetchOSM(bbox).then(function
 function renderWorld(m){
   var L=window.__LEAF; // Leaflet (전역 L 은 복셀 헬퍼에 의해 덮여 있음)
   if(!L||typeof L.map!=='function'){ m.innerHTML='<div class="wrap"><div class="empty"><h3>지도를 불러오지 못했습니다</h3></div></div>'; return; }
-  m.innerHTML='<div style="position:absolute;inset:0"><div id="worldmap" style="position:absolute;inset:0"></div>'+
+  m.innerHTML='<div style="position:relative;width:100%;height:calc(100vh - 60px);min-height:460px"><div id="worldmap" style="position:absolute;inset:0;background:#dfe6ee"></div>'+
     '<div style="position:absolute;top:12px;left:12px;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--muted);pointer-events:none">월드 · 핀을 눌러 콘텐츠로 이동</div>'+
     '<button class="btn brand" id="cityBtn" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:500">이 구역 월드로 올리기</button>'+
     '<div style="position:absolute;top:12px;right:12px;z-index:500;display:flex;gap:6px">'+
@@ -2369,12 +2400,13 @@ function renderWorld(m){
   function buildCity(mode){
     var b=map.getBounds(); var bbox={s:b.getSouth(),w:b.getWest(),n:b.getNorth(),e:b.getEast()};
     if((bbox.n-bbox.s)>0.02||(bbox.e-bbox.w)>0.02){ toast('더 확대하세요(약 1km 이하 구역)'); return; }
-    var name=prompt('이 구역 이름(예: 청담동)',''); if(name===null)return;
-    cityBtn.disabled=true; cityBtn.textContent='지형 가져오는 중…';
-    function done(msg){ toast(msg); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; load(); }
-    function fail(e){ toast((e&&e.message)||'실패'); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; }
-    if(NET.on){ api('POST','/api/igcity/build',{bbox:bbox,name:name||'시티',mode:mode}).then(function(r){ done((mode==='real'?'리얼':'복셀')+' 월드 생성 · 건물 '+(r.buildings||0)+'개'); }).catch(fail); }
-    else { buildCityLocal(bbox,name||'시티',mode).then(function(r){ done((mode==='real'?'리얼':'복셀')+' 월드 생성 · 건물 '+r.buildings+'개'+(r.osm?'':' (지도데이터 대신 샘플지형)')); }).catch(fail); }
+    askText({title:'이 구역을 월드로',desc:'구역 이름을 정하세요',placeholder:'예: 청담동',ok:'만들기',onOk:function(name){
+      cityBtn.disabled=true; cityBtn.textContent='지형 가져오는 중…';
+      function done(msg){ toast(msg); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; load(); }
+      function fail(e){ toast((e&&e.message)||'실패'); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; }
+      if(NET.on){ api('POST','/api/igcity/build',{bbox:bbox,name:name||'시티',mode:mode}).then(function(r){ done((mode==='real'?'리얼':'복셀')+' 월드 생성 · 건물 '+(r.buildings||0)+'개'); }).catch(fail); }
+      else { buildCityLocal(bbox,name||'시티',mode).then(function(r){ done((mode==='real'?'리얼':'복셀')+' 월드 생성 · 건물 '+r.buildings+'개'+(r.osm?'':' (지도데이터 대신 샘플지형)')); }).catch(fail); }
+    }});
   }
   if(cityBtn)cityBtn.onclick=function(){
     // 모드 선택: 복셀 / 리얼
@@ -2392,10 +2424,13 @@ function renderWorld(m){
 // 세로 쇼츠 피드. igVod의 short(60초 이하)을 상하로 넘기며 재생. 좋아요·댓글·공유.
 function renderShorts(m){
   m.innerHTML='<div id="shortsWrap" style="position:absolute;inset:0;background:#000;display:grid;place-items:center"></div>'+
-    '<button class="btn brand" id="shImport" style="position:absolute;top:14px;right:14px;z-index:60">유튜브 퍼오기</button>';
+    '<button class="btn brand" id="shImport" style="position:absolute;top:14px;right:14px;z-index:60;width:auto;padding:9px 16px;white-space:nowrap;line-height:1.1;height:auto">유튜브 퍼오기</button>';
   var wrap=document.getElementById('shortsWrap'); var items=[], idx=0, vidEl=null;
   function vsrc(it){ return it.externalUrl || (it.fileId?(NET.base.replace(/\/+$/,'')+'/api/files/'+it.fileId+'?key='+encodeURIComponent(NET.key)):''); }
-  function media(it){ var yt=it.youtubeId||ytId(it.externalUrl); if(yt) return '<iframe id="shv" src="https://www.youtube.com/embed/'+yt+'?autoplay=1&mute=1&loop=1&playlist='+yt+'&playsinline=1&rel=0" style="width:100%;height:100%;border:0;background:#000" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>'; return '<video id="shv" src="'+vsrc(it)+'" style="width:100%;height:100%;object-fit:contain;background:#000" playsinline autoplay loop muted controls></video>'; }
+  function media(it){ var yt=it.youtubeId||ytId(it.externalUrl); if(yt) return '<div style="position:relative;width:100%;height:100%;background:#000">'+
+      '<img src="https://i.ytimg.com/vi/'+yt+'/hqdefault.jpg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">'+
+      '<iframe id="shv" src="https://www.youtube-nocookie.com/embed/'+yt+'?autoplay=1&mute=1&loop=1&playlist='+yt+'&playsinline=1&rel=0&controls=1" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe></div>';
+    return '<video id="shv" src="'+vsrc(it)+'" style="width:100%;height:100%;object-fit:contain;background:#000" playsinline autoplay loop muted controls></video>'; }
   function show(){
     if(!items.length){ wrap.innerHTML='<div class="empty"><h3>쇼츠가 없습니다</h3><p>오른쪽 위 "유튜브 퍼오기"로 영상을 추가하거나, 내 채널에서 영상을 올려보세요.</p></div>'; return; }
     var it=items[((idx%items.length)+items.length)%items.length];
@@ -2428,7 +2463,7 @@ function renderShorts(m){
   }
   if(NET.on){ api('GET','/api/igvod/shorts').then(function(r){ items=(r.items&&r.items.length)?r.items:(db.shorts||[]); show(); }).catch(function(){ items=db.shorts||[]; show(); }); }
   else { items=db.shorts||[]; show(); }
-  var ib=document.getElementById('shImport'); if(ib)ib.onclick=function(){ var u=prompt('유튜브 영상/쇼츠 URL 붙여넣기'); if(!u)return; var id=ytId(u.trim()); if(!id){ toast('유효한 유튜브 URL이 아닙니다'); return; } if(!db.shorts)db.shorts=[]; db.shorts.unshift({id:'sh_'+Date.now().toString(36),title:'가져온 쇼츠',creator:me(),youtubeId:id,likes:0}); saveDB(); items=db.shorts; idx=0; show(); toast('추가됨'); };
+  var ib=document.getElementById('shImport'); if(ib)ib.onclick=function(){ askText({title:'유튜브 퍼오기',desc:'유튜브 영상/쇼츠 URL을 붙여넣으세요',placeholder:'https://youtube.com/shorts/...',ok:'추가',onOk:function(u){ if(!u)return; var id=ytId(u); if(!id){ toast('유효한 유튜브 URL이 아닙니다'); return; } if(!db.shorts)db.shorts=[]; db.shorts.unshift({id:'sh_'+Date.now().toString(36),title:'가져온 쇼츠',creator:me(),youtubeId:id,likes:0}); saveDB(); items=db.shorts; idx=0; show(); toast('추가됨'); }}); };
   function onkey(e){ if(e.key==='ArrowDown'){ idx++; show(); } else if(e.key==='ArrowUp'){ idx--; show(); } }
   window.addEventListener('keydown',onkey);
   activeSession={dispose:function(){ window.removeEventListener('keydown',onkey); if(vidEl){try{vidEl.pause();}catch(e){}} }};
