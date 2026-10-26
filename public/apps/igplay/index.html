@@ -357,7 +357,8 @@ function msToClock(ms){ var s=ms/1000; var m=Math.floor(s/60); var r=(s-m*60); r
 /* ============================= level model ============================= */
 // voxel types: 1 ground, 2 wall, 3 coin(trigger), 4 goal(trigger)
 var TYPE={ground:1,wall:2,coin:3,goal:4};
-var BLOCKCOL={1:0x3fae5b,2:0x6d7a8c,3:0xffb02e,4:0x27d4b8,6:0x4aa3ff,7:0xb06bff};
+var BLOCKCOL={1:0x3fae5b,2:0x6d7a8c,3:0xffb02e,4:0x27d4b8,6:0x4aa3ff,7:0xb06bff,9:0xff5aa0,10:0xf0556b,11:0xc8b06b,12:0x2ad17a,13:0xffd23a};
+// 인터랙티브 블록: 9 점프대, 10 가시(위험), 11 사라지는 발판, 12 체크포인트, 13 부스터
 var ANIMT={6:'move',7:'spin'}; // 애니메이션 블록 타입(6 이동발판, 7 회전)
 var CHARACTERS=[['blocky','블로키'],['robot','로봇'],['blob','슬라임'],['cat','고양이']];
 function blkCol(b){ return (b.c!=null?b.c:(BLOCKCOL[b.t]!=null?BLOCKCOL[b.t]:0xffffff)); }
@@ -874,7 +875,27 @@ function startPlayer(lv){
   function mat(t){ if(!matCache[t])matCache[t]=new THREE.MeshLambertMaterial({color:BLOCKCOL[t]}); return matCache[t]; }
   var gm=new THREE.Group(); scene.add(gm);
   lv.voxels.forEach(function(b){ if(b.t===1||b.t===2)solids[key(b.x,b.y,b.z)]=true; else if(b.t===3)coins.push(b); else if(b.t===4)goals.push(b); });
+  // 인터랙티브 블록 집합(점프대/가시/사라지는발판/체크포인트/부스터)
+  var bounceSet={}, hazardSet={}, checkpointSet={}, boosterSet={}, crumbleMap={}, curSpawn=null, boostT=0;
+  lv.voxels.forEach(function(b){ var k=key(b.x,b.y,b.z);
+    if(b.t===9){ solids[k]=true; bounceSet[k]=true; }
+    else if(b.t===11){ solids[k]=true; }
+    else if(b.t===10){ hazardSet[k]=true; }
+    else if(b.t===12){ checkpointSet[k]=true; }
+    else if(b.t===13){ boosterSet[k]=true; }
+  });
   buildVoxelMesh(lv.voxels, solids, gm);
+  // 인터랙티브 블록 렌더
+  lv.voxels.forEach(function(b){
+    if([9,10,11,12,13].indexOf(b.t)<0)return; var col=blkCol(b), mesh;
+    if(b.t===12){ mesh=new THREE.Mesh(new THREE.BoxGeometry(0.22,1.5,0.22),new THREE.MeshLambertMaterial({color:col,emissive:0x0a3a22})); mesh.position.set(b.x+0.5,b.y+0.75,b.z+0.5);
+      var flag=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.26,0.04),new THREE.MeshLambertMaterial({color:col})); flag.position.set(b.x+0.5+0.26,b.y+1.3,b.z+0.5); gm.add(flag); }
+    else if(b.t===10){ mesh=new THREE.Mesh(new THREE.ConeGeometry(0.42,0.5,4),new THREE.MeshLambertMaterial({color:col,emissive:0x3a0a10})); mesh.position.set(b.x+0.5,b.y+0.25,b.z+0.5); mesh.rotation.y=Math.PI/4; }
+    else if(b.t===13){ mesh=new THREE.Mesh(new THREE.BoxGeometry(0.92,0.14,0.92),new THREE.MeshLambertMaterial({color:col,emissive:0x5a4a00})); mesh.position.set(b.x+0.5,b.y+0.07,b.z+0.5); }
+    else { mesh=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:col,emissive:b.t===9?0x5a1030:0})); mesh.position.set(b.x+0.5,b.y+0.5,b.z+0.5); }
+    gm.add(mesh);
+    if(b.t===11)crumbleMap[key(b.x,b.y,b.z)]={mesh:mesh,gone:false,t0:null};
+  });
   lv.voxels.forEach(function(b){
     if(false){ var mesh=new THREE.Mesh(geo,mat(b.t)); mesh.position.set(b.x+0.5,b.y+0.5,b.z+0.5);
       // subtle top shade for ground
@@ -928,14 +949,19 @@ function startPlayer(lv){
     for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++)for(var z=z0;z<=z1;z++)if(isSolid(x,y,z))return true;
     return hitProp(px,py,pz)||hitAnim(px,py,pz);
   }
+  // 플레이어가 점유한 셀 중 setObj에 속한 것(가시/체크포인트/부스터 판정)
+  function cellsHit(setObj){ var x0=Math.floor(P.x-RW),x1=Math.floor(P.x+RW-1e-6),y0=Math.floor(P.y),y1=Math.floor(P.y+PH-1e-6),z0=Math.floor(P.z-RW),z1=Math.floor(P.z+RW-1e-6);
+    for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++)for(var z=z0;z<=z1;z++)if(setObj[x+','+y+','+z])return {x:x,y:y,z:z}; return null; }
   var P={x:lv.spawn.x+0.5,y:lv.spawn.y,z:lv.spawn.z+0.5,vy:0,onGround:false};
   var yaw=Math.PI, pitch=0.62, dist=7;
   var state='idle'; // idle|play|win
   var t0=0, elapsed=0, coinsGot=0;
 
-  function reset(){ P.x=lv.spawn.x+0.5; P.y=lv.spawn.y; P.z=lv.spawn.z+0.5; P.vy=0; P.onGround=false;
+  function reset(){ var sp=curSpawn||lv.spawn; P.x=sp.x+0.5; P.y=(curSpawn?curSpawn.y:lv.spawn.y); P.z=sp.z+0.5; P.vy=0; P.onGround=false; boostT=0;
     coinsGot=0; elapsed=0; t0=performance.now(); coins=[]; lv.voxels.forEach(function(b){if(b.t===3)coins.push(b);});
     coinMeshes.forEach(function(c){c.visible=true;}); yaw=Math.PI; pitch=0.62;
+    // 사라진 발판 복구
+    for(var ck in crumbleMap){ var cm=crumbleMap[ck]; cm.gone=false; cm.t0=null; cm.mesh.visible=true; solids[ck]=true; }
     var hc=document.getElementById('hCoin'); if(hc)hc.textContent='0/'+coinCount(lv);
   }
   // 터치 기기 감지 → 터치 컨트롤 표시, PC는 키보드/마우스
@@ -967,7 +993,7 @@ function startPlayer(lv){
   var jumpEl=document.getElementById('jump');
   jumpEl.addEventListener('pointerdown',function(e){ keys[' ']=true; e.stopPropagation(); setTimeout(function(){keys[' ']=false;},120); });
 
-  function startPlay(){ var ov=document.getElementById('startOv'); if(ov)ov.remove(); state='play'; reset();
+  function startPlay(){ var ov=document.getElementById('startOv'); if(ov)ov.remove(); state='play'; curSpawn=null; reset();
     if(NET.on){ api('POST','/api/igplay/events',{type:'play',levelId:lv.id}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} }).catch(function(){}); } else earn(EARN.play); }
   var pb=document.getElementById('playBtn'); if(pb)pb.onclick=startPlay;
 
@@ -990,6 +1016,7 @@ function startPlayer(lv){
     // 애니메이션 블록 갱신 + 이동발판 탑승 이송(플레이어를 발판과 함께 이동)
     animTime+=dt; updateAnim(animTime);
     var ride=ridingBlock(); if(ride){ P.x+=ride.cur.x-ride.prev.x; P.y+=ride.cur.y-ride.prev.y; P.z+=ride.cur.z-ride.prev.z; }
+    if(boostT>0)boostT-=dt; var boostMul=boostT>0?2.3:1; // 부스터 가속
     // 키보드 시점 회전(PC): Q/E 좌우, 위/아래는 드래그로
     if(keys['q'])yaw+=2.2*dt; if(keys['e'])yaw-=2.2*dt;
     // movement intent
@@ -1000,7 +1027,7 @@ function startPlayer(lv){
     var fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
     var right=new THREE.Vector3(-fwd.z,0,fwd.x);
     var mvx=(fwd.x*(-iz)+right.x*ix), mvz=(fwd.z*(-iz)+right.z*ix);
-    var ml=Math.hypot(mvx,mvz); pmoving=ml>0; if(ml>0){ mvx=mvx/ml*MOVE*dt; mvz=mvz/ml*MOVE*dt; }
+    var ml=Math.hypot(mvx,mvz); pmoving=ml>0; if(ml>0){ mvx=mvx/ml*MOVE*boostMul*dt; mvz=mvz/ml*MOVE*boostMul*dt; }
     // X
     var nx=P.x+mvx; if(!boxHit(nx,P.y,P.z))P.x=nx; else { if(mvx>0)P.x=Math.floor(nx+RW)-RW-1e-3; else P.x=Math.floor(nx-RW)+1+RW+1e-3; if(boxHit(P.x,P.y,P.z))P.x=nx-mvx; }
     // Z
@@ -1012,7 +1039,20 @@ function startPlayer(lv){
     var ny=P.y+P.vy*dt;
     if(!boxHit(P.x,ny,P.z))P.y=ny;
     else { if(P.vy<0){ P.y=Math.floor(ny)+1; P.onGround=true; } else { P.y=Math.floor(ny+PH)-PH-1e-3; } P.vy=0; }
-    if(P.y<-20){ reset(); } // fell off -> respawn
+    if(P.y<-20){ reset(); return; } // fell off -> respawn
+    // 발밑 블록: 점프대(튕김) / 사라지는 발판(타이머 시작)
+    if(P.onGround){ var fy=Math.floor(P.y-0.5), bk=Math.floor(P.x)+','+fy+','+Math.floor(P.z);
+      if(bounceSet[bk]){ P.vy=JUMPV*1.9; P.onGround=false; }
+      else if(crumbleMap[bk] && !crumbleMap[bk].gone && crumbleMap[bk].t0==null){ crumbleMap[bk].t0=animTime; }
+    }
+    // 사라지는 발판 타이머 → 제거
+    for(var ck in crumbleMap){ var cmb=crumbleMap[ck]; if(cmb.t0!=null && !cmb.gone && animTime-cmb.t0>0.55){ cmb.gone=true; cmb.mesh.visible=false; delete solids[ck]; } }
+    // 가시(위험): 닿으면 리스폰
+    if(cellsHit(hazardSet)){ reset(); return; }
+    // 체크포인트: 통과 시 리스폰 지점 갱신
+    var cp=cellsHit(checkpointSet); if(cp){ curSpawn={x:cp.x,y:cp.y,z:cp.z}; }
+    // 부스터: 밟으면 가속 지속
+    if(cellsHit(boosterSet)){ boostT=0.5; }
     // face movement
     if(ml>0) pg.rotation.y=Math.atan2(mvx,mvz);
     // coins
@@ -1045,7 +1085,7 @@ function startPlayer(lv){
 
 /* ============================= EDITOR ============================= */
 function renderEditor(m){
-  var cur={t:1,c:null,brush:1,axis:'x',dist:3,spd:1}; // t=툴, c=색(null=기본), brush=크기, axis/dist/spd=이동발판 설정
+  var cur={t:1,c:null,brush:1,axis:'x',dist:3,spd:1,fill:false}; // t=툴, c=색, brush=크기, fill=영역채우기
   m.innerHTML='<div class="edwrap">'+
     '<div class="edbar" id="edbar"></div>'+
     '<div class="edcanvas" id="edc"><canvas id="edgl"></canvas>'+
@@ -1064,7 +1104,7 @@ function renderEditor(m){
       '<button class="btn" id="edtest">▶ 테스트</button>'+
       '<button class="btn brand" id="edsave">업로드</button>'+
     '</div></div>';
-  var tools=[['지면',1,'#3fae5b'],['벽',2,'#6d7a8c'],['이동 발판',6,'#4aa3ff'],['회전 블록',7,'#b06bff'],['코인',3,'#ffb02e'],['골',4,'#27d4b8'],['시작',5,'#ffffff'],['지우개',0,'#f0556b']];
+  var tools=[['지면',1,'#3fae5b'],['벽',2,'#6d7a8c'],['이동 발판',6,'#4aa3ff'],['회전 블록',7,'#b06bff'],['점프대',9,'#ff5aa0'],['가시',10,'#f0556b'],['사라지는 발판',11,'#c8b06b'],['체크포인트',12,'#2ad17a'],['부스터',13,'#ffd23a'],['코인',3,'#ffb02e'],['골',4,'#27d4b8'],['시작',5,'#ffffff'],['지우개',0,'#f0556b']];
   var bar=document.getElementById('edbar');
   tools.forEach(function(tl){ var b=document.createElement('button'); b.className='tool'+(tl[1]===cur.t?' on':''); b.innerHTML='<b class="sw" style="background:'+tl[2]+'"></b>'+tl[0];
     b.onclick=function(){ cur.t=tl[1]; bar.querySelectorAll('.tool').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); syncMoveCtl(); }; bar.appendChild(b); });
@@ -1093,6 +1133,14 @@ function renderEditor(m){
   moveCtl.querySelector('#edSpd').onchange=function(e){ cur.spd=+e.target.value; };
   function syncMoveCtl(){ moveCtl.style.display=(cur.t===6?'flex':'none'); }
   syncMoveCtl();
+  // 편집 도구: 영역 채우기 · 실행취소/다시실행 · 카메라 프리셋
+  var sep2=document.createElement('span'); sep2.style.cssText='width:1px;height:22px;background:var(--border2);margin:0 4px'; bar.appendChild(sep2);
+  var fillBtn=document.createElement('button'); fillBtn.className='tool'; fillBtn.id='edFill'; fillBtn.textContent='영역 채우기'; fillBtn.title='두 모서리를 찍어 상자 영역을 한 번에 채움';
+  fillBtn.onclick=function(){ cur.fill=!cur.fill; fillA=null; fillBtn.classList.toggle('on',cur.fill); }; bar.appendChild(fillBtn);
+  var undoBtn=document.createElement('button'); undoBtn.className='tool'; undoBtn.id='edUndo'; undoBtn.textContent='↶ 실행취소'; undoBtn.onclick=function(){ undo(); }; bar.appendChild(undoBtn);
+  var redoBtn=document.createElement('button'); redoBtn.className='tool'; redoBtn.id='edRedo'; redoBtn.textContent='↷ 다시실행'; redoBtn.onclick=function(){ redo(); }; bar.appendChild(redoBtn);
+  var topBtn=document.createElement('button'); topBtn.className='tool'; topBtn.textContent='탑뷰'; topBtn.onclick=function(){ topView(); }; bar.appendChild(topBtn);
+  var frontBtn=document.createElement('button'); frontBtn.className='tool'; frontBtn.textContent='정면'; frontBtn.onclick=function(){ frontView(); }; bar.appendChild(frontBtn);
 
   // three editor scene
   var canvas=document.getElementById('edgl'); var cont=document.getElementById('edc');
@@ -1107,6 +1155,18 @@ function renderEditor(m){
   var plane=new THREE.Mesh(new THREE.PlaneGeometry(GS,GS),new THREE.MeshBasicMaterial({visible:false})); plane.rotation.x=-Math.PI/2; plane.position.set(GS/2,0,GS/2); scene.add(plane);
   var geo=new THREE.BoxGeometry(1,1,1); var edgeGeo=new THREE.EdgesGeometry(geo);
   var voxels={}; // key -> {t,mesh,edge}
+  var history=[], hidx=-1, fillA=null;
+  function snapshot(){ var vox=[]; for(var k in voxels){ var v=voxels[k],p=v.mesh.position; vox.push({x:Math.floor(p.x),y:Math.floor(p.y),z:Math.floor(p.z),t:v.t,c:v.c,a:v.a}); } return {vox:vox,spawn:{x:spawn.x,y:spawn.y,z:spawn.z}}; }
+  function pushHist(){ history=history.slice(0,hidx+1); history.push(snapshot()); if(history.length>80)history.shift(); hidx=history.length-1; updUndo(); }
+  function clearAllVox(){ Object.keys(voxels).forEach(function(k){ var p=voxels[k].mesh.position; removeVox(Math.floor(p.x),Math.floor(p.y),Math.floor(p.z)); }); }
+  function restore(s){ clearAllVox(); s.vox.forEach(function(b){ addVox(b.x,b.y,b.z,b.t,(b.c!=null?b.c:null),(b.a||null)); }); if(s.spawn)setSpawn(s.spawn.x,s.spawn.y,s.spawn.z); }
+  function undo(){ if(hidx>0){ hidx--; restore(history[hidx]); updUndo(); } }
+  function redo(){ if(hidx<history.length-1){ hidx++; restore(history[hidx]); updUndo(); } }
+  function updUndo(){ var u=document.getElementById('edUndo'),rd=document.getElementById('edRedo'); if(u)u.style.opacity=hidx<=0?0.4:1; if(rd)rd.style.opacity=hidx>=history.length-1?0.4:1; }
+  function fillBox(a,b){ var x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),y0=Math.min(a.y,b.y),y1=Math.max(a.y,b.y),z0=Math.min(a.z,b.z),z1=Math.max(a.z,b.z);
+    if((x1-x0+1)*(y1-y0+1)*(z1-z0+1)>4000){ toast('영역이 너무 큽니다'); return; }
+    var t=cur.t,c=cur.c,aa=null; if(t===6)aa={axis:cur.axis,dist:cur.dist,spd:cur.spd}; else if(t===7)aa={spd:cur.spd};
+    for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++)for(var z=z0;z<=z1;z++){ if(x<0||z<0||x>=GS||z>=GS||y<0||y>18)continue; addVox(x,y,z,t,c,aa); } }
   var edProps=[]; // 에디터 메시 프롭 목록 {mesh, data}
   var edCover=null; // 레이어룸 커버 이미지(data URL)
   var spawn={x:3,y:1,z:3}; var spawnMarker=null;
@@ -1128,10 +1188,13 @@ function renderEditor(m){
   // starter platform (realistic working state)
   for(var x=0;x<8;x++)for(var z=0;z<8;z++)addVox(x,0,z,1);
   setSpawn(3,1,3);
+  pushHist(); // 초기 상태를 실행취소 기준점으로
 
   // camera orbit
   var tgt=new THREE.Vector3(GS/2*0.4,1,GS/2*0.4), oyaw=0.7,opitch=0.9,odist=20;
   function updCam(){ var cx=tgt.x+Math.sin(oyaw)*Math.cos(opitch)*odist, cy=tgt.y+Math.sin(opitch)*odist, cz=tgt.z+Math.cos(oyaw)*Math.cos(opitch)*odist; camera.position.set(cx,cy,cz); camera.lookAt(tgt); }
+  function topView(){ oyaw=0.001; opitch=1.45; odist=24; updCam(); }
+  function frontView(){ oyaw=0; opitch=0.32; odist=20; updCam(); }
   var ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
   var dragId=null,px=0,py=0,moved=0,btn=0;
   canvas.addEventListener('pointerdown',function(e){ dragId=e.pointerId; px=e.clientX; py=e.clientY; moved=0; btn=e.button; canvas.setPointerCapture(e.pointerId); });
@@ -1146,12 +1209,13 @@ function renderEditor(m){
     var meshes=[plane]; for(var k in voxels)meshes.push(voxels[k].mesh);
     var hits=ray.intersectObjects(meshes,false); if(!hits.length)return;
     var h=hits[0];
-    if(erase){ if(h.object!==plane){ var p=h.object.position; removeVox(Math.floor(p.x),Math.floor(p.y),Math.floor(p.z)); } return; }
+    if(erase){ if(h.object!==plane){ var p=h.object.position; removeVox(Math.floor(p.x),Math.floor(p.y),Math.floor(p.z)); pushHist(); } return; }
     var cx,cy,cz;
     if(h.object===plane){ cx=Math.floor(h.point.x); cy=0; cz=Math.floor(h.point.z); }
     else { var n=h.face.normal; var p=h.object.position; cx=Math.floor(p.x+n.x); cy=Math.floor(p.y+n.y); cz=Math.floor(p.z+n.z); }
     if(cx<0||cz<0||cx>=GS||cz>=GS||cy<0||cy>18)return;
-    placeVox(cx,cy,cz);
+    if(cur.fill){ if(!fillA){ fillA={x:cx,y:cy,z:cz}; toast('채우기 시작점 — 반대 모서리를 클릭하세요'); } else { fillBox(fillA,{x:cx,y:cy,z:cz}); fillA=null; pushHist(); } return; }
+    placeVox(cx,cy,cz); pushHist();
   }
   updCam();
   var raf; function frame(){ raf=requestAnimationFrame(frame); if(spawnMarker)spawnMarker.rotation.y+=0.01; renderer.render(scene,camera); }
@@ -1182,7 +1246,7 @@ function renderEditor(m){
       vox.forEach(function(b){ var x=b.x|0,y=b.y|0,z=b.z|0; if(x>=0&&z>=0&&x<GS&&z<GS&&y>=0&&y<=18)addVox(x,y,z,b.t||1,(b.c!=null?b.c:null),(b.a||null)); });
       if(data.spawn)setSpawn(data.spawn.x|0,data.spawn.y|0,data.spawn.z|0);
       if(data.title&&document.getElementById('edtitle'))document.getElementById('edtitle').value=data.title;
-      toast('임포트 완료 ('+vox.length+' 블록)'); }catch(err){ toast('JSON 파싱 실패'); } };
+      pushHist(); toast('임포트 완료 ('+vox.length+' 블록)'); }catch(err){ toast('JSON 파싱 실패'); } };
     rd.readAsText(f); e.target.value=''; };
   // webmax OBJ 임포트 → 메시 프롭(복셀화 없음). 시작 지점 근처에 배치.
   document.getElementById('edobj').onchange=function(e){ var f=e.target.files&&e.target.files[0]; if(!f)return; var rd=new FileReader();
@@ -1989,6 +2053,16 @@ render();
     "벽": ["Wall", "दीवार", "Dinding"],
     "이동 발판": ["Moving platform", "चलता प्लेटफ़ॉर्म", "Platform bergerak"],
     "회전 블록": ["Spinning block", "घूमता ब्लॉक", "Blok berputar"],
+    "점프대": ["Jump pad", "जंप पैड", "Papan lompat"],
+    "가시": ["Spikes", "काँटे", "Duri"],
+    "사라지는 발판": ["Crumbling platform", "गिरता प्लेटफ़ॉर्म", "Platform runtuh"],
+    "체크포인트": ["Checkpoint", "चेकपॉइंट", "Checkpoint"],
+    "부스터": ["Booster", "बूस्टर", "Booster"],
+    "영역 채우기": ["Fill area", "क्षेत्र भरें", "Isi area"],
+    "↶ 실행취소": ["↶ Undo", "↶ पूर्ववत", "↶ Urungkan"],
+    "↷ 다시실행": ["↷ Redo", "↷ फिर करें", "↷ Ulangi"],
+    "탑뷰": ["Top view", "ऊपर से", "Tampak atas"],
+    "정면": ["Front view", "सामने से", "Tampak depan"],
     "코인": ["Coin", "सिक्का", "Koin"],
     "골": ["Goal", "लक्ष्य", "Tujuan"],
     "시작": ["Spawn", "स्पॉन", "Spawn"],
