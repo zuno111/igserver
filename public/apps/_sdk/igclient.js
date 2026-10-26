@@ -245,6 +245,46 @@
         async reportPublish(id, body) { return (await req('POST', '/api/igsocial/publish/' + id + '/result', { body })).targets; },
         async publishes() { return (await req('GET', '/api/igsocial/publish')).publishes; },
       },
+
+      // ---- igLive (라이브 + 라이브커머스 + 선물) ----
+      live: {
+        async sessions() { return (await req('GET', '/api/iglive/sessions', { auth: false })).sessions; },
+        async get(id) { return (await req('GET', '/api/iglive/sessions/' + id)).session; },
+        async start(body) { return (await req('POST', '/api/iglive/sessions', { body })).session; },
+        async stop(id) { return req('POST', '/api/iglive/sessions/' + id + '/stop'); },
+        async setProduct(id, productId) { return req('POST', '/api/iglive/sessions/' + id + '/product', { body: { productId } }); },
+        async join(id) { return req('POST', '/api/iglive/sessions/' + id + '/join'); },
+        async leave(id) { return req('POST', '/api/iglive/sessions/' + id + '/leave'); },
+        async chatHistory(id) { return (await req('GET', '/api/iglive/sessions/' + id + '/chat', { auth: false })).chat; },
+        async chat(id, text) { return req('POST', '/api/iglive/sessions/' + id + '/chat', { body: { text } }); },
+        async gift(id, amount) { return req('POST', '/api/iglive/sessions/' + id + '/gift', { body: { amount } }); },
+        // 실시간: 채팅·시청자·선물·상품 변경 수신
+        watch(id, onEvent, opts) { return api.subscribe('live:' + id, (m) => onEvent(m), opts); },
+      },
+
+      // ---- igVod (영상·쇼츠 콘텐츠) ----
+      vod: {
+        async feed(kind) { return (await req('GET', '/api/igvod/feed' + (kind ? '?kind=' + kind : ''), { auth: !!token })).items; },
+        async shorts() { return (await req('GET', '/api/igvod/shorts', { auth: !!token })).items; },
+        async get(id) { return (await req('GET', '/api/igvod/' + id, { auth: !!token })).item; },
+        async publish(body) { return (await req('POST', '/api/igvod', { body })).item; },
+        async publishFile(blob, filename, meta) { const f = await api.upload(blob, filename); return this.publish(Object.assign({ fileId: f.id }, meta)); },
+        async remove(id) { return req('DELETE', '/api/igvod/' + id); },
+        async like(id) { return req('POST', '/api/igvod/' + id + '/like'); },
+        async comments(id) { return (await req('GET', '/api/igvod/' + id + '/comments', { auth: false })).comments; },
+        async comment(id, text) { return req('POST', '/api/igvod/' + id + '/comments', { body: { text } }); },
+        async byUser(uid) { return (await req('GET', '/api/igvod/users/' + uid + '/items', { auth: false })).items; },
+      },
+
+      // ---- igMap (월드: 지도 핀) ----
+      map: {
+        async pins({ minLat, maxLat, minLng, maxLng, kinds, limit } = {}) {
+          const qs = new URLSearchParams();
+          if ([minLat, maxLat, minLng, maxLng].every((v) => typeof v === 'number')) { qs.set('minLat', minLat); qs.set('maxLat', maxLat); qs.set('minLng', minLng); qs.set('maxLng', maxLng); }
+          if (kinds) qs.set('kinds', Array.isArray(kinds) ? kinds.join(',') : kinds); if (limit) qs.set('limit', limit);
+          return (await req('GET', '/api/igmap/pins' + (qs.toString() ? '?' + qs : ''), { auth: false })).pins;
+        },
+      },
     };
     return api;
   }

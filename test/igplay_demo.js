@@ -437,6 +437,69 @@ async function run() {
   r = await j('POST', '/api/igsocial/publish/' + spId + '/result', { key, token: creator, body: { platform: 'instagram', status: 'posted', ref: 'ig_abc' } });
   ok('플랫폼 결과 보고(posted)', r.status === 200 && r.data.targets.find((t) => t.platform === 'instagram').status === 'posted');
 
+  // ===================== igLive (라이브 + 선물) =====================
+  console.log('--- igLive(라이브·채팅·선물) ---');
+  r = await j('POST', '/api/iglive/sessions', { key, token: creator, body: { title: '첫 방송', peerId: 'peer_abc', geo: { lat: 37.52, lng: 127.03, label: '청담' } } });
+  ok('방송 시작', r.status === 201 && r.data.session.live === true, JSON.stringify(r.data));
+  const liveId = r.data.session.id;
+  r = await j('GET', '/api/iglive/sessions', { key });
+  ok('라이브 목록에 노출', r.status === 200 && r.data.sessions.some((s) => s.id === liveId));
+  r = await j('POST', '/api/iglive/sessions/' + liveId + '/join', { key, token: player });
+  ok('시청 참가(peerId 수신·시청자 1)', r.status === 200 && r.data.peerId === 'peer_abc' && r.data.watching === 1, JSON.stringify(r.data));
+  r = await j('POST', '/api/iglive/sessions/' + liveId + '/chat', { key, token: player, body: { text: '안녕하세요' } });
+  ok('채팅 전송', r.status === 201);
+  r = await j('GET', '/api/iglive/sessions/' + liveId + '/chat', { key });
+  ok('채팅 조회', r.status === 200 && r.data.chat.some((c) => c.text === '안녕하세요'));
+  let gc = (await j('GET', '/api/igplay/wallet', { key, token: creator })).data.wallet.balance;
+  let gp = (await j('GET', '/api/igplay/wallet', { key, token: player })).data.wallet.balance;
+  r = await j('POST', '/api/iglive/sessions/' + liveId + '/gift', { key, token: player, body: { amount: 10 } });
+  ok('선물(후원) 성공', r.status === 200);
+  let gc2 = (await j('GET', '/api/igplay/wallet', { key, token: creator })).data.wallet.balance;
+  let gp2 = (await j('GET', '/api/igplay/wallet', { key, token: player })).data.wallet.balance;
+  ok('선물 ISC 이동(시청자 -10, 방송자 +10)', gp2 === gp - 10 && gc2 === gc + 10, `${gp}->${gp2}, ${gc}->${gc2}`);
+  r = await j('POST', '/api/iglive/sessions/' + liveId + '/gift', { key, token: creator, body: { amount: 5 } });
+  ok('본인 방송 선물 차단', r.status === 400);
+  r = await j('POST', '/api/iglive/sessions/' + liveId + '/stop', { key, token: creator });
+  ok('방송 종료', r.status === 200);
+  r = await j('GET', '/api/iglive/sessions', { key });
+  ok('종료 후 목록에서 제외', r.status === 200 && !r.data.sessions.some((s) => s.id === liveId));
+
+  // ===================== igVod (영상·쇼츠) =====================
+  console.log('--- igVod(영상·쇼츠) ---');
+  r = await j('POST', '/api/igvod', { key, token: creator, body: { kind: 'video', title: '내 첫 영상', fileId: 'f_v1', dur: 300, geo: { lat: 37.50, lng: 127.02 } } });
+  ok('영상 발행', r.status === 201 && r.data.item.kind === 'video');
+  const vid = r.data.item.id;
+  r = await j('POST', '/api/igvod', { key, token: creator, body: { kind: 'short', title: '긴 쇼츠', fileId: 'f_s0', dur: 90 } });
+  ok('60초 초과 쇼츠 거부', r.status === 400);
+  r = await j('POST', '/api/igvod', { key, token: creator, body: { kind: 'short', title: '짧은 쇼츠', fileId: 'f_s1', dur: 30 } });
+  ok('쇼츠 발행(≤60s)', r.status === 201 && r.data.item.kind === 'short');
+  const sid = r.data.item.id;
+  r = await j('GET', '/api/igvod/shorts', { key });
+  ok('쇼츠 피드는 short만', r.status === 200 && r.data.items.length >= 1 && r.data.items.every((i) => i.kind === 'short'));
+  r = await j('GET', '/api/igvod/' + vid, { key, token: player });
+  ok('영상 재생 시 조회수 증가', r.status === 200 && r.data.item.views === 1);
+  r = await j('POST', '/api/igvod/' + sid + '/like', { key, token: player });
+  ok('쇼츠 좋아요', r.status === 200 && r.data.liked === true && r.data.likes === 1);
+  r = await j('POST', '/api/igvod/' + sid + '/comments', { key, token: player, body: { text: '멋져요' } });
+  ok('쇼츠 댓글', r.status === 201);
+  r = await j('GET', '/api/igvod/' + sid + '/comments', { key });
+  ok('댓글 조회', r.status === 200 && r.data.comments[0].text === '멋져요');
+  r = await j('GET', '/api/igvod/feed', { key });
+  ok('통합 피드(영상+쇼츠)', r.status === 200 && r.data.items.some((i) => i.id === vid) && r.data.items.some((i) => i.id === sid));
+
+  // ===================== igMap (월드: 지도 핀) =====================
+  console.log('--- igMap(지도 핀) ---');
+  // geo 붙은 레벨 업로드
+  const geoLv = sampleLevel('청담 월드'); geoLv.geo = { lat: 37.519, lng: 127.047, label: '청담동' };
+  r = await j('POST', '/api/igplay/levels', { key, token: creator, body: geoLv });
+  ok('위치 붙은 레벨 업로드', r.status === 201 && r.data.level.geo && r.data.level.geo.lat === 37.519, JSON.stringify(r.data.level.geo));
+  // 서울 bbox 핀 조회(레벨+영상 포함)
+  r = await j('GET', '/api/igmap/pins?minLat=37.4&maxLat=37.6&minLng=126.9&maxLng=127.1&kinds=level,vod,store', { key });
+  ok('지도 핀 조회(레벨·영상)', r.status === 200 && r.data.pins.some((p) => p.kind === 'level') && r.data.pins.some((p) => p.kind === 'vod'), JSON.stringify(r.data.pins.map((p) => p.kind)));
+  // 범위 밖 bbox → 없음
+  r = await j('GET', '/api/igmap/pins?minLat=30&maxLat=31&minLng=120&maxLng=121', { key });
+  ok('범위 밖 bbox 빈 결과', r.status === 200 && r.data.pins.length === 0, JSON.stringify(r.data.pins.length));
+
   // 보안: 제네릭 /api/data 로 ISC 내부 컬렉션 쓰기 차단
   r = await j('POST', '/api/data/_isc_wallet', { key, token: player, body: { balance: 999999 } });
   ok('내부 컬렉션(_isc_wallet) 쓰기 차단(403)', r.status === 403, JSON.stringify(r.data));

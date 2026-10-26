@@ -13,6 +13,7 @@ import { requireUser, optionalUser } from '../middleware/auth.js';
 import { broadcast } from '../realtime.js';
 import { randomId } from '../config.js';
 import { credit, debit } from '../isc.js';
+import { cleanGeo } from './igplay.js';
 
 const router = Router();
 
@@ -35,7 +36,7 @@ function itemPublic(rec, { entitled = false, mine = false } = {}) {
     creator: d.creator || '', ownerId: rec.owner_id, access: d.access || 'free',
     price: d.price | 0, gateSymbol: d.gateSymbol || null, gateMin: d.gateMin | 0,
     tags: Array.isArray(d.tags) ? d.tags : [], downloads: d.downloads | 0, revenue: d.revenue | 0,
-    status: d.status || 'open', source: d.source || null, created_at: rec.created_at,
+    status: d.status || 'open', source: d.source || null, geo: d.geo || null, created_at: rec.created_at,
     hasPayload: !!(d.fileId || d.externalUrl), entitled, mine,
   };
   // 페이로드는 소유자/본인에게만 노출
@@ -125,7 +126,7 @@ router.post('/catalog', requireUser, async (req, res, next) => {
       fileId: b.fileId ? String(b.fileId).slice(0, 80) : null, externalUrl: (typeof b.externalUrl === 'string' && /^https?:\/\//.test(b.externalUrl)) ? b.externalUrl.slice(0, 500) : null,
       tags: Array.isArray(b.tags) ? b.tags.slice(0, 10).map((t) => String(t).slice(0, 24)) : [],
       refColl: b.refColl ? String(b.refColl).slice(0, 40) : null, refId: b.refId ? String(b.refId).slice(0, 80) : null,
-      source: b.source ? String(b.source).slice(0, 40) : null, downloads: 0, revenue: 0, status: 'open',
+      source: b.source ? String(b.source).slice(0, 40) : null, geo: cleanGeo(b.geo), downloads: 0, revenue: 0, status: 'open',
     };
     const rec = await repo.putRecord({ project_id: pid, collection: 'catalog', doc_id: id, data, owner_id: uid });
     broadcast(pid, 'igstore:catalog', { type: 'item_new', id, kind, title: data.title, ts: Date.now() });

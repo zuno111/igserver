@@ -37,8 +37,16 @@ function levelPublic(rec) {
     id: rec.doc_id, title: d.title, creator: d.creator, creatorId: rec.owner_id,
     genre: d.genre, difficulty: d.difficulty, voxels: d.voxels || [], props: d.props || [], cover: d.cover || null, spawn: d.spawn || null,
     desc: d.desc || '', plays: d.plays | 0, likes: d.likes | 0,
-    boostedUntil: d.boostedUntil || 0, gateSymbol: d.gateSymbol || null, gateMin: d.gateMin | 0, created_at: rec.created_at,
+    boostedUntil: d.boostedUntil || 0, gateSymbol: d.gateSymbol || null, gateMin: d.gateMin | 0,
+    geo: d.geo || null, created_at: rec.created_at,
   };
+}
+// 지도 좌표 정제(공용): {lat,lng,label} 또는 null
+export function cleanGeo(g) {
+  if (!g || typeof g !== 'object') return null;
+  const lat = +g.lat, lng = +g.lng;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng, label: String(g.label || '').slice(0, 80) };
 }
 // 토큰 보유량 조회(게이팅 검증용)
 async function tokenBalance(pid, symbol, uid) {
@@ -85,7 +93,7 @@ router.get('/levels/:id', optionalUser, async (req, res, next) => {
 // 업로드
 router.post('/levels', requireUser, async (req, res, next) => {
   try {
-    const { title, genre, difficulty, voxels, spawn, desc, props, cover, gateSymbol, gateMin } = req.body || {};
+    const { title, genre, difficulty, voxels, spawn, desc, props, cover, gateSymbol, gateMin, geo } = req.body || {};
     if (!title || typeof title !== 'string') return res.status(400).json({ error: 'bad_title', message: '제목이 필요합니다.' });
     if (!Array.isArray(voxels) || !voxels.length) return res.status(400).json({ error: 'bad_voxels', message: '블록 데이터가 필요합니다.' });
     if (!voxels.some((b) => b && (b.t === 1 || b.t === 2))) return res.status(400).json({ error: 'no_ground', message: '지면 블록이 필요합니다.' });
@@ -102,6 +110,7 @@ router.post('/levels', requireUser, async (req, res, next) => {
       plays: 0, likes: 0, boostedUntil: 0,
       gateSymbol: (typeof gateSymbol === 'string' && /^[A-Z][A-Z0-9]{1,9}$/.test(gateSymbol)) ? gateSymbol : null,
       gateMin: (gateMin | 0) > 0 ? (gateMin | 0) : 0,
+      geo: cleanGeo(geo),
     };
     const rec = await repo.putRecord({ project_id: req.project.id, collection: 'levels', doc_id: id, data, owner_id: req.user.uid });
     broadcast(req.project.id, 'igplay:levels', { type: 'level_new', id, title: data.title, ts: Date.now() });

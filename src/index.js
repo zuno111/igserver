@@ -25,6 +25,9 @@ import igstoreRoutes from './routes/igstore.js';
 import iggameRoutes from './routes/iggame.js';
 import igvideoRoutes from './routes/igvideo.js';
 import igsocialRoutes from './routes/igsocial.js';
+import igliveRoutes from './routes/iglive.js';
+import igvodRoutes from './routes/igvod.js';
+import igmapRoutes from './routes/igmap.js';
 import messengerRoutes from './routes/messenger.js';
 import { ensureIgPlay, igplayInject } from './provision.js';
 import { ensureMessenger, messengerInject } from './provision_messenger.js';
@@ -98,6 +101,9 @@ async function main() {
   app.use('/api/iggame', enforceKeyScope, iggameRoutes);
   app.use('/api/igvideo', enforceKeyScope, igvideoRoutes);
   app.use('/api/igsocial', enforceKeyScope, igsocialRoutes);
+  app.use('/api/iglive', enforceKeyScope, igliveRoutes);
+  app.use('/api/igvod', enforceKeyScope, igvodRoutes);
+  app.use('/api/igmap', enforceKeyScope, igmapRoutes);
   app.use('/api/messenger', enforceKeyScope, messengerRoutes);
   // 프로젝트 자기 정보 / 사용량 조회
   app.get('/api/project', (req, res) => res.json({ project: { id: req.project.id, name: req.project.name, slug: req.project.slug } }));
