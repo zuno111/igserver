@@ -2459,7 +2459,7 @@ var CITY_PRESETS={
 };
 var exploreSession=null;
 function renderExplore(m,key){
-  var T=window.igT||function(s){return s;};
+  var T=function(s){return (window.igT||function(x){return x;})(s);};
   key=key||'seoul'; var P0=CITY_PRESETS[key]||CITY_PRESETS.seoul;
   m.innerHTML=''+
   '<div class="exRoot" style="position:relative;width:100%;height:calc(100vh - 56px);min-height:520px;overflow:hidden;background:#aee0ff">'+
@@ -2468,11 +2468,11 @@ function renderExplore(m,key){
     // 상단 도시 탭
     '<div class="exTabs" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 8px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
       '<span class="exTab" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap">🌐 복셀 지구본</span>'+
-      Object.keys(CITY_PRESETS).map(function(k){var c=CITY_PRESETS[k];return '<button class="exTab" data-city="'+k+'" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap;border:1px solid '+(k===key?'var(--brand)':'transparent')+';background:'+(k===key?'var(--brand)':'var(--surface2)')+';color:'+(k===key?'#1a1205':'var(--fg)')+';font-weight:600;cursor:pointer">'+c.flag+' '+c.name.split(' ')[0]+'</button>';}).join('')+
+      Object.keys(CITY_PRESETS).map(function(k){var c=CITY_PRESETS[k];return '<button class="exTab" data-city="'+k+'" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap;border:1px solid '+(k===key?'var(--brand)':'transparent')+';background:'+(k===key?'var(--brand)':'var(--surface2)')+';color:'+(k===key?'#1a1205':'var(--fg)')+';font-weight:600;cursor:pointer">'+c.flag+' '+T(c.name).split(' ')[0]+'</button>';}).join('')+
     '</div>'+
     // 좌측 패널
     '<div class="exPanel" style="position:absolute;top:70px;left:12px;z-index:30;width:270px;max-width:46vw;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-height:calc(100vh - 150px);overflow:auto">'+
-      '<div style="font-weight:700;font-size:15px">'+P0.flag+' '+esc(P0.name)+'</div>'+
+      '<div style="font-weight:700;font-size:15px">'+P0.flag+' '+esc(T(P0.name))+'</div>'+
       '<div style="color:var(--muted);font-size:11.5px;margin-bottom:10px">'+P0.lat.toFixed(3)+'°N, '+P0.lng.toFixed(3)+'°E</div>'+
       '<div style="display:flex;gap:5px;margin-bottom:12px">'+
         [['quarter','쿼터뷰'],['wide','대도시 광각'],['close','클로즈업']].map(function(v){return '<button class="exView" data-v="'+v[0]+'" style="flex:1;padding:6px 4px;border-radius:8px;font-size:11.5px;border:1px solid var(--border);background:var(--surface2);color:var(--fg);cursor:pointer">'+v[1]+'</button>';}).join('')+
@@ -2481,7 +2481,7 @@ function renderExplore(m,key){
       '<div id="exLm" style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">'+
         P0.landmarks.map(function(l,i){return '<button class="exWarp" data-i="'+i+'" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--fg);cursor:pointer;font-size:12.5px;text-align:left"><span>'+esc(l.n)+'</span><span style="color:var(--faint);font-family:monospace;font-size:11px">('+l.x+','+l.z+')</span></button>';}).join('')+
       '</div>'+
-      '<div style="font-size:12.5px;font-weight:700;margin-bottom:6px">🏆 역사·언어·미식 퀘스트 ('+P0.quests.length+')</div>'+
+      '<div style="font-size:12.5px;font-weight:700;margin-bottom:6px">🏆 '+T('역사·언어·미식 퀘스트')+' ('+P0.quests.length+')</div>'+
       '<div style="display:flex;flex-direction:column;gap:7px">'+
         P0.quests.map(function(q){return '<div style="border:1px dashed var(--border2);border-radius:10px;padding:9px 11px"><div style="font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;gap:6px"><span>'+esc(q.t)+'</span><span style="color:var(--brand);white-space:nowrap">+'+q.r+'</span></div><div style="color:var(--muted);font-size:11.5px;margin-top:3px;line-height:1.4">'+esc(q.d)+'</div></div>';}).join('')+
       '</div>'+
@@ -2495,16 +2495,16 @@ function renderExplore(m,key){
     // 상단 우측 코인/버튼
     '<div class="exTopBar" style="position:absolute;top:12px;right:12px;z-index:31;display:flex;gap:6px;align-items:center">'+
       '<span style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-weight:700;font-family:monospace;color:#ffb02e">◉ '+fmt(db.isc||0)+'</span>'+
-      '<button class="exTop" id="exTv" style="background:#ff5a6e;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">📺 유튜브 TV</button>'+
-      '<button class="exTop" id="exDex" style="background:#6a7bff;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">📖 도감</button>'+
-      '<button class="exTop" id="exAva" style="background:#ff6ab0;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">💗 아바타</button>'+
+      '<button class="exTop" id="exTv" style="background:#ff5a6e;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">📺 '+T('유튜브 TV')+'</button>'+
+      '<button class="exTop" id="exDex" style="background:#6a7bff;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">📖 '+T('도감')+'</button>'+
+      '<button class="exTop" id="exAva" style="background:#ff6ab0;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">💗 '+T('아바타')+'</button>'+
     '</div>'+
     // 하단 표정/모션 바
     '<div class="exEmoBar" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;flex-wrap:wrap;row-gap:7px;gap:10px;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw">'+
       '<span style="font-size:12px;color:var(--muted);font-weight:700">표정</span>'+
-      [['😊','행복'],['😆','신남'],['😉','윙크'],['🤔','호기심'],['😲','깜짝'],['🥹','뿌듯']].map(function(e){return '<button class="exEmo" data-e="'+e[0]+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:13px;cursor:pointer;white-space:nowrap">'+e[0]+' '+e[1]+'</button>';}).join('')+
+      [['😊','행복'],['😆','신남'],['😉','윙크'],['🤔','호기심'],['😲','깜짝'],['🥹','뿌듯']].map(function(e){return '<button class="exEmo" data-e="'+e[0]+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:13px;cursor:pointer;white-space:nowrap">'+e[0]+' '+T(e[1])+'</button>';}).join('')+
       '<span style="width:1px;height:20px;background:var(--border)"></span><span style="font-size:12px;color:var(--muted);font-weight:700">모션</span>'+
-      [['wave','👋 인사'],['cheer','🙌 환호'],['dance','💃 댄스'],['jump','⤴ 점프']].map(function(mo){return '<button class="exMo" data-m="'+mo[0]+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap">'+mo[1]+'</button>';}).join('')+
+      [['wave','👋','인사'],['cheer','🙌','환호'],['dance','💃','댄스'],['jump','⤴','점프']].map(function(mo){return '<button class="exMo" data-m="'+mo[0]+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap">'+mo[1]+' '+T(mo[2])+'</button>';}).join('')+
     '</div>'+
     // 조이스틱(터치·마우스 공용 이동) — 왼쪽 아래
     '<div id="exJoy" style="position:absolute;left:20px;bottom:86px;z-index:32;width:120px;height:120px;border-radius:50%;background:rgba(20,26,36,.28);border:2px solid rgba(255,255,255,.35);touch-action:none;user-select:none">'+
@@ -2518,7 +2518,7 @@ function renderExplore(m,key){
   exploreEngine(P0,key);
 }
 function exploreEngine(P0,key){
-  var T=window.igT||function(s){return s;}; // 캔버스·조합 텍스트 번역
+  var T=function(s){return (window.igT||function(x){return x;})(s);}; // 캔버스·조합 텍스트 번역
   var cv=document.getElementById('exCv'); if(!cv||typeof THREE==='undefined')return;
   var renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
   renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
