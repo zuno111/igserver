@@ -919,15 +919,15 @@ function loadDB(){ try{var r=localStorage.getItem(DB_KEY); if(r)return norm(JSON
   return norm({nick:null,likes:{},subs:{},comments:{},times:{},myLevels:[],plays:{}}); }
 function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; if(!d.catalog||!d.catalog.length)d.catalog=defaultCatalog(); if(!d.shorts||!d.shorts.length)d.shorts=defaultShorts(); if(!d.market)d.market=[]; if(!d.ownedStore)d.ownedStore=[];
   // 시드 버전 — 올라가면 기본 숏폼/카탈로그를 최신으로 교체(사용자가 올린 항목은 보존)
-  var SEED_VER=3;
+  var SEED_VER=4;
   if(d.seedVer!==SEED_VER){ d.shorts=defaultShorts(); var userCat=(d.catalog||[]).filter(function(c){return c.creatorId!=='demo';}); d.catalog=defaultCatalog().concat(userCat); d.seedVer=SEED_VER; }
   return d; }
 function defaultShorts(){ return [
-  {id:'sh_bb',title:'강남 월드 미리보기 🏙️',creator:'Voxel Street',youtubeId:'aqz-KE-bpKQ',likes:12800},
-  {id:'sh_si',title:'블록 파쿠르 하이라이트 🧱',creator:'파쿠르랩',youtubeId:'eRsGyueVLvQ',likes:9400},
-  {id:'sh_zoo',title:'첫 레벨 플레이 영상 🎮',creator:'igPlay',youtubeId:'jNQXAC9IVRw',likes:5300},
-  {id:'sh_ts',title:'복셀 에디터 꿀팁 ✏️',creator:'빌더랩',youtubeId:'R6MlUcmOul8',likes:3100},
-  {id:'sh_ed',title:'캐릭터 커스터마이즈 🐱',creator:'igPlay',youtubeId:'TLkA0RELQ1g',likes:2400}
+  {id:'sh_1',title:'강남 월드 미리보기 🏙️',creator:'Voxel Street',youtubeId:'M7lc1UVf-VE',likes:12800},
+  {id:'sh_2',title:'블록 파쿠르 하이라이트 🧱',creator:'파쿠르랩',youtubeId:'dQw4w9WgXcQ',likes:9400},
+  {id:'sh_3',title:'첫 레벨 플레이 영상 🎮',creator:'igPlay',youtubeId:'jNQXAC9IVRw',likes:5300},
+  {id:'sh_4',title:'복셀 에디터 꿀팁 ✏️',creator:'빌더랩',youtubeId:'kXYiU_JCYtU',likes:3100},
+  {id:'sh_5',title:'캐릭터 커스터마이즈 🐱',creator:'igPlay',youtubeId:'60ItHLz5WEA',likes:2400}
 ]; }
 function defaultCatalog(){ var c='demo'; function it(k,t,cr,ac,p,tags,extra){ var o={id:'ci_seed_'+t.replace(/\s/g,'').slice(0,6)+Math.random().toString(36).slice(2,5),kind:k,title:t,desc:'',creator:cr,creatorId:c,ownerId:c,access:ac,price:p||0,gateSymbol:null,gateMin:0,externalUrl:null,tags:tags||[],cover:null,downloads:Math.floor(Math.random()*4000)}; if(extra){for(var kk in extra)o[kk]=extra[kk];} return o; }
   return [
