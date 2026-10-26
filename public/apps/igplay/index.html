@@ -3562,12 +3562,21 @@ render();
   var LANGS = [["ko", "한국어"], ["en", "English"], ["hi", "हिन्दी"], ["id", "Indonesia"]];
   var IDX = { en: 0, hi: 1, id: 2 };
   function detect() {
+    // 사용자가 고른 언어가 저장돼 있으면 그걸, 없으면 기본은 영어.
     try { var s = localStorage.getItem('igplay_lang'); if (s && ['ko', 'en', 'hi', 'id'].indexOf(s) >= 0) return s; } catch (e) {}
-    var n = (navigator.language || 'ko').slice(0, 2).toLowerCase();
-    return ['ko', 'en', 'hi', 'id'].indexOf(n) >= 0 ? n : 'ko';
+    return 'en';
   }
   var LOCALE = detect();
-  function tr(ko) { if (LOCALE === 'ko') return ko; var e = M[ko]; return (e && e[IDX[LOCALE]] != null && e[IDX[LOCALE]] !== '') ? e[IDX[LOCALE]] : (e && e[IDX[LOCALE]] === '' ? '' : ko); }
+  function tr(ko) {
+    if (LOCALE === 'ko') return ko;
+    var e = M[ko]; if (!e) return ko;
+    var v = e[IDX[LOCALE]];
+    if (v === '') return '';            // 의도적 빈 문자열
+    if (v != null) return v;            // 번역 있음
+    // 번역 누락: 한국어가 아니라 영어로 폴백(영어도 없으면 한국어 원문)
+    var en = e[0];
+    return (en != null && en !== '') ? en : ko;
+  }
   var orig = new WeakMap();
   function tText(tn) {
     if (!orig.has(tn)) orig.set(tn, tn.nodeValue);
