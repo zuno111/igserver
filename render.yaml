@@ -1,0 +1,32 @@
+# Render Blueprint — igServer를 무료로 온라인 공개 사이트로 배포.
+# Render 가입(깃허브 로그인) → New + → Blueprint → 이 저장소 선택 → Apply.
+# 웹서비스 + 무료 PostgreSQL이 함께 올라가고, 끝나면 https://<이름>.onrender.com 주소가 나온다.
+databases:
+  - name: igserver-db
+    plan: free
+    databaseName: igserver
+    user: igserver
+
+services:
+  - type: web
+    name: igserver
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install
+    startCommand: node src/index.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: igserver-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: NODE_VERSION
+        value: 22.11.0
+      - key: NODE_ENV
+        value: production

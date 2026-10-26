@@ -1,23 +1,12 @@
-# igServer 컨테이너. 어디서나(Fly.io/Render/VPS/라즈베리파이) 동일하게 실행.
-FROM node:20-bookworm-slim
-
+# igServer 온라인 배포용 이미지 (Render/Railway/Fly 등 어디서든 동일하게 뜬다).
+# pg·ws·bcryptjs·express 는 순수 JS라 네이티브 빌드 없이 설치된다.
+# better-sqlite3 는 선택 의존성 — 빌드 못 해도 무시하고 진행(온라인은 postgres 사용).
+FROM node:22-slim
 WORKDIR /app
-
-# better-sqlite3 네이티브 빌드 도구 (prebuilt 없을 때 대비)
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
-  && rm -rf /var/lib/apt/lists/*
-
-COPY package.json ./
-RUN npm install --omit=dev --no-audit --no-fund
-
-COPY src ./src
-COPY public ./public
-
-ENV PORT=8787 HOST=0.0.0.0 NODE_ENV=production
+COPY package*.json ./
+RUN npm install --omit=dev --no-audit --no-fund || npm install --omit=dev --omit=optional --no-audit --no-fund
+COPY . .
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 EXPOSE 8787
-VOLUME ["/app/data"]
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
-  CMD node -e "fetch('http://localhost:'+(process.env.PORT||8787)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-
 CMD ["node", "src/index.js"]
