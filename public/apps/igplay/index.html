@@ -2459,6 +2459,7 @@ var CITY_PRESETS={
 };
 var exploreSession=null;
 function renderExplore(m,key){
+  var T=window.igT||function(s){return s;};
   key=key||'seoul'; var P0=CITY_PRESETS[key]||CITY_PRESETS.seoul;
   m.innerHTML=''+
   '<div class="exRoot" style="position:relative;width:100%;height:calc(100vh - 56px);min-height:520px;overflow:hidden;background:#aee0ff">'+
