@@ -918,7 +918,9 @@ var db;
 function loadDB(){ try{var r=localStorage.getItem(DB_KEY); if(r)return norm(JSON.parse(r));}catch(e){}
   return norm({nick:null,likes:{},subs:{},comments:{},times:{},myLevels:[],plays:{}}); }
 function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; if(!d.catalog||!d.catalog.length)d.catalog=defaultCatalog(); if(!d.shorts||!d.shorts.length)d.shorts=defaultShorts(); if(!d.market)d.market=[]; if(!d.ownedStore)d.ownedStore=[];
-  if(d.shorts&&d.shorts.some(function(s){return s.externalUrl&&s.externalUrl.indexOf('gtv-videos-bucket')>=0;}))d.shorts=defaultShorts(); // 구 mp4 시드 갱신
+  // 시드 버전 — 올라가면 기본 숏폼/카탈로그를 최신으로 교체(사용자가 올린 항목은 보존)
+  var SEED_VER=3;
+  if(d.seedVer!==SEED_VER){ d.shorts=defaultShorts(); var userCat=(d.catalog||[]).filter(function(c){return c.creatorId!=='demo';}); d.catalog=defaultCatalog().concat(userCat); d.seedVer=SEED_VER; }
   return d; }
 function defaultShorts(){ return [
   {id:'sh_bb',title:'강남 월드 미리보기 🏙️',creator:'Voxel Street',youtubeId:'aqz-KE-bpKQ',likes:12800},
@@ -927,17 +929,17 @@ function defaultShorts(){ return [
   {id:'sh_ts',title:'복셀 에디터 꿀팁 ✏️',creator:'빌더랩',youtubeId:'R6MlUcmOul8',likes:3100},
   {id:'sh_ed',title:'캐릭터 커스터마이즈 🐱',creator:'igPlay',youtubeId:'TLkA0RELQ1g',likes:2400}
 ]; }
-function defaultCatalog(){ var c='demo'; function it(k,t,cr,ac,p,tags){ return {id:'ci_seed_'+t.replace(/\s/g,'').slice(0,6)+Math.random().toString(36).slice(2,5),kind:k,title:t,desc:'',creator:cr,creatorId:c,ownerId:c,access:ac,price:p||0,gateSymbol:null,gateMin:0,externalUrl:null,tags:tags||[],cover:null,downloads:Math.floor(Math.random()*4000)}; }
+function defaultCatalog(){ var c='demo'; function it(k,t,cr,ac,p,tags,extra){ var o={id:'ci_seed_'+t.replace(/\s/g,'').slice(0,6)+Math.random().toString(36).slice(2,5),kind:k,title:t,desc:'',creator:cr,creatorId:c,ownerId:c,access:ac,price:p||0,gateSymbol:null,gateMin:0,externalUrl:null,tags:tags||[],cover:null,downloads:Math.floor(Math.random()*4000)}; if(extra){for(var kk in extra)o[kk]=extra[kk];} return o; }
   return [
-    it('asset3d','로우폴리 빌딩팩 30종','Voxel Street','free',0,['3D','건물','도시']),
-    it('asset3d','캐릭터 메시팩 — 로봇/고양이','빌더랩','paid',120,['3D','캐릭터']),
-    it('image','복셀 텍스처 세트 48종','igPlay','ad',0,['텍스처','복셀']),
-    it('image','하늘·배경 이미지 20종','레이어룸','free',0,['배경','이미지']),
-    it('music','게임 BGM — 네온 시티 10곡','사운드IG','paid',150,['BGM','루프']),
-    it('music','효과음 팩 — 점프/코인/클리어','사운드IG','free',0,['SFX','효과음']),
-    it('game','강남 블록 러너 (리얼모드)','Voxel Street','free',0,['도시','리얼']),
-    it('doc','레벨 디자인 프리셋 모음','파쿠르랩','free',0,['프리셋','문서']),
-    it('video','월드 제작 튜토리얼 영상','igPlay','free',0,['튜토리얼'])
+    it('game','강남 블록 러너 (리얼모드)','Voxel Street','free',0,['도시','리얼'],{refColl:'levels',refId:'world-gangnam'}),
+    it('game','홍대 복셀 거리 월드','Voxel Street','free',0,['도시','복셀'],{refColl:'levels',refId:'world-hongdae'}),
+    it('game','블록 파쿠르 시즌 1','파쿠르랩','free',0,['파쿠르'],{refColl:'levels',refId:'parkour-s1'}),
+    it('game','코인 러시 — 숲속 대작전','Voxel Street','free',0,['수집'],{refColl:'levels',refId:'coin-rush'}),
+    it('asset3d','로우폴리 3D 에셋팩 (Kenney CC0)','Voxel Street','free',0,['3D','건물'],{externalUrl:'https://kenney.nl/assets/category:3D'}),
+    it('image','하늘·배경 이미지 (Pexels)','레이어룸','free',0,['배경','이미지'],{externalUrl:'https://www.pexels.com/search/sky/'}),
+    it('music','게임 BGM 무료팩 (Pixabay)','사운드IG','free',0,['BGM','루프'],{externalUrl:'https://pixabay.com/music/search/game/'}),
+    it('music','효과음 팩 (Pixabay SFX)','사운드IG','free',0,['SFX','효과음'],{externalUrl:'https://pixabay.com/sound-effects/search/game/'}),
+    it('video','월드 제작 튜토리얼','igPlay','free',0,['튜토리얼'],{externalUrl:'https://www.youtube.com/results?search_query=voxel+world'})
   ];
 }
 // 랭킹 더미(로컬): 전역 클리어 기록 느낌
@@ -1376,6 +1378,8 @@ function openServerDialog(){
 /* ============================= WATCH + PLAYER ============================= */
 function renderWatch(m,id){
   var lv=getLevel(id); if(!lv){ m.innerHTML='<div class="wrap"><div class="empty"><h3>레벨을 찾을 수 없습니다</h3></div></div>'; return; }
+  // 도시(월드) 레벨은 일반 레벨 플레이어가 아니라 탐험 모드로 — 자유 이동·NPC·워프가 되는 환경에서 돌아다님
+  if(lv.source==='igcity'){ location.hash='#explore'; return; }
   // 홀더 전용 레벨: 서버에서 잠금 확인
   if(NET.on && lv.gateSymbol){
     api('GET','/api/igplay/levels/'+id).then(function(r){
@@ -2470,7 +2474,7 @@ function exploreEngine(P0,key){
     var pole=new THREE.Mesh(new THREE.BoxGeometry(0.12,20,0.12),new THREE.MeshLambertMaterial({color:0xffd27a,transparent:true,opacity:0.35})); pole.position.set(CX+l.x,11,CZ+l.z); gm.add(pole); lmMeshes.push(beac); });
   // NPC
   var npcObjs=[];
-  (P0.npcs||[]).forEach(function(n){ var c=makeCharacter(n.char||'blocky',n.color||0xd94f4f); c.group.position.set(CX+n.x,0,CZ+n.z); scene.add(c.group); npcObjs.push({o:c,data:n}); var tag=null; });
+  (P0.npcs||[]).forEach(function(n){ var c=makeCharacter(n.char||'blocky',n.color||0xd94f4f); c.group.position.set(CX+n.x,0.6,CZ+n.z); scene.add(c.group); npcObjs.push({o:c,data:n}); });
   // 플레이어
   var charObj=makeCharacter(db.char||'blocky',skinCol(db.skin)); scene.add(charObj.group);
   var P={x:CX,y:2,z:CZ+8,vy:0,onGround:false};
@@ -2530,8 +2534,11 @@ function exploreEngine(P0,key){
     var vd=viewMode==='wide'?18:viewMode==='close'?4:9, vp=viewMode==='wide'?0.5:0.4;
     if(viewMode!=='close'){ pitch=vp; } dist=vd;
     var T=new THREE.Vector3(P.x,P.y+1.2,P.z);
-    camera.position.set(T.x-Math.sin(yaw)*Math.cos(pitch)*dist,T.y+Math.sin(pitch)*dist,T.z-Math.cos(yaw)*Math.cos(pitch)*dist);
-    camera.lookAt(T);
+    var want=new THREE.Vector3(T.x-Math.sin(yaw)*Math.cos(pitch)*dist,T.y+Math.sin(pitch)*dist,T.z-Math.cos(yaw)*Math.cos(pitch)*dist);
+    // 카메라-플레이어 선이 건물에 막히면 벽 앞으로 당겨 벽을 뚫지 않게
+    var cdir=want.clone().sub(T); var cmax=cdir.length()||0.01; cdir.multiplyScalar(1/cmax); var chit=cmax;
+    for(var cs=0.6;cs<cmax;cs+=0.5){ var cpt=T.clone().addScaledVector(cdir,cs); var blk=false; for(var cpi=0;cpi<propBoxes.length;cpi++){ var cb=propBoxes[cpi]; if(cpt.x>cb.minx-0.3&&cpt.x<cb.maxx+0.3&&cpt.z>cb.minz-0.3&&cpt.z<cb.maxz+0.3&&cpt.y>cb.miny&&cpt.y<cb.maxy+0.3){ blk=true; break; } } if(blk){ chit=Math.max(1.3,cs-0.5); break; } }
+    camera.position.copy(T.clone().addScaledVector(cdir,chit)); camera.lookAt(T);
     sun.position.set(P.x+70,95,P.z+45); sun.target.position.set(P.x,0,P.z); sun.target.updateMatrixWorld();
     npcObjs.forEach(function(n){ n.o.update({moving:false,onGround:true,t:now*0.001,dt:dt}); n.o.group.lookAt(P.x,n.o.group.position.y,P.z); });
     lmMeshes.forEach(function(mo){ mo.position.y=22+Math.sin(now*0.003)*0.7; mo.rotation.y+=dt*1.2; });
