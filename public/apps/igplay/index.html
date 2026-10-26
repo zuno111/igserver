@@ -2692,16 +2692,21 @@ function sigSend(ws,sigRoom,data){ try{ ws.send(JSON.stringify({type:'publish',r
 
 // ---- 방송자 ----
 // 로그인 안 돼 있으면 게스트 계정을 즉석 생성해 바로 방송 가능하게(별도 로그인 절차 없이).
-function ensureAccount(){
-  if(NET.on) return Promise.resolve(true);
+function freshGuest(){
   var em='guest_'+Math.random().toString(36).slice(2,10)+'@igplay.live';
   var pw='g'+Math.random().toString(36).slice(2,12)+'X9';
   var nm='게스트'+Math.floor(Math.random()*9000+1000);
   return api('POST','/api/auth/signup',{email:em,password:pw,name:nm}).then(function(r){
-    NET.token=r.token; NET.uid=(r.user&&r.user.id)||''; NET.name=(r.user&&r.user.name)||nm; NET.on=true;
+    NET.token=r.token; NET.uid=(r.user&&r.user.id)||''; NET.name=(r.user&&r.user.name)||nm; NET.on=true; NET._verified=true;
     try{ netSave(); }catch(e){} try{ updateSrvBtn(); }catch(e){} try{ updateLoginBtn(); }catch(e){}
     return true;
   });
+}
+function ensureAccount(){
+  // 로그인 상태면 토큰을 한 번 검증 — 이전 프로젝트의 낡은 토큰이면 새 게스트로 자동 복구.
+  if(NET.on && NET.token){ if(NET._verified) return Promise.resolve(true);
+    return api('GET','/api/auth/me').then(function(){ NET._verified=true; return true; }).catch(function(){ netClear(); return freshGuest(); }); }
+  return freshGuest();
 }
 function startBroadcast(){
   if(!liveReady()){ toast('서버 연결이 필요합니다'); return; }
