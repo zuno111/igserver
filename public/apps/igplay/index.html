@@ -917,7 +917,9 @@ var DB_KEY='igplay_v1';
 var db;
 function loadDB(){ try{var r=localStorage.getItem(DB_KEY); if(r)return norm(JSON.parse(r));}catch(e){}
   return norm({nick:null,likes:{},subs:{},comments:{},times:{},myLevels:[],plays:{}}); }
-function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; if(!d.catalog||!d.catalog.length)d.catalog=defaultCatalog(); if(!d.shorts||!d.shorts.length)d.shorts=defaultShorts(); if(!d.market)d.market=[]; if(!d.ownedStore)d.ownedStore=[]; return d; }
+function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; if(!d.catalog||!d.catalog.length)d.catalog=defaultCatalog(); if(!d.shorts||!d.shorts.length)d.shorts=defaultShorts(); if(!d.market)d.market=[]; if(!d.ownedStore)d.ownedStore=[];
+  if(d.shorts&&d.shorts.some(function(s){return s.externalUrl&&s.externalUrl.indexOf('gtv-videos-bucket')>=0;}))d.shorts=defaultShorts(); // 구 mp4 시드 갱신
+  return d; }
 function defaultShorts(){ return [
   {id:'sh_gn',title:'강남 월드 미리보기 🏙️',creator:'Voxel Street',youtubeId:'9bZkp7q19f0',likes:12800},
   {id:'sh_bb',title:'블록 파쿠르 하이라이트 🧱',creator:'파쿠르랩',youtubeId:'aqz-KE-bpKQ',likes:9400},
@@ -1561,7 +1563,8 @@ function buildProps(props, group){
     for(var j=0;j<pr.faces.length;j++){ var v=pr.verts[pr.faces[j]]||[0,0,0]; pos[j*3]=v[0];pos[j*3+1]=v[1];pos[j*3+2]=v[2]; }
     g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.computeVertexNormals();
     var sc=pr.scale||1;
-    var mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:pr.color||0xb0b8c4}));
+    var mat=new THREE.MeshLambertMaterial({color:pr.color||0xb0b8c4,side:THREE.DoubleSide}); mat.shadowSide=THREE.BackSide;
+    var mesh=new THREE.Mesh(g,mat);
     mesh.scale.set(sc,sc,sc); mesh.position.set(pr.pos.x,pr.pos.y,pr.pos.z); mesh.castShadow=true; mesh.receiveShadow=true; group.add(mesh);
     // 충돌 AABB (월드 좌표)
     var w=(pr.size?pr.size.w:1)*sc, h=(pr.size?pr.size.h:1)*sc, d=(pr.size?pr.size.d:1)*sc;
@@ -2352,7 +2355,7 @@ function cityReal(features,opts){ opts=opts||{}; var bb=features.bbox; var latMi
   function toM(lat,lon){ return [(lon-bb.w)*mLng,(bb.n-lat)*mLat]; }
   var maxB=Math.max(10,opts.maxBuildings||140), props=[];
   function boxProp(cx,cy,cz,w,h,d,color){ var hw=w/2,hd=d/2; var verts=[[-hw,0,-hd],[hw,0,-hd],[hw,h,-hd],[-hw,h,-hd],[-hw,0,hd],[hw,0,hd],[hw,h,hd],[-hw,h,hd]]; var quads=[[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[3,2,6,7],[4,5,1,0]]; var faces=[]; quads.forEach(function(q){ faces.push(q[0],q[1],q[2],q[0],q[2],q[3]); }); props.push({verts:verts,faces:faces,pos:{x:cx,y:cy,z:cz},scale:1,color:color,size:{w:w,h:h,d:d},collide:true}); }
-  boxProp(widthM/2,0,heightM/2,widthM,0.6,heightM,0x37415a);
+  boxProp(widthM/2,0,heightM/2,widthM,0.6,heightM,0xc2c9cf);
   var built=0; (features.buildings||[]).forEach(function(bd,bi){ if(built>=maxB)return; var g=bd.geometry||[]; if(g.length<4)return; var pts=g.map(function(p){return toM(p.lat,p.lon);}); if(pts.length>1&&pts[0][0]===pts[pts.length-1][0]&&pts[0][1]===pts[pts.length-1][1])pts=pts.slice(0,-1); var n=pts.length; if(n<3)return; var cx=0,cz=0,minx=1e9,maxx=-1e9,minz=1e9,maxz=-1e9; pts.forEach(function(p){ cx+=p[0];cz+=p[1]; if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0]; if(p[1]<minz)minz=p[1]; if(p[1]>maxz)maxz=p[1]; }); cx/=n;cz/=n; var hM=Math.max(3,Math.min(240,Number(bd.height)||(Number(bd.levels)||3)*3)); var local=pts.map(function(p){return [p[0]-cx,p[1]-cz];}); var verts=[]; for(var i=0;i<n;i++)verts.push([local[i][0],0,local[i][1]]); for(i=0;i<n;i++)verts.push([local[i][0],hM,local[i][1]]); var faces=[]; for(i=1;i<n-1;i++)faces.push(0,i+1,i); for(i=1;i<n-1;i++)faces.push(n,n+i,n+i+1); for(i=0;i<n;i++){ var j=(i+1)%n; faces.push(i,j,n+j,i,n+j,n+i); } var PAL=[0x6b7280,0x8a93a0,0x9aa7b4,0x5f7f9a,0x7d6a5b,0xb7bcc4,0x4a5a6e,0xa98f74]; var color=hM>70?[0x3f5a7a,0x4a6b8a,0x5c6f8c][bi%3]:PAL[bi%PAL.length]; props.push({verts:verts,faces:faces,pos:{x:cx,y:0.3,z:cz},scale:1,color:color,size:{w:maxx-minx,h:hM,d:maxz-minz},collide:true}); built++; });
   var spawn={x:Math.round(widthM/2),y:1,z:Math.round(heightM/2)};
   var voxels=[{x:0,y:0,z:0,t:1},{x:Math.round(widthM)-2,y:1,z:Math.round(heightM)-2,t:4}];
@@ -2447,11 +2450,11 @@ function exploreEngine(P0,key){
   if(renderer.outputEncoding!==undefined)renderer.outputEncoding=THREE.sRGBEncoding;
   var scene=new THREE.Scene(); scene.background=new THREE.Color(0xaee0ff); scene.fog=new THREE.Fog(0xaee0ff,140,440);
   var camera=new THREE.PerspectiveCamera(60,16/9,0.1,900);
-  scene.add(new THREE.HemisphereLight(0xdcefff,0x8aa0a8,0.55));
-  scene.add(new THREE.AmbientLight(0xffffff,0.14));
-  var sun=new THREE.DirectionalLight(0xfff2d8,1.15); sun.castShadow=true;
-  sun.shadow.mapSize.set(2048,2048); sun.shadow.bias=-0.0004; sun.shadow.normalBias=0.6;
-  var sc=sun.shadow.camera; sc.near=20; sc.far=700; sc.left=-95; sc.right=95; sc.top=95; sc.bottom=-95; sc.updateProjectionMatrix();
+  scene.add(new THREE.HemisphereLight(0xdcefff,0x7d9098,0.42));
+  scene.add(new THREE.AmbientLight(0xffffff,0.08));
+  var sun=new THREE.DirectionalLight(0xfff0d0,1.45); sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048); sun.shadow.bias=-0.0004; sun.shadow.normalBias=0.4;
+  var sc=sun.shadow.camera; sc.near=10; sc.far=400; sc.left=-60; sc.right=60; sc.top=60; sc.bottom=-60; sc.updateProjectionMatrix();
   scene.add(sun); scene.add(sun.target);
   var gm=new THREE.Group(); scene.add(gm);
   // 도시 생성(샘플 지형 → 리얼 메시) + 지면
@@ -2529,7 +2532,7 @@ function exploreEngine(P0,key){
     var T=new THREE.Vector3(P.x,P.y+1.2,P.z);
     camera.position.set(T.x-Math.sin(yaw)*Math.cos(pitch)*dist,T.y+Math.sin(pitch)*dist,T.z-Math.cos(yaw)*Math.cos(pitch)*dist);
     camera.lookAt(T);
-    sun.position.set(P.x+120,240,P.z-80); sun.target.position.set(P.x,0,P.z); sun.target.updateMatrixWorld();
+    sun.position.set(P.x+70,95,P.z+45); sun.target.position.set(P.x,0,P.z); sun.target.updateMatrixWorld();
     npcObjs.forEach(function(n){ n.o.update({moving:false,onGround:true,t:now*0.001,dt:dt}); n.o.group.lookAt(P.x,n.o.group.position.y,P.z); });
     lmMeshes.forEach(function(mo){ mo.position.y=22+Math.sin(now*0.003)*0.7; mo.rotation.y+=dt*1.2; });
     // NPC 근접 상호작용
@@ -2565,7 +2568,16 @@ function renderWorld(m){
     '</div></div>';
   var COLORS={level:'#ffb02e',vod:'#3aa0ff',live:'#f0556b',store:'#27d4b8'};
   var map=L.map('worldmap',{zoomControl:true,attributionControl:true}).setView([37.5665,126.9780],13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  // 아티팩트 보안정책이 외부 지도 타일(OSM 등) 이미지를 막으므로, 타일을 직접 그려 지도 배경을 만든다(네트워크 0)
+  var LocalMap=L.GridLayer.extend({ createTile:function(coords){ var tile=document.createElement('canvas'); var s=this.getTileSize(); tile.width=s.x; tile.height=s.y; var c=tile.getContext('2d');
+    function hsh(a,b){ var n=Math.sin(a*127.1+b*311.7+(coords.z||0)*13.37)*43758.5453; return n-Math.floor(n); }
+    c.fillStyle='#e9eef0'; c.fillRect(0,0,s.x,s.y);
+    var g=4, cw=s.x/g, ch=s.y/g;
+    for(var i=0;i<g;i++)for(var j=0;j<g;j++){ var r=hsh(coords.x*g+i,coords.y*g+j);
+      c.fillStyle=r<0.14?'#cfe6d6':(r<0.26?'#cfe0ef':(r<0.62?'#e2e8ec':'#dde5ea')); c.fillRect(i*cw+1.5,j*ch+1.5,cw-3,ch-3); }
+    c.strokeStyle='#c4ced5'; c.lineWidth=2; c.beginPath(); for(var k=0;k<=g;k++){ c.moveTo(k*cw,0);c.lineTo(k*cw,s.y); c.moveTo(0,k*ch);c.lineTo(s.x,k*ch);} c.stroke();
+    return tile; } });
+  new LocalMap({maxZoom:19,attribution:'igPlay 월드맵'}).addTo(map);
   var layer=L.layerGroup().addTo(map);
   function drawPins(pins){ layer.clearLayers();
     (pins||[]).forEach(function(p){ var col=COLORS[p.kind]||'#ffffff';
@@ -2615,7 +2627,7 @@ function renderShorts(m){
   var wrap=document.getElementById('shortsWrap'); var items=[], idx=0, vidEl=null;
   function vsrc(it){ return it.externalUrl || (it.fileId?(NET.base.replace(/\/+$/,'')+'/api/files/'+it.fileId+'?key='+encodeURIComponent(NET.key)):''); }
   function hueOf(s){ var h=0; s=s||''; for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))%360; return h; }
-  // 깨지지 않는 포스터(그라데이션 + 썸네일은 실패 시 자동 숨김) → 탭하면 그 자리에서 재생
+  // mp4 등 직접 영상은 바로 자동재생, 유튜브는 포스터+탭(임베드 제약 대비)
   function media(it){ var yt=it.youtubeId||ytId(it.externalUrl); var h=hueOf(it.id||it.title);
     var grad='linear-gradient(160deg,hsl('+h+',62%,40%),hsl('+((h+38)%360)+',58%,20%))';
     var thumb=yt?'<img src="https://i.ytimg.com/vi/'+yt+'/hqdefault.jpg" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">':'';
@@ -2626,19 +2638,19 @@ function renderShorts(m){
     var it=items[((idx%items.length)+items.length)%items.length];
     wrap.innerHTML='<div style="position:relative;height:100%;width:100%;max-width:470px;margin:0 auto">'+
       media(it)+
-      '<div style="position:absolute;right:12px;bottom:96px;display:flex;flex-direction:column;gap:14px;align-items:center">'+
+      '<div style="position:absolute;right:12px;bottom:96px;z-index:8;display:flex;flex-direction:column;gap:14px;align-items:center">'+
         '<button class="btn" data-like style="width:52px;height:52px;border-radius:50%;flex-direction:column;font-size:12px"><span style="font-size:18px">♥</span>'+fmt(it.likes||0)+'</button>'+
         '<button class="btn" data-cmt style="width:52px;height:52px;border-radius:50%;font-size:12px">댓글</button>'+
         '<button class="btn" data-shr style="width:52px;height:52px;border-radius:50%;font-size:12px">공유</button>'+
       '</div>'+
-      '<div style="position:absolute;left:16px;bottom:28px;color:#fff;text-shadow:0 1px 4px #000;max-width:70%"><b>@'+esc(it.creator||'익명')+'</b><div style="font-size:13.5px;margin-top:3px">'+esc(it.title||'')+'</div></div>'+
-      '<div style="position:absolute;right:14px;top:46%;display:flex;flex-direction:column;gap:8px"><button class="btn" data-up style="width:40px;height:40px;border-radius:50%;padding:0">▲</button><button class="btn" data-dn style="width:40px;height:40px;border-radius:50%;padding:0">▼</button></div>'+
+      '<div style="position:absolute;left:16px;bottom:28px;z-index:8;color:#fff;text-shadow:0 1px 4px #000;max-width:70%;pointer-events:none"><b>@'+esc(it.creator||'익명')+'</b><div style="font-size:13.5px;margin-top:3px">'+esc(it.title||'')+'</div></div>'+
+      '<div style="position:absolute;right:14px;top:44%;z-index:8;display:flex;flex-direction:column;gap:8px"><button class="btn" data-up style="width:42px;height:42px;border-radius:50%;padding:0;font-size:16px">▲</button><button class="btn" data-dn style="width:42px;height:42px;border-radius:50%;padding:0;font-size:16px">▼</button></div>'+
       '</div>';
     var stage=wrap.querySelector('#shStage'); var pb=wrap.querySelector('.shPlay');
     if(pb)pb.onclick=function(){ var yt=it.youtubeId||ytId(it.externalUrl);
       if(yt){ stage.innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/'+yt+'?autoplay=1&rel=0&playsinline=1" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>'+
         '<a href="https://youtu.be/'+yt+'" target="_blank" rel="noopener" style="position:absolute;top:8px;left:8px;z-index:3;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:4px 9px;border-radius:8px;text-decoration:none">유튜브에서 열기 ↗</a>'; }
-      else if(vsrc(it)){ stage.innerHTML='<video src="'+vsrc(it)+'" style="width:100%;height:100%;object-fit:contain;background:#000" autoplay loop controls playsinline></video>'; }
+      else if(vsrc(it)){ stage.innerHTML='<video src="'+vsrc(it)+'" style="width:100%;height:100%;object-fit:cover;background:#000" autoplay loop controls playsinline></video>'; }
       else toast('연결된 영상이 없습니다'); };
     wrap.querySelector('[data-up]').onclick=function(){ idx--; show(); };
     wrap.querySelector('[data-dn]').onclick=function(){ idx++; show(); };
