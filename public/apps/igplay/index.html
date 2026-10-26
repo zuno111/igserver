@@ -2593,10 +2593,14 @@ function exploreEngine(P0,key){
   function kd(e){ var k=e.key.toLowerCase(); keys[k]=true; if(k===' '||k.indexOf('arrow')===0)e.preventDefault(); }
   function ku(e){ keys[e.key.toLowerCase()]=false; }
   window.addEventListener('keydown',kd); window.addEventListener('keyup',ku);
-  var lookId=null,lx=0,ly=0;
-  cv.addEventListener('pointerdown',function(e){ lookId=e.pointerId; lx=e.clientX; ly=e.clientY; try{cv.setPointerCapture(e.pointerId);}catch(x){} });
-  cv.addEventListener('pointermove',function(e){ if(e.pointerId!==lookId)return; yaw-=(e.clientX-lx)*0.006; pitch-=(e.clientY-ly)*0.006; pitch=Math.max(0.15,Math.min(1.4,pitch)); lx=e.clientX; ly=e.clientY; });
-  cv.addEventListener('pointerup',function(e){ if(e.pointerId===lookId)lookId=null; });
+  var lookId=null,lx=0,ly=0,downX=0,downY=0,downT=0,moved=0;
+  var billRay=new THREE.Raycaster();
+  cv.addEventListener('pointerdown',function(e){ lookId=e.pointerId; lx=e.clientX; ly=e.clientY; downX=e.clientX; downY=e.clientY; downT=Date.now(); moved=0; try{cv.setPointerCapture(e.pointerId);}catch(x){} });
+  cv.addEventListener('pointermove',function(e){ if(e.pointerId!==lookId)return; moved+=Math.abs(e.clientX-lx)+Math.abs(e.clientY-ly); yaw-=(e.clientX-lx)*0.006; pitch-=(e.clientY-ly)*0.006; pitch=Math.max(0.15,Math.min(1.4,pitch)); lx=e.clientX; ly=e.clientY; });
+  cv.addEventListener('pointerup',function(e){ if(e.pointerId===lookId)lookId=null;
+    // 탭(거의 안 움직인 짧은 클릭)이 간판을 가리키면 입장
+    if(moved<8 && Date.now()-downT<400){ try{ var r=cv.getBoundingClientRect(); var nx=((downX-r.left)/r.width)*2-1, ny=-((downY-r.top)/r.height)*2+1; billRay.setFromCamera({x:nx,y:ny},camera); var hit=billRay.intersectObject(bill,false); if(hit&&hit.length){ location.hash = BILL.liveList.length ? ('#live/'+BILL.liveList[0].id) : '#live'; } }catch(x){} }
+  });
   // 모션 상태
   var motion=null,motionT=0,emoFxEl=document.getElementById('exEmoFx');
   function doEmote(em){ mpAct('emote',em); if(!emoFxEl)return; emoFxEl.textContent=em; emoFxEl.style.opacity='1'; emoFxEl.style.transform='translate(-50%,-80%)'; setTimeout(function(){ emoFxEl.style.opacity='0'; emoFxEl.style.transform='translate(-50%,-50%)'; },1100); }
@@ -2808,7 +2812,7 @@ function hostEngine(id,stream,title){
     pc.createOffer().then(function(o){ return pc.setLocalDescription(o); }).then(function(){ sigSend(ws,sigRoom,{from:hostCid,to:vcid,kind:'offer',sdp:pc.localDescription}); });
   }
   function appendChat(c){ var box=document.getElementById('lvChat'); if(!box)return; var row=document.createElement('div'); row.style.marginBottom='6px'; row.innerHTML='<b style="color:var(--brand)">'+esc(c.name||'익명')+'</b> '+esc(c.text||''); box.appendChild(row); box.scrollTop=box.scrollHeight; }
-  function giftFx(name,amt){ var fx=document.getElementById('lvGiftFx'); if(fx){ fx.textContent='🎁 '+esc(name)+' +'+amt; fx.animate?fx.animate([{opacity:0,transform:'translateY(20px)'},{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-30px)'}],{duration:2200}):0; } }
+  function giftFx(name,amt){ liveGiftFx(esc(name),amt); }
   document.getElementById('lvStop').onclick=function(){ try{ if(recorder&&recorder.state!=='inactive')recorder.stop(); }catch(e){} setTimeout(saveRecording,350); api('POST','/api/iglive/sessions/'+id+'/stop',{}).catch(function(){}); cleanup(); location.hash='#live'; };
   document.getElementById('lvMute').onclick=function(e){ var a=stream.getAudioTracks()[0]; if(a){ a.enabled=!a.enabled; e.target.textContent=a.enabled?'마이크 끄기':'마이크 켜기'; } };
   document.getElementById('lvProduct').onclick=function(){ pickProduct(function(pid){ api('POST','/api/iglive/sessions/'+id+'/product',{productId:pid}).then(function(){ toast(pid?'상품을 연결했습니다':'상품 연결을 해제했습니다'); }).catch(function(e){ toast(e.message||'실패'); }); }); };
@@ -2859,7 +2863,7 @@ function watchEngine(id){
     pc.setRemoteDescription(new RTCSessionDescription(sdp)).then(function(){ return pc.createAnswer(); }).then(function(a){ return pc.setLocalDescription(a); }).then(function(){ sigSend(ws,sigRoom,{from:myCid,to:hostCid,kind:'answer',sdp:pc.localDescription}); });
   }
   function appendChat(c){ var box=document.getElementById('lvChat'); if(!box)return; var row=document.createElement('div'); row.style.marginBottom='6px'; row.innerHTML='<b style="color:var(--brand)">'+esc(c.name||'익명')+'</b> '+esc(c.text||''); box.appendChild(row); box.scrollTop=box.scrollHeight; }
-  function giftFx(name,amt){ var fx=document.getElementById('lvGiftFx'); if(fx){ fx.textContent='🎁 '+esc(name)+' +'+amt; if(fx.animate)fx.animate([{opacity:0,transform:'translateY(20px)'},{opacity:1},{opacity:0,transform:'translateY(-30px)'}],{duration:2200}); } }
+  function giftFx(name,amt){ liveGiftFx(esc(name),amt); }
   document.getElementById('lvTap').onclick=function(){ video.muted=false; video.play&&video.play(); toast('소리 켜짐'); };
   document.getElementById('lvLeave').onclick=function(){ cleanup(); location.hash='#live'; };
   document.getElementById('lvGift').onclick=function(){ ensureAccount().then(function(){ return api('POST','/api/iglive/sessions/'+id+'/gift',{amount:10}); }).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet&&updateWallet();} toast('🎁 10 ISC 선물 완료'); }).catch(function(e){ toast(e.message||'선물 실패'); }); };
@@ -2868,6 +2872,15 @@ function watchEngine(id){
   function sendMsg(){ var inp=document.getElementById('lvMsg'); if(!inp)return; var t=inp.value.trim(); if(!t)return; inp.value=''; ensureAccount().then(function(){ return api('POST','/api/iglive/sessions/'+id+'/chat',{text:t}); }).catch(function(e){ toast(e.message); }); }
   function cleanup(){ try{clearInterval(helloIv);}catch(e){} api('POST','/api/iglive/sessions/'+id+'/leave',{}).catch(function(){}); try{ws.close();}catch(e){} if(pc){ try{pc.close();}catch(e){} } }
   activeSession={dispose:cleanup};
+}
+
+// 선물 떠오름 연출(방송자·시청자 공용) — 여러 개가 겹쳐 떠오르며 사라짐
+function liveGiftFx(name,amt){ var host=document.getElementById('lvGiftFx'); if(!host)return;
+  var el=document.createElement('div'); el.textContent='🎁 '+name+' +'+amt+' ISC';
+  el.style.cssText='font-size:19px;font-weight:800;color:#ffd27a;text-shadow:0 2px 8px rgba(0,0,0,.7);line-height:1.5;opacity:0';
+  host.appendChild(el);
+  if(el.animate){ el.animate([{opacity:0,transform:'translateY(26px) scale(.8)'},{opacity:1,transform:'translateY(-4px) scale(1.12)'},{opacity:1,transform:'translateY(-34px) scale(1)'},{opacity:0,transform:'translateY(-76px) scale(.9)'}],{duration:2600,easing:'cubic-bezier(.2,.7,.3,1)'}); }
+  setTimeout(function(){ try{el.remove();}catch(e){} },2700);
 }
 
 // ---- 라이브 커머스: 상품 선택기 + 시청자 상품 카드 ----
