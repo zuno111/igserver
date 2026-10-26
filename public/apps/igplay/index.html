@@ -244,6 +244,8 @@ body.has-touch .touchctrl{display:grid}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 "use strict";
 /* ============================= store ============================= */
@@ -512,6 +514,8 @@ function render(){
   else if(r.name==='shop'){ renderShop(m); }
   else if(r.name==='market'){ renderMarket(m); }
   else if(r.name==='store'){ renderStore(m); }
+  else if(r.name==='world'){ renderWorld(m); }
+  else if(r.name==='shorts'){ renderShorts(m); }
   else renderHome(m,r.name);
 }
 window.addEventListener('hashchange',render);
@@ -1513,6 +1517,79 @@ function publishStoreDialog(m){
     if(acc.value==='token'){ var sym=wrap.querySelector('#pSym').value.trim().toUpperCase(); var mn=Math.round(+wrap.querySelector('#pMin').value||0); if(!sym){ toast('토큰 심볼을 입력하세요'); return; } body.gateSymbol=sym; body.gateMin=mn||1; }
     api('POST','/api/igstore/catalog',body).then(function(){ toast('올리기 완료'); close(); storeTab='mine'; renderStore(m); }).catch(function(e){ toast(e.message); });
   };
+}
+
+/* ============================= 월드 (지도) ============================= */
+// 실제 지도(OpenStreetMap, 무료 타일) 위에 레벨·영상·라이브·상점을 위치 핀으로 올린다.
+function renderWorld(m){
+  if(!NET.on){ m.innerHTML='<div class="wrap"><div class="sechead"><h2>월드</h2><p>실제 지도 위의 레벨·영상·라이브·상점</p></div><div class="empty"><h3>서버 연결이 필요합니다</h3><p>월드 지도는 서버 계정이 필요합니다. 상단 "서버"에서 연결하세요.</p><button class="btn brand" style="margin-top:12px" onclick="openServerDialog()">서버 연결</button></div></div>'; return; }
+  if(typeof L==='undefined'){ m.innerHTML='<div class="wrap"><div class="empty"><h3>지도를 불러오지 못했습니다</h3></div></div>'; return; }
+  m.innerHTML='<div style="position:absolute;inset:0"><div id="worldmap" style="position:absolute;inset:0"></div>'+
+    '<div style="position:absolute;top:12px;left:12px;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--muted);pointer-events:none">월드 · 핀을 눌러 콘텐츠로 이동</div>'+
+    '<div style="position:absolute;top:12px;right:12px;z-index:500;display:flex;gap:6px">'+
+      ['level|레벨|#ffb02e','vod|영상|#3aa0ff','live|라이브|#f0556b','store|상점|#27d4b8'].map(function(s){var p=s.split("|");return '<span style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px 9px;font-size:11px"><b style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p[2]+';margin-right:4px"></b>'+p[1]+'</span>';}).join('')+
+    '</div></div>';
+  var COLORS={level:'#ffb02e',vod:'#3aa0ff',live:'#f0556b',store:'#27d4b8'};
+  var map=L.map('worldmap',{zoomControl:true,attributionControl:true}).setView([37.5665,126.9780],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  var layer=L.layerGroup().addTo(map);
+  function load(){ var b=map.getBounds();
+    api('GET','/api/igmap/pins?minLat='+b.getSouth()+'&maxLat='+b.getNorth()+'&minLng='+b.getWest()+'&maxLng='+b.getEast()).then(function(r){
+      layer.clearLayers();
+      (r.pins||[]).forEach(function(p){ var col=COLORS[p.kind]||'#ffffff';
+        var mk=L.circleMarker([p.lat,p.lng],{radius:9,color:'#0b0f16',fillColor:col,fillOpacity:0.9,weight:2}).addTo(layer);
+        var html='<b>'+esc(p.title||'')+'</b><br><span style="color:#888">'+esc(p.kind)+(p.label?(' · '+esc(p.label)):'')+'</span>';
+        if(p.kind==='level')html+='<br><a href="#watch/'+p.id+'">플레이</a>';
+        mk.bindPopup(html);
+      });
+    }).catch(function(){});
+  }
+  map.on('moveend',load); setTimeout(function(){ map.invalidateSize(); load(); },80);
+  activeSession={dispose:function(){ try{map.remove();}catch(e){} }};
+}
+
+/* ============================= 쇼츠 (플샷/숏폼) ============================= */
+// 세로 쇼츠 피드. igVod의 short(60초 이하)을 상하로 넘기며 재생. 좋아요·댓글·공유.
+function renderShorts(m){
+  if(!NET.on){ m.innerHTML='<div class="wrap"><div class="sechead"><h2>숏폼</h2><p>60초 이하 세로 영상</p></div><div class="empty"><h3>서버 연결이 필요합니다</h3><p>상단 "서버"에서 연결하세요.</p><button class="btn brand" style="margin-top:12px" onclick="openServerDialog()">서버 연결</button></div></div>'; return; }
+  m.innerHTML='<div id="shortsWrap" style="position:absolute;inset:0;background:#000;display:grid;place-items:center"></div>';
+  var wrap=document.getElementById('shortsWrap'); var items=[], idx=0, vidEl=null;
+  function vsrc(it){ return it.externalUrl || (it.fileId?(NET.base.replace(/\/+$/,'')+'/api/files/'+it.fileId+'?key='+encodeURIComponent(NET.key)):''); }
+  function show(){
+    if(!items.length){ wrap.innerHTML='<div class="empty"><h3>쇼츠가 없습니다</h3><p>내 채널에서 60초 이하 영상을 올려보세요.</p></div>'; return; }
+    var it=items[((idx%items.length)+items.length)%items.length];
+    wrap.innerHTML='<div style="position:relative;height:100%;width:100%;max-width:470px;margin:0 auto">'+
+      '<video id="shv" src="'+vsrc(it)+'" style="width:100%;height:100%;object-fit:contain;background:#000" playsinline autoplay loop muted controls></video>'+
+      '<div style="position:absolute;right:12px;bottom:96px;display:flex;flex-direction:column;gap:14px;align-items:center">'+
+        '<button class="btn" data-like style="width:52px;height:52px;border-radius:50%;flex-direction:column;font-size:12px"><span style="font-size:18px">♥</span>'+fmt(it.likes||0)+'</button>'+
+        '<button class="btn" data-cmt style="width:52px;height:52px;border-radius:50%;font-size:12px">댓글</button>'+
+        '<button class="btn" data-shr style="width:52px;height:52px;border-radius:50%;font-size:12px">공유</button>'+
+      '</div>'+
+      '<div style="position:absolute;left:16px;bottom:28px;color:#fff;text-shadow:0 1px 4px #000;max-width:70%"><b>@'+esc(it.creator||'익명')+'</b><div style="font-size:13.5px;margin-top:3px">'+esc(it.title||'')+'</div></div>'+
+      '<div style="position:absolute;right:14px;top:46%;display:flex;flex-direction:column;gap:8px"><button class="btn" data-up style="width:40px;height:40px;border-radius:50%;padding:0">▲</button><button class="btn" data-dn style="width:40px;height:40px;border-radius:50%;padding:0">▼</button></div>'+
+      '</div>';
+    vidEl=document.getElementById('shv'); if(vidEl)vidEl.play().catch(function(){});
+    wrap.querySelector('[data-up]').onclick=function(){ idx--; show(); };
+    wrap.querySelector('[data-dn]').onclick=function(){ idx++; show(); };
+    wrap.querySelector('[data-like]').onclick=function(){ api('POST','/api/igvod/'+it.id+'/like',{}).then(function(r){ it.likes=r.likes; show(); }).catch(function(e){ toast(e.message); }); };
+    wrap.querySelector('[data-cmt]').onclick=function(){ shortsComments(it); };
+    wrap.querySelector('[data-shr]').onclick=function(){ try{navigator.clipboard.writeText(location.origin+location.pathname+'#shorts');toast('링크 복사됨');}catch(e){toast('공유');} };
+    // 재생 시 조회수 집계
+    api('GET','/api/igvod/'+it.id,{}).catch(function(){});
+  }
+  function shortsComments(it){
+    var ov=document.createElement('div'); ov.className='overlay'; ov.style.position='fixed'; ov.style.zIndex='80';
+    ov.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:20px;text-align:left;max-width:420px;width:100%"><h3 style="font-size:17px;margin-bottom:10px">댓글</h3><div id="scmts" style="max-height:40vh;overflow:auto;margin-bottom:10px">불러오는 중…</div><div style="display:flex;gap:8px"><input id="scin" placeholder="댓글 추가…" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--fg);outline:none"><button class="btn brand" id="scsend">등록</button></div><div class="obtns" style="margin-top:12px"><button class="btn" id="scclose">닫기</button></div></div>';
+    document.body.appendChild(ov); ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
+    ov.querySelector('#scclose').onclick=function(){ ov.remove(); };
+    function load(){ api('GET','/api/igvod/'+it.id+'/comments').then(function(r){ var el=ov.querySelector('#scmts'); if(!r.comments.length){el.innerHTML='<p style="color:var(--muted)">첫 댓글을 남겨보세요.</p>';return;} el.innerHTML=r.comments.map(function(c){return '<div style="margin-bottom:10px"><b style="font-size:13px">'+esc(c.name)+'</b><div style="font-size:13.5px">'+esc(c.text)+'</div></div>';}).join(''); }).catch(function(){}); }
+    ov.querySelector('#scsend').onclick=function(){ var t=ov.querySelector('#scin').value.trim(); if(!t)return; api('POST','/api/igvod/'+it.id+'/comments',{text:t}).then(function(){ ov.querySelector('#scin').value=''; load(); }).catch(function(e){ toast(e.message); }); };
+    load();
+  }
+  api('GET','/api/igvod/shorts').then(function(r){ items=r.items||[]; show(); }).catch(function(){ wrap.innerHTML='<div class="empty"><p>불러오기 실패</p></div>'; });
+  function onkey(e){ if(e.key==='ArrowDown'){ idx++; show(); } else if(e.key==='ArrowUp'){ idx--; show(); } }
+  window.addEventListener('keydown',onkey);
+  activeSession={dispose:function(){ window.removeEventListener('keydown',onkey); if(vidEl){try{vidEl.pause();}catch(e){}} }};
 }
 
 function renderMarket(m){
