@@ -231,13 +231,13 @@ body.has-touch .touchctrl{display:grid}
   /* 레이더·상단 버튼 축소 */
   .exRadar{transform:scale(.6);transform-origin:top right;top:48px !important;right:2px !important}
   .exTopBar{transform:scale(.8);transform-origin:top right;top:8px !important;right:6px !important}
-  /* 하단 표정/모션 바: 화면 하단에 가로 전체폭으로 고정, 버튼은 2줄로 전부 표시 */
-  .exEmoBar{left:0 !important;right:0 !important;bottom:0 !important;transform:none !important;width:auto !important;max-width:none !important;border-radius:14px 14px 0 0 !important;padding:7px 8px calc(7px + env(safe-area-inset-bottom,0px)) !important}
+  /* 하단 표정/모션 바: 뷰포트 하단(네비바 위)에 완전 고정 — 스크롤과 무관하게 항상 화면 하단에, 2줄로 전부 표시 */
+  .exEmoBar{position:fixed !important;left:0 !important;right:0 !important;bottom:62px !important;top:auto !important;transform:none !important;width:auto !important;max-width:none !important;z-index:31 !important;border-radius:14px 14px 0 0 !important;padding:7px 8px !important}
   .exEmoBar button{font-size:12px;padding:5px 9px}
-  /* 조이스틱·점프는 하단 바 위로 */
-  #exJoy{bottom:118px !important;left:14px !important;width:104px !important;height:104px !important}
+  /* 조이스틱·점프도 뷰포트에 고정해 하단 바 위에 항상 노출 */
+  #exJoy{position:fixed !important;bottom:166px !important;left:14px !important;top:auto !important;width:104px !important;height:104px !important;z-index:31 !important}
   #exStick{width:46px !important;height:46px !important;margin:-23px 0 0 -23px !important}
-  #exJump{bottom:124px !important;right:14px !important;width:62px !important;height:62px !important}
+  #exJump{position:fixed !important;bottom:172px !important;right:14px !important;top:auto !important;width:62px !important;height:62px !important;z-index:31 !important}
 }
 </style>
 
