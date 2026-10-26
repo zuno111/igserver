@@ -2542,7 +2542,7 @@ function exploreEngine(P0,key){
       pc.setRemoteDescription(new RTCSessionDescription(sdp)).then(function(){return pc.createAnswer();}).then(function(a){return pc.setLocalDescription(a);}).then(function(){ sigSend(ws,sigRoom,{from:myCid,to:hostCid,kind:'answer',sdp:pc.localDescription}); }).catch(function(){});
     }
     function wsOK(){ return ws&&ws.readyState===1; }
-    var ws=igOpenWS([chatRoom],function(msg){
+    var ws=igOpenWS([chatRoom,sigRoom],function(msg){
       if(msg.type==='message'&&msg.data){ var d=msg.data; if(d.to&&d.to!==myCid)return; if(d.from===myCid)return;
         if(d.kind==='offer'){ startPC(d.sdp); } else if(d.kind==='ice'&&pc&&d.candidate){ try{pc.addIceCandidate(new RTCIceCandidate(d.candidate));}catch(e){} }
       } else if(msg.type==='live_end'){ disconnectBillboard(); }
