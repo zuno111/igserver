@@ -917,7 +917,13 @@ var DB_KEY='igplay_v1';
 var db;
 function loadDB(){ try{var r=localStorage.getItem(DB_KEY); if(r)return norm(JSON.parse(r));}catch(e){}
   return norm({nick:null,likes:{},subs:{},comments:{},times:{},myLevels:[],plays:{}}); }
-function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; if(!d.catalog)d.catalog=[]; if(!d.shorts)d.shorts=[]; if(!d.market)d.market=[]; if(!d.ownedStore)d.ownedStore=[]; return d; }
+function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; if(!d.catalog)d.catalog=[]; if(!d.shorts)d.shorts=defaultShorts(); if(!d.market)d.market=[]; if(!d.ownedStore)d.ownedStore=[]; return d; }
+function defaultShorts(){ return [
+  {id:'sh_gn',title:'강남 월드 미리보기 🏙️',creator:'Voxel Street',youtubeId:'9bZkp7q19f0',likes:12800},
+  {id:'sh_bb',title:'블록 파쿠르 하이라이트 🧱',creator:'파쿠르랩',youtubeId:'aqz-KE-bpKQ',likes:9400},
+  {id:'sh_zoo',title:'첫 레벨 플레이 영상 🎮',creator:'igPlay',youtubeId:'jNQXAC9IVRw',likes:5300}
+]; }
+function ytId(u){ if(!u)return ''; var m=String(u).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([A-Za-z0-9_-]{6,})/); return m?m[1]:(/^[A-Za-z0-9_-]{6,}$/.test(u)?u:''); }
 function saveDB(){ try{localStorage.setItem(DB_KEY,JSON.stringify(db));}catch(e){} }
 db=loadDB();
 
@@ -1128,7 +1134,20 @@ function seedCoin(){
     genre:'수집',difficulty:'보통',plays:512000,likes:44000,desc:'12개의 코인을 가장 빠르게 모아 골에 도착하세요. 벽을 피해 최단 경로를 찾는 게 기록 단축의 관건입니다.',
     voxels:v,spawn:{x:0,y:1,z:0}};
 }
-var SEED=[seedTutorial(),seedParkour(),seedCoin()];
+// 월드 기본 도시 — 지도 좌표 주변을 샘플 지형으로 생성해 바로 플레이 가능한 도시 월드로.
+function seedCity(id,title,creator,lat,lng,mode,sizeM,plays,likes){
+  var half=(sizeM||170)/2, mLat=111320, mLng=111320*Math.cos(lat*Math.PI/180);
+  var bb={s:lat-half/mLat,n:lat+half/mLat,w:lng-half/mLng,e:lng+half/mLng};
+  var built; try{ var f=citySample(bb); built=mode==='real'?cityReal(f,{name:title}):cityVoxelize(f,{name:title}); }catch(e){ built={voxels:[{x:0,y:0,z:0,t:1},{x:2,y:1,z:2,t:4}],props:[],spawn:{x:1,y:1,z:1}}; }
+  return {id:id,title:title,creator:creator,creatorId:creator,genre:'월드',difficulty:'보통',plays:plays||0,likes:likes||0,
+    desc:'실제 지도 좌표 기반 '+(mode==='real'?'리얼 3D':'복셀')+' 도시 월드입니다. 자유롭게 돌아다녀 보세요.',
+    voxels:built.voxels,props:built.props||[],spawn:built.spawn,geo:{lat:lat,lng:lng,label:title},source:'igcity'};
+}
+var SEED=[seedTutorial(),seedParkour(),seedCoin(),
+  seedCity('world-gangnam','강남 리얼 시티','Voxel Street',37.4979,127.0276,'real',190,324000,28000),
+  seedCity('world-hongdae','홍대 복셀 거리','Voxel Street',37.5563,126.9236,'voxel',150,201000,17600),
+  seedCity('world-yeouido','여의도 스카이라인','igPlay',37.5219,126.9245,'real',200,156000,12400),
+  seedCity('world-jamsil','잠실 블록타운','igPlay',37.5133,127.1000,'voxel',150,98000,8200)];
 
 function allLevels(){ return NET.on ? SEED.concat(netLevels) : SEED.concat(db.myLevels); }
 function getLevel(id){ var a=allLevels(); for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i]; return null; }
@@ -1177,7 +1196,7 @@ function render(){
   else if(r.name==='channel'){ renderChannel(m); }
   else if(r.name==='ranking'){ renderRanking(m); }
   else if(r.name==='shop'){ renderShop(m); }
-  else if(r.name==='market'){ renderMarket(m); }
+  else if(r.name==='market'){ renderStore(m); }
   else if(r.name==='store'){ renderStore(m); }
   else if(r.name==='world'){ renderWorld(m); }
   else if(r.name==='shorts'){ renderShorts(m); }
@@ -1191,8 +1210,7 @@ var NAVS=[['home','추천','M3 11l9-8 9 8M5 10v10h14V10'],
           ['world','월드','M12 3a9 9 0 100 18 9 9 0 000-18M3 12h18M12 3c3 4 3 14 0 18M12 3c-3 4-3 14 0 18'],
           ['ranking','랭킹','M6 21V9M12 21V4M18 21v-7'],
           ['shop','상점','M4 8h16l-1.3 11a2 2 0 01-2 1.8H7.3a2 2 0 01-2-1.8zM8 8V6a4 4 0 018 0v2'],
-          ['market','마켓','M3 3h18v4H3zM5 7v13h14V7M9 11h6'],
-          ['store','스토어','M3 9l2-5h14l2 5M3 9h18l-1.5 11H4.5zM9 13h6'],
+          ['store','마켓','M3 9l2-5h14l2 5M3 9h18l-1.5 11H4.5zM9 13h6'],
           ['channel','내 채널','M12 8a4 4 0 100-8 4 4 0 000 8M4 21c0-4 4-6 8-6s8 2 8 6']];
 function buildNav(active){
   var n=document.getElementById('nav'); n.innerHTML='';
@@ -1397,7 +1415,7 @@ function renderWatchBody(m,id,lv){
   var tb=document.getElementById('tipBtn'); if(tb)tb.onclick=function(){
     if(NET.on){ api('POST','/api/igplay/tip',{levelId:lv.id,amount:10}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast('크리에이터에게 10 ISC 후원'); }).catch(function(e){ toast(e.message); }); return; }
     if(spend(10)){ db.tips[lv.id]=(db.tips[lv.id]||0)+10; saveDB(); toast('크리에이터에게 10 ISC 후원'); } else toast('ISC가 부족합니다'); };
-  var lb=document.getElementById('listBtn'); if(lb)lb.onclick=function(){ listLevelDialog(lv); };
+  var lb=document.getElementById('listBtn'); if(lb)lb.onclick=function(){ if(NET.on){ listLevelDialog(lv); return; } if((db.catalog||[]).some(function(it){return it.refId===lv.id;})){ toast('이미 마켓에 올라가 있습니다'); return; } db.catalog.unshift({id:'ci_lv_'+Date.now().toString(36),kind:'game',title:lv.title,desc:lv.desc||'',creator:me(),creatorId:(NET.uid||'me'),ownerId:(NET.uid||'me'),access:'free',price:0,tags:[lv.genre||'레벨'],cover:lv.cover||null,downloads:0,refColl:'levels',refId:lv.id}); saveDB(); toast('마켓에 올렸습니다'); };
   if(lb&&lb.parentNode)loadCreatorToken(lv.creatorId, lb.parentNode);
   // player
   startPlayer(lv);
@@ -2138,7 +2156,7 @@ function storeAccessBadge(it){
   return '<span class="vf" style="color:var(--ok,#2ec27e)">무료</span>';
 }
 function renderStore(m){
-  var html='<div class="wrap"><div class="sechead" style="display:flex;justify-content:space-between;align-items:flex-start"><div><h2>스토어</h2><p>게임·앱·3D·이미지·음원·영상·문서를 ISC로 거래</p></div><button class="btn brand" id="stPub">올리기</button></div>';
+  var html='<div class="wrap"><div class="sechead" style="display:flex;justify-content:space-between;align-items:flex-start"><div><h2>마켓</h2><p>레벨·게임·3D·이미지·음원·영상·문서를 올리고 받고 거래</p></div><button class="btn brand" id="stPub">올리기</button></div>';
   html+='<div style="margin:8px 0 12px"><input id="stQ" placeholder="제목·태그 검색" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--fg);outline:none"></div>';
   html+='<div class="chips">'+STORE_KINDS.map(function(t){return '<button class="chip'+(t[0]===storeTab?' on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
   html+='<div id="stlist">불러오는 중…</div></div>';
@@ -2203,7 +2221,7 @@ function storeCard(it,m){
     btn+'</div></div>';
   var bind=function(sel,fn){ var b=c.querySelector(sel); if(b)b.onclick=fn; };
   function ownLocal(){ if((db.ownedStore||[]).indexOf(it.id)<0){ db.ownedStore.push(it.id); saveDB(); } }
-  bind('[data-open]',function(){ if(!NET.on){ if(it.externalUrl){ window.open(it.externalUrl,'_blank'); toast('열기: '+esc(it.title||'')); } else toast('연결된 파일이 없습니다'); return; } storeDownload(it); });
+  bind('[data-open]',function(){ if(!NET.on){ if(it.refColl==='levels'&&it.refId){ go('watch/'+it.refId); return; } if(it.externalUrl){ window.open(it.externalUrl,'_blank'); toast('열기: '+esc(it.title||'')); } else toast('연결된 파일이 없습니다'); return; } storeDownload(it); });
   bind('[data-free]',function(){ if(!NET.on){ ownLocal(); toast('받기 완료'); renderStore(m); return; } api('POST','/api/igstore/catalog/'+it.id+'/claim',{}).then(function(){ toast('받기 완료'); renderStore(m); }).catch(function(e){ toast(e.message); }); });
   bind('[data-tok]',function(){ if(!NET.on){ toast('토큰 해제는 서버 연결이 필요합니다'); return; } api('POST','/api/igstore/catalog/'+it.id+'/claim',{}).then(function(){ toast('토큰 해제 완료'); renderStore(m); }).catch(function(e){ toast(e.message||'토큰이 부족합니다'); }); });
   bind('[data-buy]',function(){ if(!NET.on){ if(spend(it.price||0)){ ownLocal(); toast('구매 완료'); renderStore(m); } else toast('ISC가 부족합니다'); return; } api('POST','/api/igstore/catalog/'+it.id+'/buy',{}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast('구매 완료'); renderStore(m); }).catch(function(e){ toast(e.message); }); });
@@ -2373,14 +2391,16 @@ function renderWorld(m){
 /* ============================= 쇼츠 (플샷/숏폼) ============================= */
 // 세로 쇼츠 피드. igVod의 short(60초 이하)을 상하로 넘기며 재생. 좋아요·댓글·공유.
 function renderShorts(m){
-  m.innerHTML='<div id="shortsWrap" style="position:absolute;inset:0;background:#000;display:grid;place-items:center"></div>';
+  m.innerHTML='<div id="shortsWrap" style="position:absolute;inset:0;background:#000;display:grid;place-items:center"></div>'+
+    '<button class="btn brand" id="shImport" style="position:absolute;top:14px;right:14px;z-index:60">유튜브 퍼오기</button>';
   var wrap=document.getElementById('shortsWrap'); var items=[], idx=0, vidEl=null;
   function vsrc(it){ return it.externalUrl || (it.fileId?(NET.base.replace(/\/+$/,'')+'/api/files/'+it.fileId+'?key='+encodeURIComponent(NET.key)):''); }
+  function media(it){ var yt=it.youtubeId||ytId(it.externalUrl); if(yt) return '<iframe id="shv" src="https://www.youtube.com/embed/'+yt+'?autoplay=1&mute=1&loop=1&playlist='+yt+'&playsinline=1&rel=0" style="width:100%;height:100%;border:0;background:#000" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>'; return '<video id="shv" src="'+vsrc(it)+'" style="width:100%;height:100%;object-fit:contain;background:#000" playsinline autoplay loop muted controls></video>'; }
   function show(){
-    if(!items.length){ wrap.innerHTML='<div class="empty"><h3>쇼츠가 없습니다</h3><p>내 채널에서 60초 이하 영상을 올려보세요.</p></div>'; return; }
+    if(!items.length){ wrap.innerHTML='<div class="empty"><h3>쇼츠가 없습니다</h3><p>오른쪽 위 "유튜브 퍼오기"로 영상을 추가하거나, 내 채널에서 영상을 올려보세요.</p></div>'; return; }
     var it=items[((idx%items.length)+items.length)%items.length];
     wrap.innerHTML='<div style="position:relative;height:100%;width:100%;max-width:470px;margin:0 auto">'+
-      '<video id="shv" src="'+vsrc(it)+'" style="width:100%;height:100%;object-fit:contain;background:#000" playsinline autoplay loop muted controls></video>'+
+      media(it)+
       '<div style="position:absolute;right:12px;bottom:96px;display:flex;flex-direction:column;gap:14px;align-items:center">'+
         '<button class="btn" data-like style="width:52px;height:52px;border-radius:50%;flex-direction:column;font-size:12px"><span style="font-size:18px">♥</span>'+fmt(it.likes||0)+'</button>'+
         '<button class="btn" data-cmt style="width:52px;height:52px;border-radius:50%;font-size:12px">댓글</button>'+
@@ -2389,7 +2409,7 @@ function renderShorts(m){
       '<div style="position:absolute;left:16px;bottom:28px;color:#fff;text-shadow:0 1px 4px #000;max-width:70%"><b>@'+esc(it.creator||'익명')+'</b><div style="font-size:13.5px;margin-top:3px">'+esc(it.title||'')+'</div></div>'+
       '<div style="position:absolute;right:14px;top:46%;display:flex;flex-direction:column;gap:8px"><button class="btn" data-up style="width:40px;height:40px;border-radius:50%;padding:0">▲</button><button class="btn" data-dn style="width:40px;height:40px;border-radius:50%;padding:0">▼</button></div>'+
       '</div>';
-    vidEl=document.getElementById('shv'); if(vidEl)vidEl.play().catch(function(){});
+    vidEl=document.getElementById('shv'); if(vidEl&&vidEl.play){ try{var pr=vidEl.play(); if(pr&&pr.catch)pr.catch(function(){});}catch(e){} }
     wrap.querySelector('[data-up]').onclick=function(){ idx--; show(); };
     wrap.querySelector('[data-dn]').onclick=function(){ idx++; show(); };
     wrap.querySelector('[data-like]').onclick=function(){ if(!NET.on){ it.likes=(it.likes||0)+1; saveDB(); show(); return; } api('POST','/api/igvod/'+it.id+'/like',{}).then(function(r){ it.likes=r.likes; show(); }).catch(function(e){ toast(e.message); }); };
@@ -2406,8 +2426,9 @@ function renderShorts(m){
     ov.querySelector('#scsend').onclick=function(){ var t=ov.querySelector('#scin').value.trim(); if(!t)return; api('POST','/api/igvod/'+it.id+'/comments',{text:t}).then(function(){ ov.querySelector('#scin').value=''; load(); }).catch(function(e){ toast(e.message); }); };
     load();
   }
-  if(NET.on){ api('GET','/api/igvod/shorts').then(function(r){ items=r.items||[]; show(); }).catch(function(){ wrap.innerHTML='<div class="empty"><p>불러오기 실패</p></div>'; }); }
+  if(NET.on){ api('GET','/api/igvod/shorts').then(function(r){ items=(r.items&&r.items.length)?r.items:(db.shorts||[]); show(); }).catch(function(){ items=db.shorts||[]; show(); }); }
   else { items=db.shorts||[]; show(); }
+  var ib=document.getElementById('shImport'); if(ib)ib.onclick=function(){ var u=prompt('유튜브 영상/쇼츠 URL 붙여넣기'); if(!u)return; var id=ytId(u.trim()); if(!id){ toast('유효한 유튜브 URL이 아닙니다'); return; } if(!db.shorts)db.shorts=[]; db.shorts.unshift({id:'sh_'+Date.now().toString(36),title:'가져온 쇼츠',creator:me(),youtubeId:id,likes:0}); saveDB(); items=db.shorts; idx=0; show(); toast('추가됨'); };
   function onkey(e){ if(e.key==='ArrowDown'){ idx++; show(); } else if(e.key==='ArrowUp'){ idx--; show(); } }
   window.addEventListener('keydown',onkey);
   activeSession={dispose:function(){ window.removeEventListener('keydown',onkey); if(vidEl){try{vidEl.pause();}catch(e){}} }};
