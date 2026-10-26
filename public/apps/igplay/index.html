@@ -2487,7 +2487,7 @@ function renderExplore(m,key){
     '</div>'+
     // 우측 미니맵
     '<div class="exRadar" style="position:absolute;top:70px;right:12px;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px;box-shadow:0 6px 20px rgba(0,0,0,.25)">'+
-      '<div style="font-size:12px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between;gap:10px"><span>📡 '+P0.area*2+'m 월드 레이더</span><span id="exCoord" style="color:var(--faint);font-family:monospace"></span></div>'+
+      '<div style="font-size:12px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between;gap:10px"><span>📡 '+P0.area*2+'m '+T('월드 레이더')+'</span><span id="exCoord" style="color:var(--faint);font-family:monospace"></span></div>'+
       '<canvas id="exRadar" width="170" height="170" style="border-radius:10px;background:#cfe8f5;display:block"></canvas>'+
       '<div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.4">WASD 이동 · Shift 전력질주 · Space 점프<br>마우스 드래그 시점</div>'+
     '</div>'+
@@ -2517,6 +2517,7 @@ function renderExplore(m,key){
   exploreEngine(P0,key);
 }
 function exploreEngine(P0,key){
+  var T=window.igT||function(s){return s;}; // 캔버스·조합 텍스트 번역
   var cv=document.getElementById('exCv'); if(!cv||typeof THREE==='undefined')return;
   var renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
   renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -2555,13 +2556,13 @@ function exploreEngine(P0,key){
     var ll=BILL.liveList;
     if(ll.length){ var pulse=0.5+0.5*Math.sin((t||0)*0.004); c.strokeStyle='rgba(255,59,92,'+(0.5+pulse*0.5)+')'; c.lineWidth=10; c.strokeRect(6,6,500,276);
       var s=ll[0]; c.fillStyle='#ff3b5c'; c.fillRect(26,26,126,44); c.fillStyle='#fff'; c.font='bold 27px sans-serif'; c.fillText('● LIVE',38,56);
-      c.font='bold 34px sans-serif'; c.fillText(String(s.title||'라이브').slice(0,15),26,130);
-      c.fillStyle='#cfd6e4'; c.font='21px sans-serif'; c.fillText('@'+String(s.hostName||'익명').slice(0,16),26,172); c.fillText('👁 '+(s.watching|0)+'명 시청',26,206);
-      c.fillStyle='#ffd27a'; c.font='bold 23px sans-serif'; c.fillText('가까이서  F  · 입장',26,258);
-      if(ll.length>1){ c.fillStyle='#8a93a6'; c.font='18px sans-serif'; c.fillText('+'+(ll.length-1)+' 방송 중',330,258); }
+      c.font='bold 34px sans-serif'; c.fillText(String(s.title||T('라이브')).slice(0,15),26,130);
+      c.fillStyle='#cfd6e4'; c.font='21px sans-serif'; c.fillText('@'+String(s.hostName||T('익명')).slice(0,16),26,172); c.fillText('👁 '+(s.watching|0)+' '+T('시청'),26,206);
+      c.fillStyle='#ffd27a'; c.font='bold 23px sans-serif'; c.fillText(T('가까이서 F · 입장'),26,258);
+      if(ll.length>1){ c.fillStyle='#8a93a6'; c.font='18px sans-serif'; c.fillText('+'+(ll.length-1)+' '+T('방송 중'),330,258); }
     } else { c.strokeStyle='#2a2f3d'; c.lineWidth=8; c.strokeRect(5,5,502,278);
-      c.fillStyle='#8a93a6'; c.font='bold 32px sans-serif'; c.fillText('📺 지금 방송 없음',26,130);
-      c.fillStyle='#ffd27a'; c.font='bold 22px sans-serif'; c.fillText('F · 라이브 열기 / 방송 시작',26,258); }
+      c.fillStyle='#8a93a6'; c.font='bold 32px sans-serif'; c.fillText('📺 '+T('지금 방송 없음'),26,130);
+      c.fillStyle='#ffd27a'; c.font='bold 22px sans-serif'; c.fillText(T('F · 라이브 열기 / 방송 시작'),26,258); }
     billTex.needsUpdate=true; }
   drawBill(0);
   // 간판에 실제 방송 영상 재생: 라이브에 뷰어로 붙어(WebRTC) 받은 영상을 3D 스크린 텍스처로 입힘
@@ -2599,12 +2600,12 @@ function exploreEngine(P0,key){
   if(liveReady()){
     mpBadge=document.createElement('div');
     mpBadge.style.cssText='position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:29;background:rgba(20,26,36,.82);color:#fff;font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;pointer-events:none;white-space:nowrap';
-    mpBadge.textContent='👥 접속 중…';
+    mpBadge.textContent='👥 '+T('접속 중…');
     try{ cv.parentNode.appendChild(mpBadge); }catch(e){}
     MP.ws=igOpenWS([MP.room],function(msg){
       if(msg.type!=='message'||!msg.data)return; var d=msg.data; if(d.id===MP.id)return;
       if(d.k==='pos'){ var rp=MP.remote[d.id];
-        if(!rp){ var ch=makeCharacter(d.char||'blocky',(typeof d.skin==='number')?d.skin:0x8ec5ff); scene.add(ch.group); try{ ch.group.add(makeNameTag(d.name||'게스트')); }catch(e){} rp=MP.remote[d.id]={o:ch,tx:d.x,tz:d.z,ty:d.y||0.6,yaw:d.yaw||0,last:performance.now()}; ch.group.position.set(d.x,d.y||0.6,d.z); }
+        if(!rp){ var ch=makeCharacter(d.char||'blocky',(typeof d.skin==='number')?d.skin:0x8ec5ff); scene.add(ch.group); try{ ch.group.add(makeNameTag(d.name||T('게스트'))); }catch(e){} rp=MP.remote[d.id]={o:ch,tx:d.x,tz:d.z,ty:d.y||0.6,yaw:d.yaw||0,last:performance.now()}; ch.group.position.set(d.x,d.y||0.6,d.z); }
         rp.tx=d.x; rp.tz=d.z; rp.ty=(typeof d.y==='number')?d.y:0.6; rp.yaw=d.yaw||0; rp.last=performance.now();
       } else if(d.k==='act'&&MP.remote[d.id]){ var rp2=MP.remote[d.id];
         if(d.act==='emote'){ remoteEmote(rp2,d.v); } else if(d.act==='motion'){ rp2.motion=d.v; rp2.motionT=(d.v==='dance'?3:1.2); }
@@ -2621,7 +2622,7 @@ function exploreEngine(P0,key){
       if(rp.emoteSprite&&performance.now()>rp.emoteUntil){ try{rp.o.group.remove(rp.emoteSprite);}catch(e){} rp.emoteSprite=null; }
       if(rp.motionT>0){ rp.motionT-=dt; var pr=rp.o.parts; if(pr){ if(rp.motion==='wave'&&pr.armR)pr.armR.rotation.x=-2.3+Math.sin(now*0.02)*0.3; if(rp.motion==='cheer'){ if(pr.armL)pr.armL.rotation.x=-2.6; if(pr.armR)pr.armR.rotation.x=-2.6; } if(rp.motion==='dance'){ g.rotation.y+=dt*6; if(pr.armL)pr.armL.rotation.z=Math.sin(now*0.01)*0.8; } } if(rp.motionT<=0)rp.motion=null; }
     });
-    if(mpBadge)mpBadge.textContent=n>0?('👥 지금 '+(n+1)+'명이 함께 있어요'):'👥 이 월드에 나 혼자 있어요'; }
+    if(mpBadge)mpBadge.textContent=n>0?('👥 '+(n+1)+T('명이 함께 있어요')):T('👥 이 월드에 나 혼자 있어요'); }
   function isSolidProp(px,py,pz){ for(var i=0;i<propBoxes.length;i++){ var b=propBoxes[i]; if(px+RW>b.minx&&px-RW<b.maxx&&pz+RW>b.minz&&pz-RW<b.maxz&&py+PH>b.miny&&py<b.maxy)return true; } return false; }
   function kd(e){ var k=e.key.toLowerCase(); keys[k]=true; if(k===' '||k.indexOf('arrow')===0)e.preventDefault(); }
   function ku(e){ keys[e.key.toLowerCase()]=false; }
@@ -2638,7 +2639,7 @@ function exploreEngine(P0,key){
   var motion=null,motionT=0,emoFxEl=document.getElementById('exEmoFx');
   function doEmote(em){ mpAct('emote',em); if(!emoFxEl)return; emoFxEl.textContent=em; emoFxEl.style.opacity='1'; emoFxEl.style.transform='translate(-50%,-80%)'; setTimeout(function(){ emoFxEl.style.opacity='0'; emoFxEl.style.transform='translate(-50%,-50%)'; },1100); }
   function doMotion(mo){ motion=mo; motionT=mo==='dance'?3:1.2; if(mo!=='jump')mpAct('motion',mo); if(mo==='jump'&&P.onGround){ P.vy=JUMP*1.1; P.onGround=false; } }
-  function warp(i){ var l=P0.landmarks[i]; if(!l)return; P.x=CX+l.x; P.z=CZ+l.z+8; P.y=3; P.vy=0; yaw=Math.PI; toast('워프: '+l.n); }
+  function warp(i){ var l=P0.landmarks[i]; if(!l)return; P.x=CX+l.x; P.z=CZ+l.z+8; P.y=3; P.vy=0; yaw=Math.PI; toast(T('워프')+': '+T(l.n)); }
   // UI 바인딩
   var root=document.getElementById('main');
   var exPanel=root.querySelector('.exPanel'), exToggle=root.querySelector('.exPanelToggle');
@@ -3302,6 +3303,61 @@ render();
     "잠실 블록타운": ["Jamsil Block Town", "जमसिल ब्लॉक टाउन", "Kota Blok Jamsil"],
     "igPlay 공식": ["igPlay Official", "igPlay आधिकारिक", "igPlay Resmi"],
     "열기": ["Open", "खोलें", "Buka"],
+    "써보기": ["Try it", "आज़माएँ", "Coba"],
+    "에셋 마켓": ["Asset Market", "एसेट मार्केट", "Pasar Aset"],
+    // ── 탐험 UI (영어만 — 힌디/인니는 영어로 자동 폴백) ──
+    "복셀 지구본": ["Voxel Globe"], "쿼터뷰": ["Quarter view"], "대도시 광각": ["City wide"], "클로즈업": ["Close-up"],
+    "대도시 구역 빠른 이동": ["Quick travel"], "클릭 워프": ["tap to warp"], "역사·언어·미식 퀘스트": ["History · Language · Food quests"],
+    "유튜브 TV": ["YouTube TV"], "도감": ["Dex"], "아바타": ["Avatar"], "이동": ["Move"], "점프": ["Jump"],
+    "표정": ["Emote"], "모션": ["Motion"], "인사": ["Wave"], "환호": ["Cheer"], "댄스": ["Dance"],
+    "행복": ["Happy"], "신남": ["Excited"], "윙크": ["Wink"], "호기심": ["Curious"], "깜짝": ["Surprised"], "뿌듯": ["Proud"],
+    "월드 레이더": ["World radar"], "마우스 드래그 시점": ["Drag to look"], "WASD 이동 · Shift 전력질주 · Space 점프": ["WASD move · Shift sprint · Space jump"],
+    "지금 방송 없음": ["No live now"], "방송에 연결 중…": ["Connecting to stream…"], "카메라 영상이 곧 나타납니다": ["Camera video appears soon"],
+    "소리 켜기": ["Unmute"], "소리 켜짐": ["Sound on"], "선물": ["Gift"], "나가기": ["Leave"], "전송": ["Send"], "채팅 입력": ["Type a chat"],
+    "방송 종료": ["End stream"], "마이크 끄기": ["Mute mic"], "마이크 켜기": ["Unmute mic"], "상품 연결": ["Link product"], "입장하기": ["Enter"],
+    "지금 라이브": ["Live now"], "라이브 시작": ["Go live"], "방송 시작하기": ["Start streaming"], "실시간 카메라 방송 · P2P로 바로 송출": ["Live camera streaming · direct P2P"],
+    "서버 연결이 필요합니다": ["Server connection required"], "보기": ["View"], "무료": ["Free"],
+    "익명": ["Anon"], "게스트": ["Guest"], "시청": ["watching"], "방송 중": ["live"], "워프": ["Warp"],
+    "가까이서 F · 입장": ["Get close · F to enter"], "F · 라이브 열기 / 방송 시작": ["F · Open Live / Start"],
+    "접속 중…": ["Connecting…"], "명이 함께 있어요": [" here now"], "👥 이 월드에 나 혼자 있어요": ["👥 You're alone in this world"],
+    // ── 탐험 랜드마크 (en-only) ──
+    "🏯 경복궁 근정전 광장": ["🏯 Gyeongbokgung Plaza"], "🏮 광화문 대로": ["🏮 Gwanghwamun Ave"], "🏘 북촌 한옥마을": ["🏘 Bukchon Hanok Village"], "🍲 수라간 텃밭 & 화덕": ["🍲 Royal Kitchen Garden & Oven"], "🚣 한강 피크닉 공원": ["🚣 Hangang Picnic Park"], "🗼 남산 전망 언덕": ["🗼 Namsan View Hill"],
+    "🗼 에펠탑 광장": ["🗼 Eiffel Tower Plaza"], "🥐 몽마르트 언덕": ["🥐 Montmartre Hill"], "🖼 루브르 정원": ["🖼 Louvre Garden"], "🚤 센강 산책로": ["🚤 Seine Riverwalk"],
+    "⛩ 센소지 절": ["⛩ Senso-ji Temple"], "🌸 우에노 공원": ["🌸 Ueno Park"], "🏙 시부야 교차로": ["🏙 Shibuya Crossing"], "🗼 도쿄타워 언덕": ["🗼 Tokyo Tower Hill"],
+    "🚇 강남역 지하광장": ["🚇 Gangnam Stn. Plaza"], "🏢 테헤란로 타워": ["🏢 Teheran-ro Tower"], "🛍 가로수길 거리": ["🛍 Garosu-gil Street"], "☕ 신사동 카페골목": ["☕ Sinsa Cafe Alley"], "🎤 코엑스 K-POP 광장": ["🎤 COEX K-POP Plaza"], "🌃 한강 반포대교 뷰": ["🌃 Banpo Bridge View"],
+    "🎸 홍대 버스킹 광장": ["🎸 Hongdae Busking Plaza"], "🧱 벽화 골목": ["🧱 Mural Alley"], "🍜 포장마차 거리": ["🍜 Street Food Row"], "🎨 상상마당 앞": ["🎨 Sangsang Madang"], "🕹 오락실 골목": ["🕹 Arcade Alley"], "🚉 경의선 숲길": ["🚉 Gyeongui Forest Path"],
+    "🏛 국회의사당 광장": ["🏛 National Assembly Plaza"], "🏢 63빌딩 전망대": ["🏢 63 Building Deck"], "🌸 윤중로 벚꽃길": ["🌸 Yunjung Cherry Path"], "🚣 여의도 한강공원": ["🚣 Yeouido Hangang Park"], "📺 방송국 거리": ["📺 Broadcast Row"], "🎆 불꽃축제 둔치": ["🎆 Fireworks Riverside"],
+    "🗼 롯데타워 전망대": ["🗼 Lotte Tower Deck"], "🎢 놀이공원 정문": ["🎢 Theme Park Gate"], "⚾ 잠실 야구장": ["⚾ Jamsil Stadium"], "🛶 석촌호수 산책로": ["🛶 Seokchon Lake Walk"], "🛍 지하 쇼핑몰": ["🛍 Underground Mall"], "🌉 올림픽대교 뷰": ["🌉 Olympic Bridge View"],
+    // ── 퀘스트 제목 (en-only) ──
+    "역사 탐정: 경복궁의 비밀": ["History Detective: Palace Secret"], "미식 여행가: 오방색 비빔밥": ["Foodie: Five-color Bibimbap"], "예술가의 하루": ["An Artist's Day"], "마츠리 축제": ["Matsuri Festival"],
+    "K-POP 데뷔 챌린지": ["K-POP Debut Challenge"], "가로수길 쇼핑왕": ["Garosu-gil Shopping King"], "반포 야경 사진전": ["Banpo Night Photo Hunt"],
+    "버스킹 스타": ["Busking Star"], "벽화 탐험대": ["Mural Explorers"], "야식 투어": ["Late-night Food Tour"],
+    "벚꽃 러너": ["Cherry Blossom Runner"], "한강 라이더": ["Hangang Rider"], "불꽃축제 디렉터": ["Fireworks Director"],
+    "롯데타워 등반": ["Lotte Tower Climb"], "홈런 더비": ["Home Run Derby"], "호수 둘레길": ["Lake Loop Walk"],
+    // ── 도시 이름(탐험 상단) ──
+    "서울 (Seoul)": ["Seoul"], "파리 (Paris)": ["Paris"], "도쿄 (Tokyo)": ["Tokyo"],
+    // ── 퀘스트 설명 (en-only) ──
+    "세종대왕과 대화하고 한국어 퀴즈를 맞혀 미니 경복궁 정자 도면을 획득하세요.": ["Talk to King Sejong and ace the Korean quiz to earn a mini palace pavilion blueprint."],
+    "수라간 텃밭에서 재료를 수확해 화덕에서 비빔밥을 완성하세요!": ["Harvest ingredients in the royal garden and finish bibimbap at the oven!"],
+    "몽마르트에서 캔버스 조각을 모아 그림을 완성하세요.": ["Collect canvas pieces in Montmartre to finish the painting."],
+    "센소지에서 등불을 모아 축제를 밝히세요.": ["Gather lanterns at Senso-ji to light up the festival."],
+    "코엑스 광장에서 댄스 모션 3개를 완성해 데뷔 무대를 꾸미세요!": ["Pull off 3 dance motions at COEX Plaza to stage your debut!"],
+    "가로수길에서 숨은 쇼핑백을 모두 찾아보세요.": ["Find all the hidden shopping bags along Garosu-gil."],
+    "반포대교 뷰에서 야경 사진 스팟을 찾으세요.": ["Find the night-view photo spots at Banpo Bridge."],
+    "버스킹 광장에서 환호 모션으로 관객을 모으세요!": ["Draw a crowd with the cheer motion at the busking plaza!"],
+    "골목의 복셀 벽화 5개를 찾아 도감에 담으세요.": ["Find 5 voxel murals in the alleys for your dex."],
+    "포장마차 거리에서 떡볶이·어묵·호떡을 순서대로 맛보세요.": ["Taste tteokbokki, fish cake and hotteok in order on food-stall row."],
+    "윤중로 벚꽃길을 전력질주로 완주하세요!": ["Sprint the whole Yunjung cherry-blossom path!"],
+    "한강공원에서 자전거 체크포인트를 도세요.": ["Ride the bike checkpoints around Hangang Park."],
+    "둔치에서 불꽃 발사 스팟을 모두 찾으세요.": ["Find every fireworks launch spot by the riverside."],
+    "전망대 꼭대기 비컨까지 점프로 올라가세요!": ["Jump your way up to the beacon atop the observation deck!"],
+    "야구장에서 숨은 야구공 9개를 모으세요.": ["Collect 9 hidden baseballs in the stadium."],
+    "석촌호수를 한 바퀴 돌아 산책 도장을 찍으세요.": ["Loop Seokchon Lake once to stamp your walk."],
+    // ── NPC 이름 (en-only) ──
+    "세종대왕": ["King Sejong"], "수라간 상궁": ["Royal Cook"], "한옥지기": ["Hanok Keeper"], "화가": ["Painter"], "신관": ["Shrine Priest"],
+    "아이돌 연습생": ["Idol Trainee"], "카페 바리스타": ["Cafe Barista"], "스트리트 래퍼": ["Street Rapper"],
+    "버스킹 기타리스트": ["Busking Guitarist"], "벽화 아티스트": ["Mural Artist"], "포장마차 사장님": ["Food Stall Owner"],
+    "방송 리포터": ["TV Reporter"], "벚꽃 상인": ["Blossom Vendor"], "놀이공원 마스코트": ["Park Mascot"], "야구 선수": ["Baseball Player"], "호수지기": ["Lake Keeper"],
     "탐험": ["Explore", "एक्सप्लोर", "Jelajahi"],
     "라이브": ["Live", "लाइव", "Live"],
     "에셋마켓": ["Asset Market", "एसेट मार्केट", "Pasar Aset"],
@@ -3585,6 +3641,7 @@ render();
     return 'en';
   }
   var LOCALE = detect();
+  window.igT = function (s) { try { return tr(s); } catch (e) { return s; } };
   function tr(ko) {
     if (LOCALE === 'ko') return ko;
     var e = M[ko]; if (!e) return ko;

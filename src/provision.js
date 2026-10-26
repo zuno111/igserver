@@ -37,6 +37,10 @@ export function igplayInject(req, res, next) {
     // <title> 바로 뒤(스크립트 로드 전)에 주입
     const out = html.includes('<title>') ? html.replace('<title>', inject + '<title>') : inject + html;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    // 브라우저가 옛 버전을 붙들지 않도록 — 항상 최신 HTML을 받도록 캐시 금지
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.send(out);
   });
 }
