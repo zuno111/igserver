@@ -1217,6 +1217,7 @@ function render(){
   else if(r.name==='market'){ renderStore(m); }
   else if(r.name==='store'){ renderStore(m); }
   else if(r.name==='world'){ renderWorld(m); }
+  else if(r.name==='explore'){ renderExplore(m,r.arg); }
   else if(r.name==='shorts'){ renderShorts(m); }
   else renderHome(m,r.name);
 }
@@ -1224,6 +1225,7 @@ window.addEventListener('hashchange',render);
 
 /* ============================= nav ============================= */
 var NAVS=[['home','추천','M3 11l9-8 9 8M5 10v10h14V10'],
+          ['explore','탐험','M12 3a9 9 0 100 18 9 9 0 000-18M3 12h18M12 3c3 4 3 14 0 18M12 3c-3 4-3 14 0 18'],
           ['shorts','숏폼','M4 6h16v12H4zM10 9l5 3-5 3z'],
           ['world','월드','M12 3a9 9 0 100 18 9 9 0 000-18M3 12h18M12 3c3 4 3 14 0 18M12 3c-3 4-3 14 0 18'],
           ['ranking','랭킹','M6 21V9M12 21V4M18 21v-7'],
@@ -2349,12 +2351,12 @@ function cityReal(features,opts){ opts=opts||{}; var bb=features.bbox; var latMi
   var voxels=[{x:0,y:0,z:0,t:1},{x:Math.round(widthM)-2,y:1,z:Math.round(heightM)-2,t:4}];
   return {voxels:voxels,props:props,spawn:spawn,geo:{lat:latMid,lng:(bb.w+bb.e)/2,label:opts.name||''},size:{w:Math.round(widthM),d:Math.round(heightM)}};
 }
-function citySample(bb){ var mLat=111320, mLng=111320*Math.cos(((bb.s+bb.n)/2)*Math.PI/180); var dLat=function(m){return m/mLat;},dLng=function(m){return m/mLng;}; var W0=bb.w,N0=bb.n;
+function citySample(bb,opts){ opts=opts||{}; var mLat=111320, mLng=111320*Math.cos(((bb.s+bb.n)/2)*Math.PI/180); var dLat=function(m){return m/mLat;},dLng=function(m){return m/mLng;}; var W0=bb.w,N0=bb.n;
   function rect(x,z,w,d){ var lat0=N0-dLat(z),lon0=W0+dLng(x),lat1=N0-dLat(z+d),lon1=W0+dLng(x+w); return [{lat:lat0,lon:lon0},{lat:lat0,lon:lon1},{lat:lat1,lon:lon1},{lat:lat1,lon:lon0},{lat:lat0,lon:lon0}]; }
-  var widthM=(bb.e-bb.w)*mLng, heightM=(bb.n-bb.s)*mLat; var lot=46,gap=14,margin=12;
+  var widthM=(bb.e-bb.w)*mLng, heightM=(bb.n-bb.s)*mLat; var lot=opts.lot||46,gap=opts.gap||14,margin=10,fill=opts.fill||0.78;
   var cols=Math.max(2,Math.floor((widthM-margin)/(lot+gap))), rows=Math.max(2,Math.floor((heightM-margin)/(lot+gap)));
   var seed=Math.abs(Math.floor((bb.w+bb.n)*1000))%9999+7; var rnd=function(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; };
-  var buildings=[],roads=[]; for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){ var x=margin+c*(lot+gap),z=margin+r*(lot+gap); var bw=lot*(0.7+rnd()*0.26),bd=lot*(0.7+rnd()*0.26); var h=Math.round(16+rnd()*90+(rnd()<0.22?rnd()*90:0)); buildings.push({geometry:rect(x+(lot-bw)/2,z+(lot-bd)/2,bw,bd),height:h}); }
+  var buildings=[],roads=[]; for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){ if(opts.skip&&rnd()<opts.skip)continue; var x=margin+c*(lot+gap),z=margin+r*(lot+gap); var bw=lot*(fill+rnd()*(1-fill)*0.9),bd=lot*(fill+rnd()*(1-fill)*0.9); var h=Math.round(14+rnd()*70+(rnd()<0.2?rnd()*110:0)); buildings.push({geometry:rect(x+(lot-bw)/2,z+(lot-bd)/2,bw,bd),height:h}); }
   for(c=0;c<=cols;c++){ var xx=c*(lot+gap); roads.push({geometry:[{lat:N0,lon:W0+dLng(xx)},{lat:N0-dLat(rows*(lot+gap)),lon:W0+dLng(xx)}]}); }
   for(r=0;r<=rows;r++){ var zz=r*(lot+gap); roads.push({geometry:[{lat:N0-dLat(zz),lon:W0},{lat:N0-dLat(zz),lon:W0+dLng(cols*(lot+gap))}]}); }
   return {bbox:bb,buildings:buildings,roads:roads};
@@ -2364,6 +2366,176 @@ function cityFetchOSM(bb){ var q='[out:json][timeout:25];(way["building"]('+bb.s
 }
 // bbox→도시 레벨(로컬 저장). OSM 우선, 막히면 샘플 지형으로라도 생성.
 function buildCityLocal(bbox,name,mode){ return cityFetchOSM(bbox).then(function(f){ return {f:f,osm:true}; }).catch(function(){ return {f:citySample(bbox),osm:false}; }).then(function(o){ var built=mode==='real'?cityReal(o.f,{name:name}):cityVoxelize(o.f,{name:name}); var id='lv_loc_'+Date.now().toString(36); var lv={id:id,title:name||(mode==='real'?'리얼 시티':'복셀 시티'),creator:me(),creatorId:(NET.uid||'me'),genre:'어드벤처',difficulty:'보통',voxels:built.voxels,props:built.props||[],spawn:built.spawn,desc:'지도에서 만든 '+(mode==='real'?'리얼':'복셀')+' 도시 월드',geo:built.geo,plays:0,likes:0,source:'igcity'}; db.myLevels.push(lv); saveDB(); return {lv:lv,osm:o.osm,buildings:(o.f.buildings||[]).length}; }); }
+
+/* ============================= 탐험 모드 (복셀 지구본 / 대도시) ============================= */
+var CITY_PRESETS={
+  seoul:{name:'서울 (Seoul)',cc:'KR',flag:'🇰🇷',lat:37.5796,lng:126.9770,area:260,
+    landmarks:[{n:'🏯 경복궁 근정전 광장',x:0,z:-60},{n:'🏮 광화문 대로',x:0,z:20},{n:'🏘 북촌 한옥마을',x:-80,z:-30},{n:'🍲 수라간 텃밭 & 화덕',x:70,z:25},{n:'🚣 한강 피크닉 공원',x:0,z:100},{n:'🗼 남산 전망 언덕',x:95,z:-95}],
+    quests:[{t:'역사 탐정: 경복궁의 비밀',d:'세종대왕과 대화하고 한국어 퀴즈를 맞혀 미니 경복궁 정자 도면을 획득하세요.',r:350},{t:'미식 여행가: 오방색 비빔밥',d:'수라간 텃밭에서 재료를 수확해 화덕에서 비빔밥을 완성하세요!',r:300}],
+    npcs:[{n:'세종대왕',x:0,z:-52,color:0xd94f4f,char:'blocky'},{n:'수라간 상궁',x:66,z:22,color:0xe08f3a,char:'blocky'},{n:'한옥지기',x:-78,z:-28,color:0x6a8fd9,char:'cat'}]},
+  paris:{name:'파리 (Paris)',cc:'FR',flag:'🇫🇷',lat:48.8566,lng:2.3522,area:260,
+    landmarks:[{n:'🗼 에펠탑 광장',x:0,z:-60},{n:'🥐 몽마르트 언덕',x:-70,z:-20},{n:'🖼 루브르 정원',x:60,z:10},{n:'🚤 센강 산책로',x:0,z:90}],
+    quests:[{t:'예술가의 하루',d:'몽마르트에서 캔버스 조각을 모아 그림을 완성하세요.',r:320}],
+    npcs:[{n:'화가',x:-66,z:-18,color:0x9b59b6,char:'blocky'}]},
+  tokyo:{name:'도쿄 (Tokyo)',cc:'JP',flag:'🇯🇵',lat:35.6762,lng:139.6503,area:260,
+    landmarks:[{n:'⛩ 센소지 절',x:0,z:-55},{n:'🌸 우에노 공원',x:-70,z:0},{n:'🏙 시부야 교차로',x:70,z:20},{n:'🗼 도쿄타워 언덕',x:0,z:95}],
+    quests:[{t:'마츠리 축제',d:'센소지에서 등불을 모아 축제를 밝히세요.',r:300}],
+    npcs:[{n:'신관',x:0,z:-48,color:0xcf4f6f,char:'blocky'}]}
+};
+var exploreSession=null;
+function renderExplore(m,key){
+  key=key||'seoul'; var P0=CITY_PRESETS[key]||CITY_PRESETS.seoul;
+  m.innerHTML=''+
+  '<div style="position:relative;width:100%;height:calc(100vh - 56px);min-height:520px;overflow:hidden;background:#aee0ff">'+
+    '<canvas id="exCv" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>'+
+    // 상단 도시 탭
+    '<div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 8px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
+      '<span class="exTab" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap">🌐 복셀 지구본</span>'+
+      Object.keys(CITY_PRESETS).map(function(k){var c=CITY_PRESETS[k];return '<button class="exTab" data-city="'+k+'" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap;border:1px solid '+(k===key?'var(--brand)':'transparent')+';background:'+(k===key?'var(--brand)':'var(--surface2)')+';color:'+(k===key?'#1a1205':'var(--fg)')+';font-weight:600;cursor:pointer">'+c.flag+' '+c.name.split(' ')[0]+'</button>';}).join('')+
+    '</div>'+
+    // 좌측 패널
+    '<div style="position:absolute;top:70px;left:12px;z-index:30;width:270px;max-width:46vw;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-height:calc(100vh - 150px);overflow:auto">'+
+      '<div style="font-weight:700;font-size:15px">'+P0.flag+' '+esc(P0.name)+'</div>'+
+      '<div style="color:var(--muted);font-size:11.5px;margin-bottom:10px">'+P0.lat.toFixed(3)+'°N, '+P0.lng.toFixed(3)+'°E</div>'+
+      '<div style="display:flex;gap:5px;margin-bottom:12px">'+
+        [['quarter','쿼터뷰'],['wide','대도시 광각'],['close','클로즈업']].map(function(v){return '<button class="exView" data-v="'+v[0]+'" style="flex:1;padding:6px 4px;border-radius:8px;font-size:11.5px;border:1px solid var(--border);background:var(--surface2);color:var(--fg);cursor:pointer">'+v[1]+'</button>';}).join('')+
+      '</div>'+
+      '<div style="font-size:12.5px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between">대도시 구역 빠른 이동<span style="color:var(--brand);font-weight:600">클릭 워프</span></div>'+
+      '<div id="exLm" style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">'+
+        P0.landmarks.map(function(l,i){return '<button class="exWarp" data-i="'+i+'" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--fg);cursor:pointer;font-size:12.5px;text-align:left"><span>'+esc(l.n)+'</span><span style="color:var(--faint);font-family:monospace;font-size:11px">('+l.x+','+l.z+')</span></button>';}).join('')+
+      '</div>'+
+      '<div style="font-size:12.5px;font-weight:700;margin-bottom:6px">🏆 역사·언어·미식 퀘스트 ('+P0.quests.length+')</div>'+
+      '<div style="display:flex;flex-direction:column;gap:7px">'+
+        P0.quests.map(function(q){return '<div style="border:1px dashed var(--border2);border-radius:10px;padding:9px 11px"><div style="font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;gap:6px"><span>'+esc(q.t)+'</span><span style="color:var(--brand);white-space:nowrap">+'+q.r+'</span></div><div style="color:var(--muted);font-size:11.5px;margin-top:3px;line-height:1.4">'+esc(q.d)+'</div></div>';}).join('')+
+      '</div>'+
+    '</div>'+
+    // 우측 미니맵
+    '<div style="position:absolute;top:70px;right:12px;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px;box-shadow:0 6px 20px rgba(0,0,0,.25)">'+
+      '<div style="font-size:12px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between;gap:10px"><span>📡 '+P0.area*2+'m 월드 레이더</span><span id="exCoord" style="color:var(--faint);font-family:monospace"></span></div>'+
+      '<canvas id="exRadar" width="170" height="170" style="border-radius:10px;background:#cfe8f5;display:block"></canvas>'+
+      '<div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.4">WASD 이동 · Shift 전력질주 · Space 점프<br>마우스 드래그 시점</div>'+
+    '</div>'+
+    // 상단 우측 코인/버튼
+    '<div style="position:absolute;top:12px;right:12px;z-index:31;display:flex;gap:6px;align-items:center">'+
+      '<span style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-weight:700;font-family:monospace;color:#ffb02e">◉ '+fmt(db.isc||0)+'</span>'+
+      '<button class="exTop" id="exTv" style="background:#ff5a6e;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">📺 유튜브 TV</button>'+
+      '<button class="exTop" id="exDex" style="background:#6a7bff;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">📖 도감</button>'+
+      '<button class="exTop" id="exAva" style="background:#ff6ab0;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">💗 아바타</button>'+
+    '</div>'+
+    // 하단 표정/모션 바
+    '<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
+      '<span style="font-size:12px;color:var(--muted);font-weight:700">표정</span>'+
+      [['😊','행복'],['😆','신남'],['😉','윙크'],['🤔','호기심'],['😲','깜짝'],['🥹','뿌듯']].map(function(e){return '<button class="exEmo" data-e="'+e[0]+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:13px;cursor:pointer;white-space:nowrap">'+e[0]+' '+e[1]+'</button>';}).join('')+
+      '<span style="width:1px;height:20px;background:var(--border)"></span><span style="font-size:12px;color:var(--muted);font-weight:700">모션</span>'+
+      [['wave','👋 인사'],['cheer','🙌 환호'],['dance','💃 댄스'],['jump','⤴ 점프']].map(function(mo){return '<button class="exMo" data-m="'+mo[0]+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap">'+mo[1]+'</button>';}).join('')+
+    '</div>'+
+    '<div id="exEmoFx" style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);z-index:25;font-size:70px;opacity:0;transition:opacity .2s,transform .4s;pointer-events:none"></div>'+
+  '</div>';
+  exploreEngine(P0,key);
+}
+function exploreEngine(P0,key){
+  var cv=document.getElementById('exCv'); if(!cv||typeof THREE==='undefined')return;
+  var renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  var scene=new THREE.Scene(); scene.background=new THREE.Color(0xaee0ff); scene.fog=new THREE.Fog(0xaee0ff,120,420);
+  var camera=new THREE.PerspectiveCamera(60,16/9,0.1,900);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x9fb6a0,0.95));
+  var sun=new THREE.DirectionalLight(0xffffff,0.62); sun.position.set(80,160,40); scene.add(sun);
+  var gm=new THREE.Group(); scene.add(gm);
+  // 도시 생성(샘플 지형 → 리얼 메시) + 지면
+  var half=P0.area/2, mLat=111320, mLng=111320*Math.cos(P0.lat*Math.PI/180);
+  var bb={s:P0.lat-half/mLat,n:P0.lat+half/mLat,w:P0.lng-half/mLng,e:P0.lng+half/mLng};
+  var built; try{ built=cityReal(citySample(bb,{lot:24,gap:6,fill:0.9,skip:0.08}),{name:P0.name,maxBuildings:220}); }catch(e){ built={props:[],spawn:{x:half,y:1,z:half}}; }
+  var CX=P0.area/2, CZ=P0.area/2; // 월드 중심(랜드마크 좌표 기준점)
+  var propBoxes=buildProps(built.props,gm);
+  // 랜드마크: 떠있는 비컨(시야를 가리지 않게 높이 띄우고 얇게)
+  var lmMeshes=[];
+  P0.landmarks.forEach(function(l){ var beac=new THREE.Mesh(new THREE.OctahedronGeometry(1.5),new THREE.MeshLambertMaterial({color:0xffb02e,emissive:0x6a4400})); beac.position.set(CX+l.x,22,CZ+l.z); gm.add(beac);
+    var pole=new THREE.Mesh(new THREE.BoxGeometry(0.12,20,0.12),new THREE.MeshLambertMaterial({color:0xffd27a,transparent:true,opacity:0.35})); pole.position.set(CX+l.x,11,CZ+l.z); gm.add(pole); lmMeshes.push(beac); });
+  // NPC
+  var npcObjs=[];
+  (P0.npcs||[]).forEach(function(n){ var c=makeCharacter(n.char||'blocky',n.color||0xd94f4f); c.group.position.set(CX+n.x,0,CZ+n.z); scene.add(c.group); npcObjs.push({o:c,data:n}); var tag=null; });
+  // 플레이어
+  var charObj=makeCharacter(db.char||'blocky',skinCol(db.skin)); scene.add(charObj.group);
+  var P={x:CX,y:2,z:CZ+8,vy:0,onGround:false};
+  var yaw=Math.PI,pitch=0.4,dist=9,viewMode='quarter';
+  var keys={}; var RW=0.35,PH=1.5,GRAV=26,BASE=7,JUMP=9.2;
+  function isSolidProp(px,py,pz){ for(var i=0;i<propBoxes.length;i++){ var b=propBoxes[i]; if(px+RW>b.minx&&px-RW<b.maxx&&pz+RW>b.minz&&pz-RW<b.maxz&&py+PH>b.miny&&py<b.maxy)return true; } return false; }
+  function kd(e){ var k=e.key.toLowerCase(); keys[k]=true; if(k===' '||k.indexOf('arrow')===0)e.preventDefault(); }
+  function ku(e){ keys[e.key.toLowerCase()]=false; }
+  window.addEventListener('keydown',kd); window.addEventListener('keyup',ku);
+  var lookId=null,lx=0,ly=0;
+  cv.addEventListener('pointerdown',function(e){ lookId=e.pointerId; lx=e.clientX; ly=e.clientY; try{cv.setPointerCapture(e.pointerId);}catch(x){} });
+  cv.addEventListener('pointermove',function(e){ if(e.pointerId!==lookId)return; yaw-=(e.clientX-lx)*0.006; pitch-=(e.clientY-ly)*0.006; pitch=Math.max(0.15,Math.min(1.4,pitch)); lx=e.clientX; ly=e.clientY; });
+  cv.addEventListener('pointerup',function(e){ if(e.pointerId===lookId)lookId=null; });
+  // 모션 상태
+  var motion=null,motionT=0,emoFxEl=document.getElementById('exEmoFx');
+  function doEmote(em){ if(!emoFxEl)return; emoFxEl.textContent=em; emoFxEl.style.opacity='1'; emoFxEl.style.transform='translate(-50%,-80%)'; setTimeout(function(){ emoFxEl.style.opacity='0'; emoFxEl.style.transform='translate(-50%,-50%)'; },1100); }
+  function doMotion(mo){ motion=mo; motionT=mo==='dance'?3:1.2; if(mo==='jump'&&P.onGround){ P.vy=JUMP*1.1; P.onGround=false; } }
+  function warp(i){ var l=P0.landmarks[i]; if(!l)return; P.x=CX+l.x; P.z=CZ+l.z+8; P.y=3; P.vy=0; yaw=Math.PI; toast('워프: '+l.n); }
+  // UI 바인딩
+  var root=document.getElementById('main');
+  root.querySelectorAll('.exWarp').forEach(function(btn){ btn.onclick=function(){ warp(+btn.getAttribute('data-i')); }; });
+  root.querySelectorAll('.exEmo').forEach(function(btn){ btn.onclick=function(){ doEmote(btn.getAttribute('data-e')); }; });
+  root.querySelectorAll('.exMo').forEach(function(btn){ btn.onclick=function(){ doMotion(btn.getAttribute('data-m')); }; });
+  root.querySelectorAll('.exView').forEach(function(btn){ btn.onclick=function(){ viewMode=btn.getAttribute('data-v'); }; });
+  root.querySelectorAll('.exTab[data-city]').forEach(function(btn){ btn.onclick=function(){ dispose(); renderExplore(document.getElementById('main'),btn.getAttribute('data-city')); }; });
+  var tv=document.getElementById('exTv'); if(tv)tv.onclick=function(){ exploreTV(); };
+  var dx=document.getElementById('exDex'); if(dx)dx.onclick=function(){ toast('도감: 방문한 랜드마크·수집품이 기록됩니다(준비 중)'); };
+  var av=document.getElementById('exAva'); if(av)av.onclick=function(){ go('shop'); };
+  // 레이더
+  var radar=document.getElementById('exRadar'), rctx=radar&&radar.getContext('2d'), RANGE=P0.area;
+  function drawRadar(){ if(!rctx)return; var W=170,H=170; rctx.clearRect(0,0,W,H); rctx.fillStyle='#cfe8f5'; rctx.fillRect(0,0,W,H);
+    rctx.strokeStyle='rgba(120,150,170,.5)'; rctx.lineWidth=1; for(var g=0;g<=4;g++){ rctx.beginPath(); rctx.moveTo(g*W/4,0); rctx.lineTo(g*W/4,H); rctx.moveTo(0,g*H/4); rctx.lineTo(W,g*H/4); rctx.stroke(); }
+    function toR(wx,wz){ return [W/2+((wx-P.x)/RANGE)*W, H/2+((wz-P.z)/RANGE)*H]; }
+    P0.landmarks.forEach(function(l){ var p=toR(CX+l.x,CZ+l.z); rctx.fillStyle='#ff8a3d'; rctx.beginPath(); rctx.arc(p[0],p[1],3.5,0,7); rctx.fill(); });
+    (P0.npcs||[]).forEach(function(n){ var p=toR(CX+n.x,CZ+n.z); rctx.fillStyle='#e23b7a'; rctx.beginPath(); rctx.arc(p[0],p[1],4,0,7); rctx.fill(); });
+    rctx.save(); rctx.translate(W/2,H/2); rctx.rotate(-yaw); rctx.fillStyle='#2b7fff'; rctx.beginPath(); rctx.moveTo(0,-7); rctx.lineTo(5,6); rctx.lineTo(-5,6); rctx.closePath(); rctx.fill(); rctx.restore();
+  }
+  var coordEl=document.getElementById('exCoord');
+  // 루프
+  var last=performance.now(),raf;
+  function resize(){ var r=cv.getBoundingClientRect(); renderer.setSize(r.width,r.height,false); camera.aspect=r.width/Math.max(1,r.height); camera.updateProjectionMatrix(); }
+  resize(); window.addEventListener('resize',resize);
+  function frame(now){ raf=requestAnimationFrame(frame); var dt=(now-last)/1000; last=now; if(dt>0.05)dt=0.05;
+    var sprint=keys['shift']?1.9:1, sp=BASE*sprint;
+    var ix=0,iz=0; if(keys['w']||keys['arrowup'])iz-=1; if(keys['s']||keys['arrowdown'])iz+=1; if(keys['a']||keys['arrowleft'])ix-=1; if(keys['d']||keys['arrowright'])ix+=1;
+    var fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw)), right=new THREE.Vector3(-fwd.z,0,fwd.x);
+    var mvx=fwd.x*(-iz)+right.x*ix, mvz=fwd.z*(-iz)+right.z*ix, ml=Math.hypot(mvx,mvz); var moving=ml>0.01;
+    if(moving){ mvx=mvx/ml*sp*dt; mvz=mvz/ml*sp*dt; var nx=P.x+mvx; if(!isSolidProp(nx,P.y,P.z))P.x=nx; var nz=P.z+mvz; if(!isSolidProp(P.x,P.y,nz))P.z=nz; charObj.group.rotation.y=Math.atan2(mvx,mvz); }
+    if((keys[' ']||keys['spacebar'])&&P.onGround){ P.vy=JUMP; P.onGround=false; }
+    P.vy-=GRAV*dt; var ny=P.y+P.vy*dt; var ground=0.6; // 지면 프롭 윗면
+    if(ny<=ground){ P.y=ground; P.vy=0; P.onGround=true; } else P.y=ny;
+    charObj.group.position.set(P.x,P.y,P.z);
+    charObj.update({moving:moving,onGround:P.onGround,vy:P.vy,t:now*0.001,dt:dt});
+    // 모션 포즈
+    if(motionT>0){ motionT-=dt; var pr=charObj.parts; if(pr){ if(motion==='wave'&&pr.armR)pr.armR.rotation.x=-2.3+Math.sin(now*0.02)*0.3; if(motion==='cheer'){ if(pr.armL)pr.armL.rotation.x=-2.6; if(pr.armR)pr.armR.rotation.x=-2.6; } if(motion==='dance'){ charObj.group.rotation.y+=dt*6; if(pr.armL)pr.armL.rotation.z=Math.sin(now*0.01)*0.8; } } if(motionT<=0)motion=null; }
+    // 카메라(뷰 모드)
+    var vd=viewMode==='wide'?18:viewMode==='close'?4:9, vp=viewMode==='wide'?0.5:0.4;
+    if(viewMode!=='close'){ pitch=vp; } dist=vd;
+    var T=new THREE.Vector3(P.x,P.y+1.2,P.z);
+    camera.position.set(T.x-Math.sin(yaw)*Math.cos(pitch)*dist,T.y+Math.sin(pitch)*dist,T.z-Math.cos(yaw)*Math.cos(pitch)*dist);
+    camera.lookAt(T);
+    npcObjs.forEach(function(n){ n.o.update({moving:false,onGround:true,t:now*0.001,dt:dt}); n.o.group.lookAt(P.x,n.o.group.position.y,P.z); });
+    lmMeshes.forEach(function(mo){ mo.position.y=22+Math.sin(now*0.003)*0.7; mo.rotation.y+=dt*1.2; });
+    // NPC 근접 상호작용
+    var near=null; npcObjs.forEach(function(n){ if(Math.hypot(P.x-n.o.group.position.x,P.z-n.o.group.position.z)<3.2)near=n; });
+    if(near&&(keys['f']||keys['e'])){ keys['f']=keys['e']=false; npcTalk(near.data,P0); }
+    if(coordEl)coordEl.textContent='('+((P.x-CX)|0)+','+((P.z-CZ)|0)+')';
+    drawRadar();
+    renderer.render(scene,camera);
+  }
+  raf=requestAnimationFrame(frame);
+  function dispose(){ cancelAnimationFrame(raf); window.removeEventListener('keydown',kd); window.removeEventListener('keyup',ku); window.removeEventListener('resize',resize); try{renderer.dispose();}catch(e){} }
+  exploreSession={dispose:dispose}; activeSession=exploreSession;
+}
+function npcTalk(n,P0){ var q=(P0.quests&&P0.quests[0])||{t:'퀘스트',d:'안녕하세요!'};
+  var ov=document.createElement('div'); ov.className='overlay'; ov.style.position='fixed'; ov.style.inset='0'; ov.style.zIndex='3000'; ov.style.display='grid'; ov.style.placeItems='end center';
+  ov.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:18px 20px;max-width:460px;width:92%;margin-bottom:90px;text-align:left"><div style="font-weight:700;margin-bottom:6px">🧑 '+esc(n.n)+'</div><div style="font-size:13.5px;color:var(--muted);line-height:1.5;margin-bottom:12px">"'+esc(q.d)+'"</div><div class="obtns" style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="npcX">닫기</button><button class="btn brand" id="npcQ">퀘스트 수락 (+'+(q.r||100)+')</button></div></div>';
+  document.body.appendChild(ov); ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
+  ov.querySelector('#npcX').onclick=function(){ ov.remove(); };
+  ov.querySelector('#npcQ').onclick=function(){ earn(q.r||100); toast('퀘스트 수락 · +'+(q.r||100)+' ISC'); ov.remove(); };
+}
+function exploreTV(){ askText({title:'📺 유튜브 TV',desc:'유튜브 URL을 넣으면 월드 안 화면에서 재생됩니다(쇼츠 탭에도 추가).',placeholder:'https://youtube.com/...',ok:'틀기',onOk:function(u){ var id=ytId(u); if(!id){ toast('유효한 URL이 아닙니다'); return; } if(!db.shorts)db.shorts=[]; db.shorts.unshift({id:'sh_'+Date.now().toString(36),title:'유튜브 TV',creator:me(),youtubeId:id,likes:0}); saveDB(); go('shorts'); }}); }
 
 /* ============================= 월드 (지도) ============================= */
 // 실제 지도(OpenStreetMap, 무료 타일) 위에 레벨·영상·라이브·상점을 위치 핀으로 올린다.
