@@ -2531,7 +2531,29 @@ function exploreEngine(P0,key){
       c.fillStyle='#ffd27a'; c.font='bold 22px sans-serif'; c.fillText('F · 라이브 열기 / 방송 시작',26,258); }
     billTex.needsUpdate=true; }
   drawBill(0);
-  function refreshLive(){ if(!liveReady())return; api('GET','/api/iglive/sessions').then(function(r){ BILL.liveList=(r.sessions||[]); drawBill(performance.now()); }).catch(function(){}); }
+  // 간판에 실제 방송 영상 재생: 라이브에 뷰어로 붙어(WebRTC) 받은 영상을 3D 스크린 텍스처로 입힘
+  function disconnectBillboard(){ if(BILL.conn){ try{BILL.conn.close();}catch(e){} BILL.conn=null; } BILL.videoOn=false; try{ if(bill.material.map!==billTex){ if(bill.material.map&&bill.material.map.dispose)bill.material.map.dispose(); bill.material.map=billTex; bill.material.needsUpdate=true; } }catch(e){} }
+  function connectBillboard(sid){ if(BILL.conn&&BILL.conn.sid===sid)return; disconnectBillboard();
+    var vid=document.createElement('video'); vid.autoplay=true; vid.muted=true; vid.playsInline=true; vid.setAttribute('playsinline',''); vid.style.cssText='position:fixed;left:-20px;top:-20px;width:2px;height:2px;opacity:0;pointer-events:none'; document.body.appendChild(vid);
+    var myCid=newCid(), hostCid='host', pc=null, sigRoom='live-sig:'+sid, chatRoom='live:'+sid;
+    function startPC(sdp){ if(pc){try{pc.close();}catch(e){}} pc=new RTCPeerConnection(ICE_CFG);
+      pc.ontrack=function(e){ try{ vid.srcObject=e.streams[0]; var pr=vid.play&&vid.play(); if(pr&&pr.catch)pr.catch(function(){}); var vt=new THREE.VideoTexture(vid); vt.minFilter=THREE.LinearFilter; vt.magFilter=THREE.LinearFilter; if(bill.material.map&&bill.material.map!==billTex&&bill.material.map.dispose)bill.material.map.dispose(); bill.material.map=vt; bill.material.needsUpdate=true; BILL.videoOn=true; }catch(x){} };
+      pc.onicecandidate=function(e){ if(e.candidate&&wsOK())sigSend(ws,sigRoom,{from:myCid,to:hostCid,kind:'ice',candidate:e.candidate}); };
+      pc.setRemoteDescription(new RTCSessionDescription(sdp)).then(function(){return pc.createAnswer();}).then(function(a){return pc.setLocalDescription(a);}).then(function(){ sigSend(ws,sigRoom,{from:myCid,to:hostCid,kind:'answer',sdp:pc.localDescription}); }).catch(function(){});
+    }
+    function wsOK(){ return ws&&ws.readyState===1; }
+    var ws=igOpenWS([chatRoom],function(msg){
+      if(msg.type==='message'&&msg.data){ var d=msg.data; if(d.to&&d.to!==myCid)return; if(d.from===myCid)return;
+        if(d.kind==='offer'){ startPC(d.sdp); } else if(d.kind==='ice'&&pc&&d.candidate){ try{pc.addIceCandidate(new RTCIceCandidate(d.candidate));}catch(e){} }
+      } else if(msg.type==='live_end'){ disconnectBillboard(); }
+    },function(){ sigSend(ws,sigRoom,{from:myCid,to:hostCid,kind:'hello'}); });
+    api('POST','/api/iglive/sessions/'+sid+'/join',{}).catch(function(){});
+    var hi=0,hiv=setInterval(function(){ hi++; if(pc||hi>6){clearInterval(hiv);return;} if(wsOK())sigSend(ws,sigRoom,{from:myCid,to:hostCid,kind:'hello'}); },2000);
+    BILL.conn={sid:sid,close:function(){ try{clearInterval(hiv);}catch(e){} try{api('POST','/api/iglive/sessions/'+sid+'/leave',{});}catch(e){} try{ws&&ws.close();}catch(e){} try{if(pc)pc.close();}catch(e){} try{vid.srcObject=null;vid.remove();}catch(e){} }};
+  }
+  function refreshLive(){ if(!liveReady())return; api('GET','/api/iglive/sessions').then(function(r){ BILL.liveList=(r.sessions||[]); drawBill(performance.now());
+    if(BILL.liveList.length){ connectBillboard(BILL.liveList[0].id); } else { disconnectBillboard(); }
+  }).catch(function(){}); }
   refreshLive(); var billIv=setInterval(refreshLive,15000);
   // 플레이어
   var charObj=makeCharacter(db.char||'blocky',skinCol(db.skin)); scene.add(charObj.group);
@@ -2642,8 +2664,8 @@ function exploreEngine(P0,key){
     sun.position.set(P.x+70,95,P.z+45); sun.target.position.set(P.x,0,P.z); sun.target.updateMatrixWorld();
     npcObjs.forEach(function(n){ n.o.update({moving:false,onGround:true,t:now*0.001,dt:dt}); n.o.group.lookAt(P.x,n.o.group.position.y,P.z); });
     lmMeshes.forEach(function(mo){ mo.position.y=22+Math.sin(now*0.003)*0.7; mo.rotation.y+=dt*1.2; });
-    // 라이브 간판: 깜빡임 + 근접 F 입장
-    if(BILL.liveList.length)drawBill(now);
+    // 라이브 간판: 영상 재생 중이 아니면 안내 캔버스 깜빡임, 근접 F 입장
+    if(BILL.liveList.length&&!BILL.videoOn)drawBill(now);
     var nearBill=Math.hypot(P.x-BILL.x,P.z-BILL.z)<8;
     if(nearBill&&(keys['f']||keys['e'])){ keys['f']=keys['e']=false; location.hash = BILL.liveList.length ? ('#live/'+BILL.liveList[0].id) : '#live'; }
     // NPC 근접 상호작용
@@ -2656,7 +2678,7 @@ function exploreEngine(P0,key){
   }
   raf=requestAnimationFrame(frame);
   function dispose(){ cancelAnimationFrame(raf); window.removeEventListener('keydown',kd); window.removeEventListener('keyup',ku); window.removeEventListener('resize',resize);
-    try{ clearInterval(billIv); }catch(e){}
+    try{ clearInterval(billIv); }catch(e){} try{ disconnectBillboard(); }catch(e){}
     if(MP.ws){ try{ MP.ws.send(JSON.stringify({type:'publish',room:MP.room,data:{k:'bye',id:MP.id}})); }catch(e){} try{ MP.ws.close(); }catch(e){} }
     try{renderer.dispose();}catch(e){} }
   exploreSession={dispose:dispose}; activeSession=exploreSession;
@@ -2867,11 +2889,17 @@ function liveProductCard(container,productId){
   if(!it){ container.style.display='none'; return; }
   container.style.display='block';
   var icon=it.type==='game'?'🎮':(/에셋/.test(it.type||'')?'🧩':'🛍');
+  var priceNum=(typeof it.price==='number')?it.price:(parseInt(String(it.price||'').replace(/[^0-9]/g,''),10)||0);
+  var owned=(db.ownedStore||[]).indexOf(it.id)>=0;
   container.innerHTML='<div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 10px">'+
     '<div style="width:42px;height:42px;border-radius:9px;background:var(--surface2);display:grid;place-items:center;font-size:20px">'+icon+'</div>'+
-    '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(it.title||'상품')+'</div><div style="font-size:11px;color:var(--muted)">'+esc(it.creator||'')+(it.price?(' · '+esc(it.price)):' · 무료')+'</div></div>'+
-    '<button class="btn brand" id="lvBuy" style="white-space:nowrap">보기</button></div>';
-  var buy=container.querySelector('#lvBuy'); if(buy)buy.onclick=function(){ if(it.externalUrl){ window.open(it.externalUrl,'_blank','noopener'); } else if(it.refColl==='levels'&&it.refId){ location.hash='#watch/'+it.refId; } else { toast('연결된 상세가 없습니다'); } };
+    '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(it.title||'상품')+'</div><div style="font-size:11px;color:var(--muted)">'+esc(it.creator||'')+(priceNum>0?(' · '+priceNum+' ISC'):' · 무료')+'</div></div>'+
+    '<button class="btn" id="lvView" style="white-space:nowrap">보기</button>'+
+    '<button class="btn brand" id="lvGet" style="white-space:nowrap">'+(owned?'받음 ✓':(priceNum>0?('구매 '+priceNum):'받기'))+'</button></div>';
+  var view=container.querySelector('#lvView'); if(view)view.onclick=function(){ if(it.externalUrl){ window.open(it.externalUrl,'_blank','noopener'); } else if(it.refColl==='levels'&&it.refId){ location.hash='#watch/'+it.refId; } else { toast('연결된 상세가 없습니다'); } };
+  var get=container.querySelector('#lvGet'); if(get)get.onclick=function(){ if(owned){ toast('이미 받은 상품입니다'); return; }
+    ensureAccount().then(function(){ return api('POST','/api/igstore/catalog/'+it.id+(priceNum>0?'/buy':'/claim'),{}); }).then(function(r){ if(r&&r.wallet){db.isc=r.wallet.balance;updateWallet&&updateWallet();} if((db.ownedStore||[]).indexOf(it.id)<0){db.ownedStore.push(it.id);saveDB&&saveDB();} toast(priceNum>0?'구매 완료':'받기 완료'); liveProductCard(container,productId); }).catch(function(e){ toast(e.message||'실패'); });
+  };
 }
 
 // ---- 라이브 목록 ----
