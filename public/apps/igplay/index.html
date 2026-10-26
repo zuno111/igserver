@@ -215,13 +215,24 @@ body.has-touch .touchctrl{display:grid}
   .topbtn .lb{display:none} .topbtn{padding:8px 11px}
   .tags{width:100%;margin-left:0}
 }
-/* 전체화면 몰입형(탐험·숏폼)이 모바일 하단 네비바(62px)에 가리지 않도록 */
+/* 데스크톱: 토글 버튼 숨김 */
+.exPanelToggle{display:none}
+/* 전체화면 몰입형(탐험·숏폼)의 모바일 레이아웃 */
 @media (max-width:860px){
-  .exRoot{height:calc(100vh - 56px - 62px) !important;min-height:420px !important}
   #shortsWrap{bottom:62px !important}
-  /* 탐험 좌/우 패널이 3D 화면을 덜 덮게 축소 */
-  .exPanel{width:160px !important;max-width:52vw !important;max-height:42vh !important;padding:9px !important;top:60px !important;font-size:12px}
-  .exRadar{transform:scale(.7);transform-origin:top right;top:58px !important}
+  /* 탐험: 상단바(56)와 하단 네비바(62) 사이를 고정으로 꽉 채움 → 100vh 오차·검은 공백 제거 */
+  .exRoot{position:fixed !important;top:56px;left:0;right:0;bottom:62px;width:auto;height:auto !important;min-height:0 !important}
+  /* 좌측 구역 패널: 기본 접힘, 토글 버튼으로 슬라이드 */
+  .exPanel{top:56px !important;left:0 !important;width:240px !important;max-width:80vw !important;max-height:none !important;height:calc(100% - 64px) !important;border-radius:0 14px 14px 0 !important;transform:translateX(-104%);transition:transform .22s ease;box-shadow:0 0 24px rgba(0,0,0,.5)}
+  .exPanel.open{transform:none}
+  .exPanelToggle{display:flex;align-items:center;justify-content:center;position:absolute;top:10px;left:10px;z-index:33;width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:rgba(20,26,36,.85);color:#fff;font-size:18px;cursor:pointer}
+  /* 상단 도시탭: 토글 버튼 공간 확보 */
+  .exTabs{left:58px !important;transform:none !important;max-width:calc(100vw - 150px) !important}
+  /* 레이더·상단 버튼 축소 */
+  .exRadar{transform:scale(.6);transform-origin:top right;top:48px !important;right:2px !important}
+  .exTopBar{transform:scale(.8);transform-origin:top right;top:8px !important;right:6px !important}
+  /* 하단 표정/모션 바: 조이스틱·점프와 안 겹치게 폭 제한하고 아래로 */
+  .exEmoBar{left:50% !important;max-width:98vw !important;bottom:6px !important;padding:5px 8px !important}
 }
 </style>
 
@@ -2442,8 +2453,9 @@ function renderExplore(m,key){
   m.innerHTML=''+
   '<div class="exRoot" style="position:relative;width:100%;height:calc(100vh - 56px);min-height:520px;overflow:hidden;background:#aee0ff">'+
     '<canvas id="exCv" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>'+
+    '<button class="exPanelToggle" aria-label="구역 패널">🗺</button>'+
     // 상단 도시 탭
-    '<div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 8px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
+    '<div class="exTabs" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 8px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
       '<span class="exTab" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap">🌐 복셀 지구본</span>'+
       Object.keys(CITY_PRESETS).map(function(k){var c=CITY_PRESETS[k];return '<button class="exTab" data-city="'+k+'" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap;border:1px solid '+(k===key?'var(--brand)':'transparent')+';background:'+(k===key?'var(--brand)':'var(--surface2)')+';color:'+(k===key?'#1a1205':'var(--fg)')+';font-weight:600;cursor:pointer">'+c.flag+' '+c.name.split(' ')[0]+'</button>';}).join('')+
     '</div>'+
@@ -2470,14 +2482,14 @@ function renderExplore(m,key){
       '<div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.4">WASD 이동 · Shift 전력질주 · Space 점프<br>마우스 드래그 시점</div>'+
     '</div>'+
     // 상단 우측 코인/버튼
-    '<div style="position:absolute;top:12px;right:12px;z-index:31;display:flex;gap:6px;align-items:center">'+
+    '<div class="exTopBar" style="position:absolute;top:12px;right:12px;z-index:31;display:flex;gap:6px;align-items:center">'+
       '<span style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-weight:700;font-family:monospace;color:#ffb02e">◉ '+fmt(db.isc||0)+'</span>'+
       '<button class="exTop" id="exTv" style="background:#ff5a6e;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">📺 유튜브 TV</button>'+
       '<button class="exTop" id="exDex" style="background:#6a7bff;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">📖 도감</button>'+
       '<button class="exTop" id="exAva" style="background:#ff6ab0;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">💗 아바타</button>'+
     '</div>'+
     // 하단 표정/모션 바
-    '<div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
+    '<div class="exEmoBar" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
       '<span style="font-size:12px;color:var(--muted);font-weight:700">표정</span>'+
       [['😊','행복'],['😆','신남'],['😉','윙크'],['🤔','호기심'],['😲','깜짝'],['🥹','뿌듯']].map(function(e){return '<button class="exEmo" data-e="'+e[0]+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:13px;cursor:pointer;white-space:nowrap">'+e[0]+' '+e[1]+'</button>';}).join('')+
       '<span style="width:1px;height:20px;background:var(--border)"></span><span style="font-size:12px;color:var(--muted);font-weight:700">모션</span>'+
@@ -2619,7 +2631,10 @@ function exploreEngine(P0,key){
   function warp(i){ var l=P0.landmarks[i]; if(!l)return; P.x=CX+l.x; P.z=CZ+l.z+8; P.y=3; P.vy=0; yaw=Math.PI; toast('워프: '+l.n); }
   // UI 바인딩
   var root=document.getElementById('main');
-  root.querySelectorAll('.exWarp').forEach(function(btn){ btn.onclick=function(){ warp(+btn.getAttribute('data-i')); }; });
+  var exPanel=root.querySelector('.exPanel'), exToggle=root.querySelector('.exPanelToggle');
+  if(exToggle&&exPanel)exToggle.onclick=function(){ exPanel.classList.toggle('open'); };
+  function closePanel(){ if(exPanel)exPanel.classList.remove('open'); }
+  root.querySelectorAll('.exWarp').forEach(function(btn){ btn.onclick=function(){ warp(+btn.getAttribute('data-i')); closePanel(); }; });
   root.querySelectorAll('.exEmo').forEach(function(btn){ btn.onclick=function(){ doEmote(btn.getAttribute('data-e')); }; });
   root.querySelectorAll('.exMo').forEach(function(btn){ btn.onclick=function(){ doMotion(btn.getAttribute('data-m')); }; });
   root.querySelectorAll('.exView').forEach(function(btn){ btn.onclick=function(){ viewMode=btn.getAttribute('data-v'); }; });
