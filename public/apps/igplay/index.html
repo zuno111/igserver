@@ -1,3 +1,6 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>igPlay</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="브라우저에서 바로 플레이·제작하는 블록 레벨 플랫폼">
@@ -216,6 +219,9 @@ body.has-touch .touchctrl{display:grid}
 @media (max-width:860px){
   .exRoot{height:calc(100vh - 56px - 62px) !important;min-height:420px !important}
   #shortsWrap{bottom:62px !important}
+  /* 탐험 좌/우 패널이 3D 화면을 덜 덮게 축소 */
+  .exPanel{width:160px !important;max-width:52vw !important;max-height:42vh !important;padding:9px !important;top:60px !important;font-size:12px}
+  .exRadar{transform:scale(.7);transform-origin:top right;top:58px !important}
 }
 </style>
 
@@ -2442,7 +2448,7 @@ function renderExplore(m,key){
       Object.keys(CITY_PRESETS).map(function(k){var c=CITY_PRESETS[k];return '<button class="exTab" data-city="'+k+'" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap;border:1px solid '+(k===key?'var(--brand)':'transparent')+';background:'+(k===key?'var(--brand)':'var(--surface2)')+';color:'+(k===key?'#1a1205':'var(--fg)')+';font-weight:600;cursor:pointer">'+c.flag+' '+c.name.split(' ')[0]+'</button>';}).join('')+
     '</div>'+
     // 좌측 패널
-    '<div style="position:absolute;top:70px;left:12px;z-index:30;width:270px;max-width:46vw;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-height:calc(100vh - 150px);overflow:auto">'+
+    '<div class="exPanel" style="position:absolute;top:70px;left:12px;z-index:30;width:270px;max-width:46vw;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-height:calc(100vh - 150px);overflow:auto">'+
       '<div style="font-weight:700;font-size:15px">'+P0.flag+' '+esc(P0.name)+'</div>'+
       '<div style="color:var(--muted);font-size:11.5px;margin-bottom:10px">'+P0.lat.toFixed(3)+'°N, '+P0.lng.toFixed(3)+'°E</div>'+
       '<div style="display:flex;gap:5px;margin-bottom:12px">'+
@@ -2458,7 +2464,7 @@ function renderExplore(m,key){
       '</div>'+
     '</div>'+
     // 우측 미니맵
-    '<div style="position:absolute;top:70px;right:12px;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px;box-shadow:0 6px 20px rgba(0,0,0,.25)">'+
+    '<div class="exRadar" style="position:absolute;top:70px;right:12px;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px;box-shadow:0 6px 20px rgba(0,0,0,.25)">'+
       '<div style="font-size:12px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between;gap:10px"><span>📡 '+P0.area*2+'m 월드 레이더</span><span id="exCoord" style="color:var(--faint);font-family:monospace"></span></div>'+
       '<canvas id="exRadar" width="170" height="170" style="border-radius:10px;background:#cfe8f5;display:block"></canvas>'+
       '<div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.4">WASD 이동 · Shift 전력질주 · Space 점프<br>마우스 드래그 시점</div>'+
