@@ -2643,7 +2643,8 @@ function igOpenWS(roomList,onMsg,onOpen){
   if(!liveReady())return null;
   var proto=NET.base.indexOf('https')===0?'wss':'ws';
   var host=NET.base.replace(/^https?:\/\//,'').replace(/\/+$/,'');
-  var qs='key='+encodeURIComponent(NET.key)+(NET.token?'&token='+encodeURIComponent(NET.token):'');
+  // 키 인증으로 통일(로그인·비로그인이 같은 방 스코프를 공유해 서로 보이도록). 식별값은 메시지 payload로 전달.
+  var qs='key='+encodeURIComponent(NET.key);
   var ws; try{ ws=new WebSocket(proto+'://'+host+'/ws?'+qs); }catch(e){ return null; }
   ws.onopen=function(){ (roomList||[]).forEach(function(r){ try{ ws.send(JSON.stringify({type:'subscribe',room:r})); }catch(e){} }); if(onOpen)onOpen(ws); };
   ws.onmessage=function(e){ var m; try{m=JSON.parse(e.data);}catch(_){return;} onMsg(m,ws); };
@@ -2663,7 +2664,7 @@ function makeNameTag(text){
 function liveWS(room,onData,onReady){
   var proto=NET.base.indexOf('https')===0?'wss':'ws';
   var host=NET.base.replace(/^https?:\/\//,'').replace(/\/+$/,'');
-  var qs='key='+encodeURIComponent(NET.key)+(NET.token?'&token='+encodeURIComponent(NET.token):'');
+  var qs='key='+encodeURIComponent(NET.key);
   var ws; try{ ws=new WebSocket(proto+'://'+host+'/ws?'+qs); }catch(e){ return null; }
   ws.onopen=function(){ try{ ws.send(JSON.stringify({type:'subscribe',room:room})); ws.send(JSON.stringify({type:'subscribe',room:'live-sig:'+room.split(':').pop()})); }catch(e){} if(onReady)onReady(ws); };
   ws.onmessage=function(e){ var m; try{m=JSON.parse(e.data);}catch(_){return;} onData(m,ws); };
