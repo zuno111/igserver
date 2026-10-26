@@ -1272,10 +1272,11 @@ var NAVS=[['home','추천','M3 11l9-8 9 8M5 10v10h14V10'],
           ['store','에셋마켓','M3 9l2-5h14l2 5M3 9h18l-1.5 11H4.5zM9 13h6'],
           ['channel','내 채널','M12 8a4 4 0 100-8 4 4 0 000 8M4 21c0-4 4-6 8-6s8 2 8 6']];
 function buildNav(active){
+  var T=function(s){return (window.igT||function(x){return x;})(s);};
   var n=document.getElementById('nav'); n.innerHTML='';
   NAVS.forEach(function(it){
     var b=document.createElement('button'); b.className='navitem'+((active===it[0]||(active==='watch'&&it[0]==='home'))?' on':'');
-    b.innerHTML='<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="'+it[2]+'"/></svg><span>'+it[1]+'</span>';
+    b.innerHTML='<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="'+it[2]+'"/></svg><span>'+T(it[1])+'</span>';
     b.onclick=function(){go(it[0]==='channel'?'channel':it[0]);}; n.appendChild(b);
   });
   var note=document.createElement('div'); note.className='navnote';
