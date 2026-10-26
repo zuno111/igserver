@@ -1590,7 +1590,7 @@ function renderWorld(m){
   if(typeof L==='undefined'){ m.innerHTML='<div class="wrap"><div class="empty"><h3>지도를 불러오지 못했습니다</h3></div></div>'; return; }
   m.innerHTML='<div style="position:absolute;inset:0"><div id="worldmap" style="position:absolute;inset:0"></div>'+
     '<div style="position:absolute;top:12px;left:12px;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--muted);pointer-events:none">월드 · 핀을 눌러 콘텐츠로 이동</div>'+
-    '<button class="btn brand" id="cityBtn" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:500">이 구역 복셀화해서 올리기</button>'+
+    '<button class="btn brand" id="cityBtn" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:500">이 구역 월드로 올리기</button>'+
     '<div style="position:absolute;top:12px;right:12px;z-index:500;display:flex;gap:6px">'+
       ['level|레벨|#ffb02e','vod|영상|#3aa0ff','live|라이브|#f0556b','store|상점|#27d4b8'].map(function(s){var p=s.split("|");return '<span style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px 9px;font-size:11px"><b style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p[2]+';margin-right:4px"></b>'+p[1]+'</span>';}).join('')+
     '</div></div>';
@@ -1612,14 +1612,23 @@ function renderWorld(m){
   map.on('moveend',load); setTimeout(function(){ map.invalidateSize(); load(); },80);
   // 이 구역(현재 지도 범위) 땅을 OSM 건물·도로로 복셀화해 월드 레벨로 올림
   var cityBtn=document.getElementById('cityBtn');
-  if(cityBtn)cityBtn.onclick=function(){
+  function buildCity(mode){
     var b=map.getBounds(); var bbox={s:b.getSouth(),w:b.getWest(),n:b.getNorth(),e:b.getEast()};
     if((bbox.n-bbox.s)>0.02||(bbox.e-bbox.w)>0.02){ toast('더 확대하세요(약 1km 이하 구역)'); return; }
-    var name=prompt('이 구역 이름(예: 청담동)','') ; if(name===null)return;
+    var name=prompt('이 구역 이름(예: 청담동)',''); if(name===null)return;
     cityBtn.disabled=true; cityBtn.textContent='지형 가져오는 중…';
-    api('POST','/api/igcity/build',{bbox:bbox,name:name||'복셀 시티'}).then(function(r){
-      toast('복셀화 완료 · 건물 '+(r.buildings||0)+'개 ('+r.level.count+' 블록)'); cityBtn.disabled=false; cityBtn.textContent='이 구역 복셀화해서 올리기'; load();
-    }).catch(function(e){ toast(e.message||'실패'); cityBtn.disabled=false; cityBtn.textContent='이 구역 복셀화해서 올리기'; });
+    api('POST','/api/igcity/build',{bbox:bbox,name:name||'시티',mode:mode}).then(function(r){
+      toast((mode==='real'?'리얼':'복셀')+' 월드 생성 · 건물 '+(r.buildings||0)+'개'); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; load();
+    }).catch(function(e){ toast(e.message||'실패'); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; });
+  }
+  if(cityBtn)cityBtn.onclick=function(){
+    // 모드 선택: 복셀 / 리얼
+    var ov=document.createElement('div'); ov.className='overlay'; ov.style.position='fixed'; ov.style.zIndex='1200';
+    ov.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:22px;text-align:center;max-width:360px"><h3 style="font-size:18px;margin-bottom:6px">이 구역을 월드로</h3><p style="color:var(--muted);margin-bottom:16px">만드는 방식을 고르세요</p><div style="display:flex;gap:10px"><button class="btn brand" id="mVox" style="flex:1;flex-direction:column">복셀 모드<span style="font-size:11px;font-weight:400;margin-top:3px">블록 지형</span></button><button class="btn accent" id="mReal" style="flex:1;flex-direction:column">리얼 모드<span style="font-size:11px;font-weight:400;margin-top:3px">실제 3D 메시</span></button></div><button class="btn" id="mCancel" style="width:100%;margin-top:12px">취소</button></div>';
+    document.body.appendChild(ov); ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
+    ov.querySelector('#mCancel').onclick=function(){ ov.remove(); };
+    ov.querySelector('#mVox').onclick=function(){ ov.remove(); buildCity('voxel'); };
+    ov.querySelector('#mReal').onclick=function(){ ov.remove(); buildCity('real'); };
   };
   activeSession={dispose:function(){ try{map.remove();}catch(e){} }};
 }
@@ -2075,7 +2084,13 @@ render();
     "↷ 다시실행": ["↷ Redo", "↷ फिर करें", "↷ Ulangi"],
     "탑뷰": ["Top view", "ऊपर से", "Tampak atas"],
     "정면": ["Front view", "सामने से", "Tampak depan"],
-    "이 구역 복셀화해서 올리기": ["Voxelize & upload this area", "इस क्षेत्र को वॉक्सलाइज़ कर अपलोड करें", "Voxelkan & unggah area ini"],
+    "이 구역 월드로 올리기": ["Upload this area as a world", "इस क्षेत्र को वर्ल्ड बनाएँ", "Jadikan area ini dunia"],
+    "이 구역을 월드로": ["This area as a world", "इस क्षेत्र को वर्ल्ड", "Area ini jadi dunia"],
+    "만드는 방식을 고르세요": ["Choose how to build it", "बनाने का तरीका चुनें", "Pilih cara membangun"],
+    "복셀 모드": ["Voxel mode", "वॉक्सल मोड", "Mode voxel"],
+    "리얼 모드": ["Real mode", "रियल मोड", "Mode nyata"],
+    "블록 지형": ["Block terrain", "ब्लॉक भूभाग", "Medan blok"],
+    "실제 3D 메시": ["Real 3D mesh", "असली 3D मेश", "Mesh 3D nyata"],
     "월드 · 핀을 눌러 콘텐츠로 이동": ["Worlds · tap a pin to open", "वर्ल्ड · पिन दबाकर खोलें", "Dunia · ketuk pin untuk buka"],
     "코인": ["Coin", "सिक्का", "Koin"],
     "골": ["Goal", "लक्ष्य", "Tujuan"],

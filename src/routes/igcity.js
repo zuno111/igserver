@@ -88,6 +88,61 @@ export function voxelizeCity(features, opts = {}) {
   return { voxels, spawn, geo: { lat: latMid, lng: (bb.w + bb.e) / 2, label: opts.name || '' }, size: { gx, gz }, cell, count: voxels.length };
 }
 
+// 리얼 모드: 건물 footprint를 미터 스케일 3D 메시(extrude)로, 지면은 평면 프롭으로.
+// 복셀로 뭉개지 않는 저폴리 실제 도시. igPlay의 buildProps(verts/faces/pos/size)로 렌더·충돌.
+// 반환: { voxels, props, spawn, geo, size, cell:1, count }
+export function realCity(features, opts = {}) {
+  const bb = features.bbox;
+  if (!bb || ![bb.s, bb.w, bb.n, bb.e].every(Number.isFinite)) throw new Error('bbox 필요');
+  const latMid = (bb.s + bb.n) / 2;
+  const mPerLat = 111320, mPerLng = 111320 * Math.cos(latMid * Math.PI / 180);
+  const widthM = Math.max(4, (bb.e - bb.w) * mPerLng), heightM = Math.max(4, (bb.n - bb.s) * mPerLat);
+  const toM = (lat, lon) => [(lon - bb.w) * mPerLng, (bb.n - lat) * mPerLat]; // [x,z] 미터
+  const maxBuildings = Math.max(10, opts.maxBuildings || 120);
+  const props = [];
+
+  // 지면: 얇은 큰 박스 프롭(플레이어가 그 위를 걷는다)
+  function boxProp(cx, cy, cz, w, h, d, color) {
+    const hw = w / 2, hd = d / 2;
+    const verts = [[-hw, 0, -hd], [hw, 0, -hd], [hw, h, -hd], [-hw, h, -hd], [-hw, 0, hd], [hw, 0, hd], [hw, h, hd], [-hw, h, hd]];
+    const quads = [[0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7], [1, 5, 6, 2], [3, 2, 6, 7], [4, 5, 1, 0]];
+    const faces = []; quads.forEach((q) => { faces.push(q[0], q[1], q[2], q[0], q[2], q[3]); });
+    props.push({ verts, faces, pos: { x: cx, y: cy, z: cz }, scale: 1, color, size: { w, h, d }, collide: true });
+  }
+  boxProp(widthM / 2, 0, heightM / 2, widthM, 0.6, heightM, 0x37415a); // 지면
+
+  // 건물: footprint extrude
+  let built = 0;
+  (features.buildings || []).forEach((bd, bi) => {
+    if (built >= maxBuildings) return;
+    const g = bd.geometry || []; if (g.length < 4) return;
+    // 마지막 점이 첫 점과 같으면 제거(폐곡선)
+    let pts = g.map((p) => toM(p.lat, p.lon));
+    if (pts.length > 1 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) pts = pts.slice(0, -1);
+    const n = pts.length; if (n < 3) return;
+    let cx = 0, cz = 0, minx = 1e9, maxx = -1e9, minz = 1e9, maxz = -1e9;
+    pts.forEach((p) => { cx += p[0]; cz += p[1]; if (p[0] < minx) minx = p[0]; if (p[0] > maxx) maxx = p[0]; if (p[1] < minz) minz = p[1]; if (p[1] > maxz) maxz = p[1]; });
+    cx /= n; cz /= n;
+    const hM = Math.max(3, Math.min(240, Number(bd.height) || (Number(bd.levels) || 3) * 3));
+    const local = pts.map((p) => [p[0] - cx, p[1] - cz]); // 중심 기준 로컬
+    const verts = [];
+    for (let i = 0; i < n; i++) verts.push([local[i][0], 0, local[i][1]]);     // bottom 0..n-1
+    for (let i = 0; i < n; i++) verts.push([local[i][0], hM, local[i][1]]);    // top n..2n-1
+    const faces = [];
+    for (let i = 1; i < n - 1; i++) { faces.push(0, i + 1, i); }               // bottom fan
+    for (let i = 1; i < n - 1; i++) { faces.push(n, n + i, n + i + 1); }       // top fan
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; faces.push(i, j, n + j, i, n + j, n + i); } // sides
+    const shade = 0x8a93a0 + (bi % 6) * 0x050505;
+    props.push({ verts, faces, pos: { x: cx, y: 0.3, z: cz }, scale: 1, color: shade, size: { w: maxx - minx, h: hM, d: maxz - minz }, collide: true });
+    built++;
+  });
+
+  // 검증·플레이용 최소 복셀: ground 더미 1 + goal 1 (지면은 메시라 안 보이는 구석에)
+  const spawn = { x: Math.round(widthM / 2), y: 1, z: Math.round(heightM / 2) };
+  const voxels = [{ x: 0, y: 0, z: 0, t: 1 }, { x: Math.round(widthM) - 2, y: 1, z: Math.round(heightM) - 2, t: 4 }];
+  return { voxels, props, spawn, geo: { lat: latMid, lng: (bb.w + bb.e) / 2, label: opts.name || '' }, size: { w: Math.round(widthM), d: Math.round(heightM) }, cell: 1, count: voxels.length, buildings: built };
+}
+
 // Overpass로 bbox 내 건물/도로 가져오기(실행 환경의 인터넷 사용)
 async function fetchOSM(bb) {
   const q = `[out:json][timeout:30];(way["building"](${bb.s},${bb.w},${bb.n},${bb.e});way["highway"](${bb.s},${bb.w},${bb.n},${bb.e}););out geom;`;
@@ -108,7 +163,7 @@ async function saveLevel(pid, uid, name, built, creatorName) {
   const id = randomId('lv_');
   const data = {
     title: String(name || '복셀 시티').slice(0, 80), creator: creatorName || '복셀 시티',
-    genre: '어드벤처', difficulty: '보통', voxels: built.voxels, props: [], cover: null,
+    genre: '어드벤처', difficulty: '보통', voxels: built.voxels, props: built.props || [], cover: null,
     spawn: built.spawn, desc: 'OSM 지형을 복셀화한 도시 월드입니다.', plays: 0, likes: 0, boostedUntil: 0,
     gateSymbol: null, gateMin: 0, geo: built.geo, source: 'igcity',
   };
@@ -119,9 +174,9 @@ async function saveLevel(pid, uid, name, built, creatorName) {
 // 오프라인/배치: features 직접 → 레벨
 router.post('/voxelize', requireUser, async (req, res, next) => {
   try {
-    const { features, name, cell, maxSpan } = req.body || {};
+    const { features, name, cell, maxSpan, mode } = req.body || {};
     if (!features || !features.bbox) return res.status(400).json({ error: 'no_features', message: 'bbox 포함 features가 필요합니다.' });
-    const built = voxelizeCity(features, { name, cell, maxSpan });
+    const built = mode === 'real' ? realCity(features, { name }) : voxelizeCity(features, { name, cell, maxSpan });
     const out = await saveLevel(req.project.id, req.user.uid, name, built, req.user.name);
     broadcast(req.project.id, 'igplay:levels', { type: 'level_new', id: out.id, title: out.title, ts: Date.now() });
     res.status(201).json({ level: out });
@@ -130,7 +185,7 @@ router.post('/voxelize', requireUser, async (req, res, next) => {
 // 실시간: 장소/bbox → OSM → 복셀 레벨
 router.post('/build', requireUser, async (req, res, next) => {
   try {
-    const { bbox, name, cell, maxSpan } = req.body || {};
+    const { bbox, name, cell, maxSpan, mode } = req.body || {};
     if (!bbox || !['s', 'w', 'n', 'e'].every((k) => Number.isFinite(+bbox[k]))) return res.status(400).json({ error: 'bad_bbox', message: 's,w,n,e 좌표가 필요합니다.' });
     const bb = { s: +bbox.s, w: +bbox.w, n: +bbox.n, e: +bbox.e };
     // 너무 넓은 영역 방지(약 1.2km 이하 권장)
@@ -139,7 +194,7 @@ router.post('/build', requireUser, async (req, res, next) => {
     try { features = await fetchOSM(bb); }
     catch (e) { return res.status(502).json({ error: 'osm_fail', message: 'OSM 데이터를 가져오지 못했습니다(인터넷/Overpass 상태 확인). ' + e.message }); }
     if (!features.buildings.length && !features.roads.length) return res.status(404).json({ error: 'empty_area', message: '이 영역에 건물·도로 데이터가 없습니다.' });
-    const built = voxelizeCity(features, { name, cell, maxSpan });
+    const built = mode === 'real' ? realCity(features, { name }) : voxelizeCity(features, { name, cell, maxSpan });
     const out = await saveLevel(req.project.id, req.user.uid, name, built, req.user.name);
     broadcast(req.project.id, 'igplay:levels', { type: 'level_new', id: out.id, title: out.title, ts: Date.now() });
     res.status(201).json({ level: out, buildings: features.buildings.length, roads: features.roads.length });

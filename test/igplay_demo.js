@@ -517,6 +517,13 @@ async function run() {
   // 지도 핀에 복셀 시티 레벨이 뜨는지
   r = await j('GET', '/api/igmap/pins?minLat=37.51&maxLat=37.53&minLng=127.04&maxLng=127.06&kinds=level', { key });
   ok('복셀 시티가 월드 지도 핀에 노출', r.status === 200 && r.data.pins.some((p) => p.id === cityId));
+  // 리얼 모드: 건물을 3D 메시(props)로
+  r = await j('POST', '/api/igcity/voxelize', { key, token: creator, body: { features: cityFeatures, name: '청담 리얼', mode: 'real' } });
+  ok('리얼 모드 → 레벨 생성', r.status === 201 && !!r.data.level.id);
+  const realId = r.data.level.id;
+  r = await j('GET', '/api/igplay/levels/' + realId, { key, token: creator });
+  ok('리얼 모드: 건물이 메시 프롭(복셀 아님)', r.status === 200 && r.data.level.props.length >= 2 && r.data.level.props[1].verts && r.data.level.props[1].faces);
+  ok('리얼 모드: 최소 복셀은 지면+골만', r.status === 200 && r.data.level.voxels.length === 2 && r.data.level.voxels.some((b) => b.t === 4));
   // 잘못된 요청(bbox 없음)
   r = await j('POST', '/api/igcity/voxelize', { key, token: creator, body: { features: { buildings: [] } } });
   ok('bbox 없는 요청 거부', r.status === 400);
