@@ -1070,7 +1070,12 @@ function showRewardAd(onDone){
 
 function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove('show');},1900); }
 function avaColor(seed){ var h=0; for(var i=0;i<seed.length;i++)h=(h*31+seed.charCodeAt(i))%360; return 'hsl('+h+',62%,58%)'; }
-function fmt(n){ n=Math.round(n); if(n>=10000)return (n/10000).toFixed(n>=100000?0:1).replace(/\.0$/,'')+'만'; if(n>=1000)return (n/1000).toFixed(1).replace(/\.0$/,'')+'천'; return ''+n; }
+function igLocale(){ try{ var s=localStorage.getItem('igplay_lang'); if(s&&['ko','en','hi','id'].indexOf(s)>=0)return s; }catch(e){} return 'en'; }
+function fmt(n){ n=Math.round(n);
+  if(igLocale()==='ko'){ if(n>=10000)return (n/10000).toFixed(n>=100000?0:1).replace(/\.0$/,'')+'만'; if(n>=1000)return (n/1000).toFixed(1).replace(/\.0$/,'')+'천'; return ''+n; }
+  if(n>=1000000)return (n/1000000).toFixed(n>=10000000?0:1).replace(/\.0$/,'')+'M';
+  if(n>=1000)return (n/1000).toFixed(n>=100000?0:1).replace(/\.0$/,'')+'K';
+  return ''+n; }
 function msToClock(ms){ var s=ms/1000; var m=Math.floor(s/60); var r=(s-m*60); return m+':'+(r<10?'0':'')+r.toFixed(2); }
 
 /* ============================= level model ============================= */
@@ -1322,7 +1327,7 @@ function makeCard(l){
    '<div class="meta"><div class="ava" style="background:'+avaColor(l.creatorId)+'">'+l.creator.charAt(0)+'</div>'+
      '<div class="mtext"><div class="ctitle">'+esc(l.title)+'</div>'+
      '<div class="csub">'+esc(l.creator)+(l.verified?' ✔':'')+'</div>'+
-     '<div class="csub"><span class="vf"><span>플레이</span> '+fmt(playCount(l))+'<span>회</span></span> · <span>'+esc(l.genre)+'</span></div></div></div>';
+     '<div class="csub"><span class="vf">'+fmt(playCount(l))+' <span>회</span></span> · <span>'+esc(l.genre)+'</span></div></div></div>';
   var cv=c.querySelector('canvas'); if(l.cover){ setThumbImage(c.querySelector('.thumb'),l.cover,cv); } else drawThumb(cv,l);
   return c;
 }
