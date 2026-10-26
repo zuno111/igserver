@@ -921,11 +921,11 @@ function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(
   if(d.shorts&&d.shorts.some(function(s){return s.externalUrl&&s.externalUrl.indexOf('gtv-videos-bucket')>=0;}))d.shorts=defaultShorts(); // 구 mp4 시드 갱신
   return d; }
 function defaultShorts(){ return [
-  {id:'sh_gn',title:'강남 월드 미리보기 🏙️',creator:'Voxel Street',youtubeId:'9bZkp7q19f0',likes:12800},
-  {id:'sh_bb',title:'블록 파쿠르 하이라이트 🧱',creator:'파쿠르랩',youtubeId:'aqz-KE-bpKQ',likes:9400},
+  {id:'sh_bb',title:'강남 월드 미리보기 🏙️',creator:'Voxel Street',youtubeId:'aqz-KE-bpKQ',likes:12800},
+  {id:'sh_si',title:'블록 파쿠르 하이라이트 🧱',creator:'파쿠르랩',youtubeId:'eRsGyueVLvQ',likes:9400},
   {id:'sh_zoo',title:'첫 레벨 플레이 영상 🎮',creator:'igPlay',youtubeId:'jNQXAC9IVRw',likes:5300},
-  {id:'sh_me',title:'복셀 에디터 꿀팁 ✏️',creator:'빌더랩',youtubeId:'ZZ5LpwO-An4',likes:3100},
-  {id:'sh_cat',title:'캐릭터 커스터마이즈 🐱',creator:'igPlay',youtubeId:'kJQP7kiw5Fk',likes:2400}
+  {id:'sh_ts',title:'복셀 에디터 꿀팁 ✏️',creator:'빌더랩',youtubeId:'R6MlUcmOul8',likes:3100},
+  {id:'sh_ed',title:'캐릭터 커스터마이즈 🐱',creator:'igPlay',youtubeId:'TLkA0RELQ1g',likes:2400}
 ]; }
 function defaultCatalog(){ var c='demo'; function it(k,t,cr,ac,p,tags){ return {id:'ci_seed_'+t.replace(/\s/g,'').slice(0,6)+Math.random().toString(36).slice(2,5),kind:k,title:t,desc:'',creator:cr,creatorId:c,ownerId:c,access:ac,price:p||0,gateSymbol:null,gateMin:0,externalUrl:null,tags:tags||[],cover:null,downloads:Math.floor(Math.random()*4000)}; }
   return [
@@ -2578,6 +2578,8 @@ function renderWorld(m){
     c.strokeStyle='#c4ced5'; c.lineWidth=2; c.beginPath(); for(var k=0;k<=g;k++){ c.moveTo(k*cw,0);c.lineTo(k*cw,s.y); c.moveTo(0,k*ch);c.lineTo(s.x,k*ch);} c.stroke();
     return tile; } });
   new LocalMap({maxZoom:19,attribution:'igPlay 월드맵'}).addTo(map);
+  // 실제 도메인에선 OSM 타일이 위에 로드되어 진짜 지도가 되고, 차단되는 환경(아티팩트)에선 위 자체 지도가 그대로 보인다.
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap',crossOrigin:true}).addTo(map);
   var layer=L.layerGroup().addTo(map);
   function drawPins(pins){ layer.clearLayers();
     (pins||[]).forEach(function(p){ var col=COLORS[p.kind]||'#ffffff';
