@@ -212,6 +212,11 @@ body.has-touch .touchctrl{display:grid}
   .topbtn .lb{display:none} .topbtn{padding:8px 11px}
   .tags{width:100%;margin-left:0}
 }
+/* 전체화면 몰입형(탐험·숏폼)이 모바일 하단 네비바(62px)에 가리지 않도록 */
+@media (max-width:860px){
+  .exRoot{height:calc(100vh - 56px - 62px) !important;min-height:420px !important}
+  #shortsWrap{bottom:62px !important}
+}
 </style>
 
 <div id="app">
@@ -2429,7 +2434,7 @@ var exploreSession=null;
 function renderExplore(m,key){
   key=key||'seoul'; var P0=CITY_PRESETS[key]||CITY_PRESETS.seoul;
   m.innerHTML=''+
-  '<div style="position:relative;width:100%;height:calc(100vh - 56px);min-height:520px;overflow:hidden;background:#aee0ff">'+
+  '<div class="exRoot" style="position:relative;width:100%;height:calc(100vh - 56px);min-height:520px;overflow:hidden;background:#aee0ff">'+
     '<canvas id="exCv" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>'+
     // 상단 도시 탭
     '<div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 8px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
