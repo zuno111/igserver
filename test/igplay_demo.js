@@ -500,6 +500,27 @@ async function run() {
   r = await j('GET', '/api/igmap/pins?minLat=30&maxLat=31&minLng=120&maxLng=121', { key });
   ok('범위 밖 bbox 빈 결과', r.status === 200 && r.data.pins.length === 0, JSON.stringify(r.data.pins.length));
 
+  // ===================== igCity (도시 복셀화 → 월드 레벨) =====================
+  console.log('--- igCity(도시 복셀화) ---');
+  function sq(lat, lon, d) { return [{ lat, lon }, { lat, lon: lon + d }, { lat: lat + d, lon: lon + d }, { lat: lat + d, lon }]; }
+  const cityFeatures = { bbox: { s: 37.5190, w: 127.0470, n: 37.5205, e: 127.0490 },
+    buildings: [{ geometry: sq(37.5194, 127.0474, 0.0004), height: '30' }, { geometry: sq(37.5198, 127.0482, 0.0003), levels: '5' }],
+    roads: [{ geometry: [{ lat: 37.5192, lon: 127.0472 }, { lat: 37.5202, lon: 127.0486 }] }] };
+  r = await j('POST', '/api/igcity/voxelize', { key, token: creator, body: { features: cityFeatures, name: '청담 월드', cell: 4 } });
+  ok('도시 복셀화 → 레벨 생성', r.status === 201 && !!r.data.level.id && r.data.level.count > 1000, JSON.stringify({ count: r.data.level.count, size: r.data.level.size }));
+  const cityId = r.data.level.id;
+  r = await j('GET', '/api/igplay/levels/' + cityId, { key, token: creator });
+  const cv = r.data.level.voxels;
+  ok('복셀화 레벨: 지면·건물·골 포함', r.status === 200 && cv.some((b) => b.t === 1) && cv.some((b) => b.t === 2) && cv.some((b) => b.t === 4));
+  ok('복셀화 레벨: 건물 높이 쌓임(y>1)', cv.some((b) => b.t === 2 && b.y > 1));
+  ok('복셀화 레벨: 위치(geo) 부여', !!r.data.level.geo && Math.abs(r.data.level.geo.lat - 37.51975) < 0.001);
+  // 지도 핀에 복셀 시티 레벨이 뜨는지
+  r = await j('GET', '/api/igmap/pins?minLat=37.51&maxLat=37.53&minLng=127.04&maxLng=127.06&kinds=level', { key });
+  ok('복셀 시티가 월드 지도 핀에 노출', r.status === 200 && r.data.pins.some((p) => p.id === cityId));
+  // 잘못된 요청(bbox 없음)
+  r = await j('POST', '/api/igcity/voxelize', { key, token: creator, body: { features: { buildings: [] } } });
+  ok('bbox 없는 요청 거부', r.status === 400);
+
   // 보안: 제네릭 /api/data 로 ISC 내부 컬렉션 쓰기 차단
   r = await j('POST', '/api/data/_isc_wallet', { key, token: player, body: { balance: 999999 } });
   ok('내부 컬렉션(_isc_wallet) 쓰기 차단(403)', r.status === 403, JSON.stringify(r.data));

@@ -1590,6 +1590,7 @@ function renderWorld(m){
   if(typeof L==='undefined'){ m.innerHTML='<div class="wrap"><div class="empty"><h3>지도를 불러오지 못했습니다</h3></div></div>'; return; }
   m.innerHTML='<div style="position:absolute;inset:0"><div id="worldmap" style="position:absolute;inset:0"></div>'+
     '<div style="position:absolute;top:12px;left:12px;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--muted);pointer-events:none">월드 · 핀을 눌러 콘텐츠로 이동</div>'+
+    '<button class="btn brand" id="cityBtn" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:500">이 구역 복셀화해서 올리기</button>'+
     '<div style="position:absolute;top:12px;right:12px;z-index:500;display:flex;gap:6px">'+
       ['level|레벨|#ffb02e','vod|영상|#3aa0ff','live|라이브|#f0556b','store|상점|#27d4b8'].map(function(s){var p=s.split("|");return '<span style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px 9px;font-size:11px"><b style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p[2]+';margin-right:4px"></b>'+p[1]+'</span>';}).join('')+
     '</div></div>';
@@ -1609,6 +1610,17 @@ function renderWorld(m){
     }).catch(function(){});
   }
   map.on('moveend',load); setTimeout(function(){ map.invalidateSize(); load(); },80);
+  // 이 구역(현재 지도 범위) 땅을 OSM 건물·도로로 복셀화해 월드 레벨로 올림
+  var cityBtn=document.getElementById('cityBtn');
+  if(cityBtn)cityBtn.onclick=function(){
+    var b=map.getBounds(); var bbox={s:b.getSouth(),w:b.getWest(),n:b.getNorth(),e:b.getEast()};
+    if((bbox.n-bbox.s)>0.02||(bbox.e-bbox.w)>0.02){ toast('더 확대하세요(약 1km 이하 구역)'); return; }
+    var name=prompt('이 구역 이름(예: 청담동)','') ; if(name===null)return;
+    cityBtn.disabled=true; cityBtn.textContent='지형 가져오는 중…';
+    api('POST','/api/igcity/build',{bbox:bbox,name:name||'복셀 시티'}).then(function(r){
+      toast('복셀화 완료 · 건물 '+(r.buildings||0)+'개 ('+r.level.count+' 블록)'); cityBtn.disabled=false; cityBtn.textContent='이 구역 복셀화해서 올리기'; load();
+    }).catch(function(e){ toast(e.message||'실패'); cityBtn.disabled=false; cityBtn.textContent='이 구역 복셀화해서 올리기'; });
+  };
   activeSession={dispose:function(){ try{map.remove();}catch(e){} }};
 }
 
@@ -2063,6 +2075,8 @@ render();
     "↷ 다시실행": ["↷ Redo", "↷ फिर करें", "↷ Ulangi"],
     "탑뷰": ["Top view", "ऊपर से", "Tampak atas"],
     "정면": ["Front view", "सामने से", "Tampak depan"],
+    "이 구역 복셀화해서 올리기": ["Voxelize & upload this area", "इस क्षेत्र को वॉक्सलाइज़ कर अपलोड करें", "Voxelkan & unggah area ini"],
+    "월드 · 핀을 눌러 콘텐츠로 이동": ["Worlds · tap a pin to open", "वर्ल्ड · पिन दबाकर खोलें", "Dunia · ketuk pin untuk buka"],
     "코인": ["Coin", "सिक्का", "Koin"],
     "골": ["Goal", "लक्ष्य", "Tujuan"],
     "시작": ["Spawn", "स्पॉन", "Spawn"],
