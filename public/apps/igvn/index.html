@@ -1,0 +1,367 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>igPlay FMV Maker</title>
+<meta name="description" content="Make FMV dating-sim / visual-novel games from AI videos — right in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+:root{ color-scheme:dark;
+  --bg:#0c0f16; --surface:#141a24; --surface2:#1b2230; --surface3:#232d3d; --border:#283244; --border2:#374258;
+  --fg:#eaeef4; --muted:#93a1b4; --faint:#67748a; --brand:#ff5a8a; --brand2:#ff8f5a; --accent:#6a8bff; --ok:#39d98a; }
+*{box-sizing:border-box} html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font-family:'IBM Plex Sans KR',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+#app{min-height:100%}
+a{color:var(--accent)}
+button,input,textarea,select{font-family:inherit}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--surface3)}
+.btn.brand{background:linear-gradient(90deg,var(--brand),var(--brand2));border:0;color:#1a0710}
+.btn.ghost{background:transparent}
+.btn.sm{padding:6px 10px;font-size:12.5px;border-radius:8px}
+.btn.danger{color:#ff7a90}
+.in{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--fg);outline:none;font-size:14px}
+.in:focus{border-color:var(--brand)}
+textarea.in{min-height:84px;resize:vertical;line-height:1.5}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:12px 18px;background:rgba(12,15,22,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:18px;cursor:pointer}
+.logo .d{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;color:#1a0710;font-size:15px}
+.wrap{max-width:1100px;margin:0 auto;padding:22px 18px 60px}
+.sechead h1{font-size:24px;margin:0 0 4px} .sechead p{color:var(--muted);margin:0 0 20px;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.card:hover{border-color:var(--brand)}
+.card .thumb{aspect-ratio:16/10;background:linear-gradient(135deg,#2a2140,#3a2a55);display:grid;place-items:center;font-size:40px;position:relative}
+.card .meta{padding:11px 13px}
+.card .meta h3{margin:0;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .meta p{margin:4px 0 0;color:var(--muted);font-size:12px}
+.pill{display:inline-block;background:var(--surface3);border:1px solid var(--border);border-radius:999px;padding:3px 9px;font-size:11.5px;color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.label{font-size:12.5px;font-weight:700;color:var(--muted);margin:14px 0 6px;display:block}
+/* editor */
+.ed{display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start}
+.scenelist{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;position:sticky;top:76px}
+.scene-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;border:1px solid transparent;cursor:pointer;font-size:13px}
+.scene-item:hover{background:var(--surface2)}
+.scene-item.on{background:var(--surface2);border-color:var(--brand)}
+.scene-item .n{width:22px;height:22px;border-radius:6px;background:var(--surface3);display:grid;place-items:center;font-size:11px;flex:0 0 auto}
+.scene-item.start .n{background:var(--brand);color:#1a0710}
+.edpanel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+.vprev{aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;position:relative;margin-top:6px}
+.vprev iframe,.vprev video{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:cover;background:#000}
+.novid{position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);font-size:13px}
+.choice-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.choice-row .in{flex:1;min-width:120px}
+.aff{display:flex;gap:5px;align-items:center;font-size:12px;color:var(--muted)}
+.chartag{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:4px 10px;font-size:12.5px}
+.dot{width:10px;height:10px;border-radius:50%}
+/* player */
+.player{position:fixed;inset:0;background:#000;z-index:100;display:flex;flex-direction:column}
+.pstage{position:absolute;inset:0;background:#000}
+.pstage iframe,.pstage video{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:cover}
+.ptint{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.25),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 55%,rgba(0,0,0,.85))}
+.ptop{position:absolute;top:0;left:0;right:0;z-index:3;display:flex;align-items:center;gap:10px;padding:14px 16px}
+.ptop .aff-bars{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.affbar{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.45);border-radius:999px;padding:4px 10px;font-size:12px}
+.affbar .track{width:60px;height:5px;background:rgba(255,255,255,.2);border-radius:3px;overflow:hidden}
+.affbar .fill{height:100%;background:var(--brand)}
+.pdlg{position:absolute;left:0;right:0;bottom:0;z-index:4;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px))}
+.pbox{max-width:860px;margin:0 auto;background:rgba(14,18,26,.92);border:1px solid var(--border2);border-radius:16px;padding:16px 20px;cursor:pointer}
+.pspk{font-weight:800;color:var(--brand);margin-bottom:6px;font-size:15px}
+.ptext{font-size:16px;line-height:1.6;min-height:52px}
+.phint{text-align:right;color:var(--faint);font-size:12px;margin-top:6px}
+.pchoices{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.pchoice{background:rgba(20,26,36,.92);border:1px solid var(--border2);border-radius:12px;padding:14px 18px;font-size:15px;font-weight:600;cursor:pointer;text-align:left}
+.pchoice:hover{border-color:var(--brand);background:rgba(40,30,48,.95)}
+.pmute{position:absolute;top:14px;right:16px;z-index:5}
+.endcard{max-width:520px;margin:0 auto;background:rgba(14,18,26,.95);border:1px solid var(--border2);border-radius:18px;padding:26px;text-align:center}
+.empty{padding:50px 20px;text-align:center;color:var(--muted);grid-column:1/-1}
+.empty h3{color:var(--fg);margin:0 0 6px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:var(--surface3);border:1px solid var(--border2);border-radius:10px;padding:11px 16px;font-size:13.5px;opacity:0;transition:.2s;z-index:3000;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;display:grid;place-items:center;padding:16px}
+.ocard{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:20px;max-width:460px;width:100%}
+@media(max-width:760px){ .ed{grid-template-columns:1fr} .scenelist{position:static} }
+</style>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s,r){return (r||document).querySelector(s);};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function uid(p){return (p||'id')+Math.random().toString(36).slice(2,9);}
+var toastT; function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('show');},1900);}
+function ytId(u){var m=String(u||'').match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/)([A-Za-z0-9_-]{11})/);return m?m[1]:'';}
+
+/* ---------------- data ---------------- */
+var KEY='igvn_v1';
+function load(){ try{var d=JSON.parse(localStorage.getItem(KEY));if(d&&d.projects)return d;}catch(e){} return {projects:[sample()],seed:1}; }
+function save(){ try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){} }
+var DB=load();
+function getP(id){ for(var i=0;i<DB.projects.length;i++)if(DB.projects[i].id===id)return DB.projects[i]; return null; }
+function newScene(){ return {id:uid('s'),video:'',speaker:'',lines:'',choices:[],ending:null}; }
+function newProject(){ var s=newScene(); return {id:uid('vn'),title:'새 FMV 미연시',creator:'',chars:[{name:'유이',color:'#ff5a8a'},{name:'하루',color:'#6a8bff'}],scenes:[s],start:s.id,updated:Date.now()}; }
+
+/* 샘플(바로 플레이 가능) */
+function sample(){
+  var s1={id:'sc1',video:'https://www.youtube.com/watch?v=M7lc1UVf-VE',speaker:'유이',
+    lines:'…드디어 왔네, 여기.\n오늘부터 우리 같은 반이야. 잘 지내보자!',choices:[
+      {text:'“응, 잘 부탁해!” (상냥하게)',to:'sc2',aff:[{c:0,d:2}]},
+      {text:'“…귀찮게 됐군.” (무뚝뚝하게)',to:'sc3',aff:[{c:0,d:-1}]}
+    ],ending:null};
+  var s2={id:'sc2',video:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',speaker:'유이',
+    lines:'헤헤, 다행이다.\n그럼… 방과후에 옥상에서 같이 도시락 먹을래?',choices:[
+      {text:'“좋아, 가자.”',to:'end_good',aff:[{c:0,d:3}]},
+      {text:'“미안, 오늘은 좀…”',to:'end_normal',aff:[{c:0,d:-1}]}
+    ],ending:null};
+  var s3={id:'sc3',video:'https://www.youtube.com/watch?v=jNQXAC9IVRw',speaker:'유이',
+    lines:'…그래. 뭐, 사람마다 다르니까.\n그래도 곤란할 땐 말해. 도와줄게.',choices:[
+      {text:'“…고마워.”',to:'end_normal',aff:[{c:0,d:1}]}
+    ],ending:null};
+  var eg={id:'end_good',video:'https://www.youtube.com/watch?v=kXYiU_JCYtU',speaker:'',lines:'',choices:[],
+    ending:{title:'HAPPY END — 옥상의 약속',text:'유이와의 거리가 한층 가까워졌다. 내일이 기다려지는 하루였다.'}};
+  var en={id:'end_normal',video:'',speaker:'',lines:'',choices:[],
+    ending:{title:'NORMAL END — 평범한 하루',text:'아직은 서로를 알아가는 중. 이야기는 이제 시작이다.'}};
+  return {id:'demo',title:'데모: 전학 첫날',creator:'igPlay',chars:[{name:'유이',color:'#ff5a8a'},{name:'하루',color:'#6a8bff'}],
+    scenes:[s1,s2,s3,eg,en],start:'sc1',updated:Date.now()};
+}
+
+/* ---------------- video ---------------- */
+function videoHTML(src,autoplay){
+  var yt=ytId(src);
+  if(yt) return '<iframe src="https://www.youtube.com/embed/'+yt+'?autoplay='+(autoplay?1:0)+'&mute=1&rel=0&playsinline=1&loop=1&playlist='+yt+'" referrerpolicy="origin" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+  if(src) return '<video src="'+esc(src)+'" autoplay muted loop playsinline></video>';
+  return '<div class="novid">🎬 영상 URL(AI 영상·유튜브·mp4)을 넣으세요</div>';
+}
+
+/* ---------------- router ---------------- */
+function go(h){ location.hash='#'+h; }
+function route(){ var h=location.hash.replace(/^#/,'')||'home'; var p=h.split('/'); render(p[0],p[1]); }
+window.addEventListener('hashchange',route);
+
+function topbar(){ return '<div class="topbar"><div class="logo" onclick="location.hash=\'#home\'"><span class="d">🎬</span><span>igPlay <b style="color:var(--brand)">FMV</b></span></div>'+
+  '<span class="pill">AI 영상 → 미연시 게임</span><div style="margin-left:auto" class="row">'+
+  '<button class="btn sm ghost" onclick="importJSON()">가져오기</button>'+
+  '<button class="btn brand sm" onclick="location.hash=\'#new\'">+ 새로 만들기</button></div></div>'; }
+
+function render(name,arg){
+  var app=$('#app');
+  if(name==='new'){ var p=newProject(); DB.projects.unshift(p); save(); go('edit/'+p.id); return; }
+  if(name==='edit'){ renderEditor(app,arg); return; }
+  if(name==='play'){ renderPlayer(app,arg); return; }
+  renderHome(app);
+}
+
+/* ---------------- home ---------------- */
+function renderHome(app){
+  app.innerHTML=topbar()+'<div class="wrap"><div class="sechead"><h1>FMV 미연시 메이커</h1>'+
+    '<p>AI로 만든 영상(또는 유튜브·mp4)으로 분기형 연애 비주얼노벨을 만들고 바로 플레이하세요. 선택지·호감도·엔딩까지.</p></div>'+
+    '<div class="grid" id="plist"></div></div>';
+  var g=$('#plist');
+  if(!DB.projects.length){ g.innerHTML='<div class="empty"><h3>아직 작품이 없어요</h3><p>“새로 만들기”로 첫 FMV 미연시를 시작하세요.</p></div>'; return; }
+  g.innerHTML=DB.projects.map(function(p){
+    var firstVid=(p.scenes.find(function(s){return s.video;})||{}).video;
+    var yt=ytId(firstVid);
+    return '<div class="card" data-id="'+p.id+'">'+
+      '<div class="thumb">'+(yt?'<img src="https://i.ytimg.com/vi/'+yt+'/hqdefault.jpg" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">':'')+'<span style="position:relative;z-index:1">💌</span></div>'+
+      '<div class="meta"><h3>'+esc(p.title)+'</h3><p>'+p.scenes.length+' 씬 · '+(p.chars.length)+' 캐릭터'+(p.creator?(' · @'+esc(p.creator)):'')+'</p>'+
+      '<div class="row" style="margin-top:10px">'+
+        '<button class="btn brand sm" data-play="'+p.id+'">▶ 플레이</button>'+
+        '<button class="btn sm" data-edit="'+p.id+'">편집</button>'+
+        '<button class="btn sm danger" data-del="'+p.id+'" style="margin-left:auto">삭제</button>'+
+      '</div></div></div>';
+  }).join('');
+  g.querySelectorAll('[data-play]').forEach(function(b){b.onclick=function(e){e.stopPropagation();go('play/'+b.getAttribute('data-play'));};});
+  g.querySelectorAll('[data-edit]').forEach(function(b){b.onclick=function(e){e.stopPropagation();go('edit/'+b.getAttribute('data-edit'));};});
+  g.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(e){e.stopPropagation();if(confirm('이 작품을 삭제할까요?')){DB.projects=DB.projects.filter(function(x){return x.id!==b.getAttribute('data-del');});save();renderHome(app);}};});
+  g.querySelectorAll('.card').forEach(function(c){c.onclick=function(){go('edit/'+c.getAttribute('data-id'));};});
+}
+
+/* ---------------- editor ---------------- */
+var curScene=0;
+function renderEditor(app,id){
+  var p=getP(id); if(!p){ go('home'); return; }
+  if(curScene>=p.scenes.length)curScene=0;
+  app.innerHTML=topbar()+'<div class="wrap">'+
+    '<div class="row" style="margin-bottom:14px">'+
+      '<input class="in" id="ptitle" value="'+esc(p.title)+'" style="max-width:360px;font-size:17px;font-weight:700" placeholder="작품 제목">'+
+      '<button class="btn brand" onclick="location.hash=\'#play/'+p.id+'\'">▶ 플레이</button>'+
+      '<button class="btn" id="exportBtn">내보내기</button>'+
+      '<button class="btn ghost" onclick="location.hash=\'#home\'">목록</button>'+
+    '</div>'+
+    '<div id="chars" style="margin-bottom:16px"></div>'+
+    '<div class="ed"><div class="scenelist" id="slist"></div><div class="edpanel" id="spanel"></div></div></div>';
+  $('#ptitle').oninput=function(){ p.title=this.value; p.updated=Date.now(); save(); };
+  $('#exportBtn').onclick=function(){ exportJSON(p); };
+  drawChars(p); drawSceneList(p); drawScenePanel(p);
+}
+function drawChars(p){
+  var el=$('#chars'); if(!el)return;
+  el.innerHTML='<span class="label" style="margin:0 8px 0 0">캐릭터</span>'+
+    p.chars.map(function(c,i){return '<span class="chartag"><span class="dot" style="background:'+esc(c.color)+'"></span><input value="'+esc(c.name)+'" data-ci="'+i+'" class="cname" style="background:transparent;border:0;color:var(--fg);width:70px;outline:none"><input type="color" value="'+esc(c.color)+'" data-ci="'+i+'" class="ccol" style="width:20px;height:20px;border:0;background:none;padding:0;cursor:pointer"><button class="btn sm ghost danger" data-crm="'+i+'" style="padding:2px 6px">✕</button></span>';}).join(' ')+
+    ' <button class="btn sm" id="caddBtn">+ 캐릭터</button>';
+  el.style.display='flex'; el.style.flexWrap='wrap'; el.style.gap='8px'; el.style.alignItems='center';
+  el.querySelectorAll('.cname').forEach(function(x){x.oninput=function(){p.chars[+x.getAttribute('data-ci')].name=x.value;save();};});
+  el.querySelectorAll('.ccol').forEach(function(x){x.oninput=function(){p.chars[+x.getAttribute('data-ci')].color=x.value;save();drawChars(p);};});
+  el.querySelectorAll('[data-crm]').forEach(function(x){x.onclick=function(){if(p.chars.length<=1){toast('캐릭터는 최소 1명');return;}p.chars.splice(+x.getAttribute('data-crm'),1);save();drawChars(p);drawScenePanel(p);};});
+  $('#caddBtn').onclick=function(){var cols=['#ff5a8a','#6a8bff','#39d98a','#ffb02e','#b57aff'];p.chars.push({name:'새 캐릭터',color:cols[p.chars.length%cols.length]});save();drawChars(p);};
+}
+function drawSceneList(p){
+  var el=$('#slist'); if(!el)return;
+  el.innerHTML='<div class="label" style="margin-top:0">씬 ('+p.scenes.length+')</div>'+
+    p.scenes.map(function(s,i){var isStart=p.start===s.id;return '<div class="scene-item'+(i===curScene?' on':'')+(isStart?' start':'')+'" data-i="'+i+'"><span class="n">'+(i+1)+'</span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(s.ending?('🏁 '+esc(s.ending.title||'엔딩')):esc((s.lines||'').split('\n')[0]||s.speaker||'(빈 씬)'))+'</span></div>';}).join('')+
+    '<button class="btn sm" id="addScene" style="width:100%;margin-top:8px">+ 씬 추가</button>';
+  el.querySelectorAll('.scene-item').forEach(function(x){x.onclick=function(){curScene=+x.getAttribute('data-i');drawSceneList(p);drawScenePanel(p);};});
+  $('#addScene').onclick=function(){var s=newScene();p.scenes.push(s);curScene=p.scenes.length-1;save();drawSceneList(p);drawScenePanel(p);};
+}
+function drawScenePanel(p){
+  var el=$('#spanel'); if(!el)return; var s=p.scenes[curScene]; if(!s){el.innerHTML='';return;}
+  var isStart=p.start===s.id;
+  var sceneOpts=p.scenes.map(function(x,i){return '<option value="'+x.id+'">'+(i+1)+'. '+esc((x.ending?('🏁 '+(x.ending.title||'엔딩')):((x.lines||'').split('\n')[0]||'씬')).slice(0,24))+'</option>';}).join('');
+  el.innerHTML=
+    '<div class="row"><b style="font-size:16px">씬 '+(curScene+1)+'</b>'+
+      '<button class="btn sm '+(isStart?'brand':'')+'" id="setStart">'+(isStart?'▶ 시작 씬':'시작 씬으로')+'</button>'+
+      '<label class="btn sm '+(s.ending?'brand':'ghost')+'" style="cursor:pointer"><input type="checkbox" id="isEnd" '+(s.ending?'checked':'')+' style="margin-right:6px">엔딩 씬</label>'+
+      '<button class="btn sm ghost" id="scUp">▲</button><button class="btn sm ghost" id="scDn">▼</button>'+
+      '<button class="btn sm danger" id="scDel" style="margin-left:auto">씬 삭제</button></div>'+
+    '<span class="label">영상 (AI 영상 URL · 유튜브 · mp4)</span>'+
+    '<div class="row"><input class="in" id="vurl" value="'+esc(s.video)+'" placeholder="https://… 또는 유튜브 링크" style="flex:1"><button class="btn" id="recBtn">🎥 녹화</button></div>'+
+    '<div class="vprev" id="vprev">'+videoHTML(s.video,false)+'</div>'+
+    (s.ending?
+      ('<span class="label">엔딩 제목</span><input class="in" id="endTitle" value="'+esc(s.ending.title||'')+'" placeholder="예: HAPPY END — 옥상의 약속">'+
+       '<span class="label">엔딩 내용</span><textarea class="in" id="endText" placeholder="엔딩 나레이션">'+esc(s.ending.text||'')+'</textarea>')
+      :
+      ('<span class="label">말하는 사람</span>'+
+       '<select class="in" id="spk" style="max-width:220px"><option value="">(나레이션)</option>'+p.chars.map(function(c){return '<option'+(s.speaker===c.name?' selected':'')+'>'+esc(c.name)+'</option>';}).join('')+'</select>'+
+       '<span class="label">대사 (한 줄에 한 문장씩, 탭하면 한 줄씩 진행)</span>'+
+       '<textarea class="in" id="lines" placeholder="첫 줄 대사\n두 번째 대사…">'+esc(s.lines)+'</textarea>'+
+       '<span class="label">선택지 → 분기 + 호감도</span><div id="choices"></div>'+
+       '<button class="btn sm" id="addChoice" style="margin-top:4px">+ 선택지</button>'+
+       '<div class="label" style="color:var(--faint);font-weight:400;margin-top:10px">선택지가 없으면 자동으로 다음 씬으로 진행됩니다.</div>'+
+       '<span class="label">다음 씬(선택지 없을 때)</span><select class="in" id="nextScene" style="max-width:360px"><option value="">— 다음 순서 / 없으면 끝 —</option>'+sceneOpts+'</select>')
+    );
+  // bindings
+  $('#setStart').onclick=function(){p.start=s.id;save();drawSceneList(p);drawScenePanel(p);toast('시작 씬 지정');};
+  $('#scDel').onclick=function(){if(p.scenes.length<=1){toast('씬은 최소 1개');return;}if(!confirm('이 씬을 삭제할까요?'))return;p.scenes.splice(curScene,1);if(curScene>=p.scenes.length)curScene=p.scenes.length-1;if(!getP(p.id).scenes.some(function(x){return x.id===p.start;}))p.start=p.scenes[0].id;save();drawSceneList(p);drawScenePanel(p);};
+  $('#scUp').onclick=function(){if(curScene<=0)return;var a=p.scenes;var t=a[curScene-1];a[curScene-1]=a[curScene];a[curScene]=t;curScene--;save();drawSceneList(p);drawScenePanel(p);};
+  $('#scDn').onclick=function(){if(curScene>=p.scenes.length-1)return;var a=p.scenes;var t=a[curScene+1];a[curScene+1]=a[curScene];a[curScene]=t;curScene++;save();drawSceneList(p);drawScenePanel(p);};
+  $('#isEnd').onchange=function(){ s.ending=this.checked?{title:'',text:''}:null; if(s.ending){s.choices=[];} save();drawSceneList(p);drawScenePanel(p); };
+  $('#vurl').oninput=function(){s.video=this.value;save();};
+  $('#vurl').onchange=function(){$('#vprev').innerHTML=videoHTML(s.video,false);};
+  $('#recBtn').onclick=function(){ recordClip(function(url){ s.video=url; save(); $('#vurl').value=url; $('#vprev').innerHTML=videoHTML(url,true); }); };
+  if(s.ending){
+    $('#endTitle').oninput=function(){s.ending.title=this.value;save();};
+    $('#endText').oninput=function(){s.ending.text=this.value;save();};
+  } else {
+    $('#spk').onchange=function(){s.speaker=this.value;save();};
+    $('#lines').oninput=function(){s.lines=this.value;save();};
+    $('#nextScene').value=s.next||''; $('#nextScene').onchange=function(){s.next=this.value;save();};
+    drawChoices(p,s,sceneOpts);
+    $('#addChoice').onclick=function(){s.choices.push({text:'',to:'',aff:[]});save();drawChoices(p,s,sceneOpts);};
+  }
+}
+function drawChoices(p,s,sceneOpts){
+  var el=$('#choices'); if(!el)return;
+  el.innerHTML=s.choices.map(function(c,i){
+    return '<div class="choice-row">'+
+      '<input class="in" data-ct="'+i+'" value="'+esc(c.text)+'" placeholder="선택지 문구">'+
+      '<select class="in" data-cto="'+i+'" style="max-width:180px"><option value="">→ 다음 씬…</option>'+sceneOpts.replace('value="'+c.to+'"','value="'+c.to+'" selected')+'</select>'+
+      '<select class="in" data-cc="'+i+'" style="max-width:120px"><option value="">호감도 없음</option>'+p.chars.map(function(ch,ci){var cur=(c.aff&&c.aff[0]&&c.aff[0].c===ci);return '<option value="'+ci+'"'+(cur?' selected':'')+'>'+esc(ch.name)+'</option>';}).join('')+'</select>'+
+      '<input class="in" type="number" data-cd="'+i+'" value="'+((c.aff&&c.aff[0])?c.aff[0].d:'')+'" placeholder="±" style="width:66px" title="호감도 증감">'+
+      '<button class="btn sm danger" data-crm="'+i+'">✕</button></div>';
+  }).join('');
+  el.querySelectorAll('[data-ct]').forEach(function(x){x.oninput=function(){s.choices[+x.getAttribute('data-ct')].text=x.value;save();};});
+  el.querySelectorAll('[data-cto]').forEach(function(x){x.onchange=function(){s.choices[+x.getAttribute('data-cto')].to=x.value;save();};});
+  function setAff(i){var ci=el.querySelector('[data-cc="'+i+'"]').value;var d=parseInt(el.querySelector('[data-cd="'+i+'"]').value,10);if(ci===''||isNaN(d)){s.choices[i].aff=[];}else{s.choices[i].aff=[{c:+ci,d:d}];}save();}
+  el.querySelectorAll('[data-cc]').forEach(function(x){x.onchange=function(){setAff(+x.getAttribute('data-cc'));};});
+  el.querySelectorAll('[data-cd]').forEach(function(x){x.oninput=function(){setAff(+x.getAttribute('data-cd'));};});
+  el.querySelectorAll('[data-crm]').forEach(function(x){x.onclick=function(){s.choices.splice(+x.getAttribute('data-crm'),1);save();drawChoices(p,s,sceneOpts);};});
+}
+
+/* 녹화(레코더 재사용): 카메라 → webm, 장면 영상으로 바로 사용 + 다운로드 */
+function recordClip(onDone){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){ toast('이 브라우저는 녹화를 지원하지 않습니다'); return; }
+  navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'},audio:true}).then(function(stream){
+    var ov=document.createElement('div'); ov.className='overlay';
+    ov.innerHTML='<div class="ocard" style="max-width:520px"><h3 style="margin:0 0 10px">🎥 장면 녹화</h3>'+
+      '<div style="aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden"><video id="rv" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover"></video></div>'+
+      '<div class="row" style="margin-top:12px"><button class="btn brand" id="rStart">● 녹화 시작</button><span id="rState" style="color:var(--muted);font-size:13px"></span><button class="btn ghost" id="rCancel" style="margin-left:auto">닫기</button></div>'+
+      '<div style="color:var(--faint);font-size:12px;margin-top:8px">녹화한 영상은 이 장면에 바로 쓰이고 파일로도 저장됩니다. (영구 보관은 AI 영상/유튜브 URL 권장)</div></div>';
+    document.body.appendChild(ov);
+    $('#rv',ov).srcObject=stream;
+    var rec=null,chunks=[],recording=false;
+    function stopAll(){ try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){} ov.remove(); }
+    $('#rCancel',ov).onclick=function(){ if(rec&&rec.state!=='inactive')rec.stop(); stopAll(); };
+    $('#rStart',ov).onclick=function(){
+      if(!recording){ chunks=[]; var mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':(MediaRecorder.isTypeSupported('video/webm')?'video/webm':''); rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined); rec.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data);}; rec.onstop=function(){ var blob=new Blob(chunks,{type:'video/webm'}); var url=URL.createObjectURL(blob); var a=document.createElement('a');a.href=url;a.download='igvn_scene_'+Date.now()+'.webm';a.click(); onDone(url); toast('녹화 완료 · 장면에 적용됨'); stopAll(); }; rec.start(1000); recording=true; this.textContent='■ 녹화 정지'; $('#rState',ov).textContent='● 녹화 중…'; }
+      else { rec.stop(); recording=false; }
+    };
+  }).catch(function(e){ toast('카메라 접근 실패: '+(e.name==='NotAllowedError'?'권한 거부':e.message)); });
+}
+
+/* ---------------- player ---------------- */
+function renderPlayer(app,id){
+  var p=getP(id); if(!p){ go('home'); return; }
+  var byId={}; p.scenes.forEach(function(s){byId[s.id]=s;});
+  var aff=p.chars.map(function(){return 0;});
+  var state={sid:p.start,line:0,typing:false};
+  app.innerHTML='<div class="player" id="player"></div>';
+  var root=$('#player');
+  function sceneById(id){ return byId[id]; }
+  function nextSeqScene(s){ var i=p.scenes.indexOf(s); return p.scenes[i+1]||null; }
+  function affBars(){ return '<div class="aff-bars">'+p.chars.map(function(c,i){var v=Math.max(0,Math.min(100,50+aff[i]*8));return '<div class="affbar"><span class="dot" style="background:'+esc(c.color)+'"></span>'+esc(c.name)+'<div class="track"><div class="fill" style="width:'+v+'%;background:'+esc(c.color)+'"></div></div></div>';}).join('')+'</div>'; }
+  function draw(){
+    var s=sceneById(state.sid); if(!s){ end({title:'THE END',text:''}); return; }
+    if(s.ending){ end(s.ending); return; }
+    var lines=(s.lines||'').split('\n').filter(function(x){return x.trim()!=='';});
+    var spkCol='#fff'; var ch=p.chars.filter(function(c){return c.name===s.speaker;})[0]; if(ch)spkCol=ch.color;
+    root.innerHTML=
+      '<div class="pstage" id="stage">'+videoHTML(s.video,true)+'</div><div class="ptint"></div>'+
+      '<button class="btn sm pmute" id="muteBtn">🔇 소리</button>'+
+      '<div class="ptop"><button class="btn sm ghost" style="color:#fff" onclick="location.hash=\'#edit/'+p.id+'\'">✕ 나가기</button>'+affBars()+'</div>'+
+      '<div class="pdlg" id="dlg"></div>';
+    $('#muteBtn').onclick=function(){ var v=root.querySelector('#stage video'); if(v){v.muted=!v.muted;this.textContent=v.muted?'🔇 소리':'🔊 소리 켜짐';} else { toast('유튜브 영상은 영상 안에서 소리를 켜주세요'); } };
+    state.line=0; showLine(s,lines);
+  }
+  function showLine(s,lines){
+    var dlg=$('#dlg'); if(!dlg)return;
+    if(state.line>=lines.length){ showChoices(s); return; }
+    var spk=s.speaker||''; var ch=p.chars.filter(function(c){return c.name===spk;})[0]; var col=ch?ch.color:'#fff';
+    var full=lines[state.line];
+    dlg.innerHTML='<div class="pbox" id="pbox">'+(spk?'<div class="pspk" style="color:'+esc(col)+'">'+esc(spk)+'</div>':'')+'<div class="ptext" id="ptext"></div><div class="phint">탭하여 계속 ▸</div></div>';
+    typeText($('#ptext'),full,function(){ state.typing=false; });
+    state.typing=true;
+    $('#pbox').onclick=function(){ if(state.typing){ $('#ptext').textContent=full; state.typing=false; return; } state.line++; showLine(s,lines); };
+  }
+  function showChoices(s){
+    var dlg=$('#dlg'); if(!dlg)return;
+    if(!s.choices||!s.choices.length){ var nx=s.next?sceneById(s.next):nextSeqScene(s); if(nx){ state.sid=nx.id; draw(); } else { end({title:'THE END',text:''}); } return; }
+    dlg.innerHTML='<div class="pchoices">'+s.choices.map(function(c,i){return '<button class="pchoice" data-i="'+i+'">'+esc(c.text||('선택지 '+(i+1)))+'</button>';}).join('')+'</div>';
+    dlg.querySelectorAll('.pchoice').forEach(function(b){ b.onclick=function(){ var c=s.choices[+b.getAttribute('data-i')]; (c.aff||[]).forEach(function(a){ if(aff[a.c]!=null)aff[a.c]+=a.d; }); if(c.to){ state.sid=c.to; } else { var nx=nextSeqScene(s); state.sid=nx?nx.id:'__end'; } draw(); }; });
+  }
+  function end(e){
+    var best=0,bi=0; aff.forEach(function(v,i){if(v>best){best=v;bi=i;}});
+    root.innerHTML='<div class="pstage" style="background:linear-gradient(135deg,#2a1430,#1a1428)"></div><div class="ptint"></div>'+
+      '<div style="position:absolute;inset:0;display:grid;place-items:center;padding:20px;z-index:3"><div class="endcard">'+
+      '<div style="font-size:40px">🎬</div><h2 style="margin:10px 0 6px;color:var(--brand)">'+esc(e.title||'THE END')+'</h2>'+
+      (e.text?'<p style="color:var(--muted);line-height:1.6">'+esc(e.text)+'</p>':'')+
+      (best>0?'<p style="margin-top:10px">최고 호감 캐릭터: <b style="color:'+esc(p.chars[bi].color)+'">'+esc(p.chars[bi].name)+'</b> (+'+best+')</p>':'')+
+      '<div class="row" style="justify-content:center;margin-top:18px"><button class="btn brand" id="replay">⟲ 다시 플레이</button><button class="btn" onclick="location.hash=\'#edit/'+p.id+'\'">편집</button><button class="btn ghost" onclick="location.hash=\'#home\'">목록</button></div>'+
+      '</div></div>';
+    $('#replay').onclick=function(){ aff=p.chars.map(function(){return 0;}); state={sid:p.start,line:0,typing:false}; draw(); };
+  }
+  draw();
+}
+function typeText(el,txt,done){ if(!el)return; el.textContent=''; var i=0; (function step(){ if(!el.isConnected){return;} el.textContent=txt.slice(0,i); i++; if(i<=txt.length){ el._tt=setTimeout(step,18); } else if(done)done(); })(); }
+
+/* ---------------- import / export ---------------- */
+function exportJSON(p){ var blob=new Blob([JSON.stringify(p,null,2)],{type:'application/json'}); var url=URL.createObjectURL(blob); var a=document.createElement('a');a.href=url;a.download=(p.title||'fmv')+'.igvn.json';a.click();setTimeout(function(){URL.revokeObjectURL(url);},800); toast('내보냈습니다'); }
+function importJSON(){ var inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';inp.onchange=function(){var f=inp.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var p=JSON.parse(r.result);p.id=uid('vn');if(!p.scenes||!p.chars)throw 0;DB.projects.unshift(p);save();toast('가져왔습니다');go('edit/'+p.id);}catch(e){toast('올바른 파일이 아닙니다');}};r.readAsText(f);};inp.click(); }
+window.importJSON=importJSON;
+
+route();
+})();
+</script>
