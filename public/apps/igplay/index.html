@@ -1318,11 +1318,11 @@ function makeCard(l){
      '<span class="plv"><b style="background:'+dc+'"></b>'+diff+'</span>'+
      (isBoosted(l.id)?'<span class="plv" style="left:auto;right:8px;background:rgba(255,176,46,.92);color:#1a1304">★ 부스트</span>':'')+
      (l.gateSymbol?'<span class="plv" style="left:auto;right:8px;top:auto;bottom:8px;background:rgba(155,107,255,.92);color:#fff">🔒 '+esc(l.gateSymbol)+'</span>':'')+
-     '<span class="dur">'+coinCount(l)+' 코인</span></div>'+
+     '<span class="dur">'+coinCount(l)+' <span>코인</span></span></div>'+
    '<div class="meta"><div class="ava" style="background:'+avaColor(l.creatorId)+'">'+l.creator.charAt(0)+'</div>'+
      '<div class="mtext"><div class="ctitle">'+esc(l.title)+'</div>'+
      '<div class="csub">'+esc(l.creator)+(l.verified?' ✔':'')+'</div>'+
-     '<div class="csub"><span class="vf">플레이 '+fmt(playCount(l))+'회</span> · '+l.genre+'</div></div></div>';
+     '<div class="csub"><span class="vf"><span>플레이</span> '+fmt(playCount(l))+'<span>회</span></span> · <span>'+esc(l.genre)+'</span></div></div></div>';
   var cv=c.querySelector('canvas'); if(l.cover){ setThumbImage(c.querySelector('.thumb'),l.cover,cv); } else drawThumb(cv,l);
   return c;
 }
@@ -3291,6 +3291,13 @@ render();
    값: M[ko] = [en, hi, id]. 사전에 없으면 한국어 그대로(폴백). */
 (function () {
   var M = {
+    "탐험": ["Explore", "एक्सप्लोर", "Jelajahi"],
+    "라이브": ["Live", "लाइव", "Live"],
+    "에셋마켓": ["Asset Market", "एसेट मार्केट", "Pasar Aset"],
+    "회": ["plays", "बार", "kali"],
+    "코인": ["coins", "कॉइन", "koin"],
+    "수집": ["Collect", "कलेक्ट", "Koleksi"],
+    "파쿠르": ["Parkour", "पार्कौर", "Parkour"],
     "만들기": ["Create", "बनाएँ", "Buat"],
     "서버": ["Server", "सर्वर", "Server"],
     "로그인": ["Log in", "लॉग इन", "Masuk"],
