@@ -2898,7 +2898,9 @@ function liveProductCard(container,productId){
     '<button class="btn brand" id="lvGet" style="white-space:nowrap">'+(owned?'받음 ✓':(priceNum>0?('구매 '+priceNum):'받기'))+'</button></div>';
   var view=container.querySelector('#lvView'); if(view)view.onclick=function(){ if(it.externalUrl){ window.open(it.externalUrl,'_blank','noopener'); } else if(it.refColl==='levels'&&it.refId){ location.hash='#watch/'+it.refId; } else { toast('연결된 상세가 없습니다'); } };
   var get=container.querySelector('#lvGet'); if(get)get.onclick=function(){ if(owned){ toast('이미 받은 상품입니다'); return; }
-    ensureAccount().then(function(){ return api('POST','/api/igstore/catalog/'+it.id+(priceNum>0?'/buy':'/claim'),{}); }).then(function(r){ if(r&&r.wallet){db.isc=r.wallet.balance;updateWallet&&updateWallet();} if((db.ownedStore||[]).indexOf(it.id)<0){db.ownedStore.push(it.id);saveDB&&saveDB();} toast(priceNum>0?'구매 완료':'받기 완료'); liveProductCard(container,productId); }).catch(function(e){ toast(e.message||'실패'); });
+    function localOwn(){ if(priceNum>0){ if((db.isc||0)<priceNum){ toast('ISC가 부족합니다'); return false; } db.isc-=priceNum; } if((db.ownedStore||[]).indexOf(it.id)<0)db.ownedStore.push(it.id); saveDB&&saveDB(); updateWallet&&updateWallet(); return true; }
+    function done(){ toast(priceNum>0?'구매 완료':'받기 완료'); liveProductCard(container,productId); }
+    ensureAccount().then(function(){ return api('POST','/api/igstore/catalog/'+it.id+(priceNum>0?'/buy':'/claim'),{}); }).then(function(r){ if(r&&r.wallet){db.isc=r.wallet.balance;updateWallet&&updateWallet();} if((db.ownedStore||[]).indexOf(it.id)<0){db.ownedStore.push(it.id);saveDB&&saveDB();} done(); }).catch(function(e){ if(localOwn())done(); });
   };
 }
 
