@@ -1379,7 +1379,7 @@ function openServerDialog(){
 function renderWatch(m,id){
   var lv=getLevel(id); if(!lv){ m.innerHTML='<div class="wrap"><div class="empty"><h3>레벨을 찾을 수 없습니다</h3></div></div>'; return; }
   // 도시(월드) 레벨은 일반 레벨 플레이어가 아니라 탐험 모드로 — 자유 이동·NPC·워프가 되는 환경에서 돌아다님
-  if(lv.source==='igcity'){ location.hash='#explore'; return; }
+  if(lv.source==='igcity'){ var ck=String(lv.id).replace('world-',''); location.hash='#explore/'+(CITY_PRESETS[ck]?ck:'seoul'); return; }
   // 홀더 전용 레벨: 서버에서 잠금 확인
   if(NET.on && lv.gateSymbol){
     api('GET','/api/igplay/levels/'+id).then(function(r){
@@ -2394,7 +2394,23 @@ var CITY_PRESETS={
   tokyo:{name:'도쿄 (Tokyo)',cc:'JP',flag:'🇯🇵',lat:35.6762,lng:139.6503,area:260,
     landmarks:[{n:'⛩ 센소지 절',x:0,z:-55},{n:'🌸 우에노 공원',x:-70,z:0},{n:'🏙 시부야 교차로',x:70,z:20},{n:'🗼 도쿄타워 언덕',x:0,z:95}],
     quests:[{t:'마츠리 축제',d:'센소지에서 등불을 모아 축제를 밝히세요.',r:300}],
-    npcs:[{n:'신관',x:0,z:-48,color:0xcf4f6f,char:'blocky'}]}
+    npcs:[{n:'신관',x:0,z:-48,color:0xcf4f6f,char:'blocky'}]},
+  gangnam:{name:'강남 리얼 시티',cc:'KR',flag:'🏙️',lat:37.4979,lng:127.0276,area:200,
+    landmarks:[{n:'🚇 강남역 지하광장',x:0,z:-60},{n:'🏢 테헤란로 타워',x:60,z:10},{n:'🛍 가로수길 거리',x:-75,z:-10},{n:'☕ 신사동 카페골목',x:-60,z:60},{n:'🎤 코엑스 K-POP 광장',x:80,z:-70},{n:'🌃 한강 반포대교 뷰',x:0,z:100}],
+    quests:[{t:'K-POP 데뷔 챌린지',d:'코엑스 광장에서 댄스 모션 3개를 완성해 데뷔 무대를 꾸미세요!',r:400},{t:'가로수길 쇼핑왕',d:'가로수길에서 숨은 쇼핑백을 모두 찾아보세요.',r:320},{t:'반포 야경 사진전',d:'반포대교 뷰에서 야경 사진 스팟을 찾으세요.',r:280}],
+    npcs:[{n:'아이돌 연습생',x:76,z:-66,color:0xff6ab0,char:'blob'},{n:'카페 바리스타',x:-58,z:56,color:0xb5793a,char:'blocky'},{n:'스트리트 래퍼',x:-72,z:-8,color:0x6a7bff,char:'robot'}]},
+  hongdae:{name:'홍대 복셀 거리',cc:'KR',flag:'🎸',lat:37.5563,lng:126.9236,area:170,
+    landmarks:[{n:'🎸 홍대 버스킹 광장',x:0,z:-50},{n:'🧱 벽화 골목',x:-60,z:0},{n:'🍜 포장마차 거리',x:55,z:20},{n:'🎨 상상마당 앞',x:0,z:60},{n:'🕹 오락실 골목',x:-45,z:55},{n:'🚉 경의선 숲길',x:70,z:-40}],
+    quests:[{t:'버스킹 스타',d:'버스킹 광장에서 환호 모션으로 관객을 모으세요!',r:360},{t:'벽화 탐험대',d:'골목의 복셀 벽화 5개를 찾아 도감에 담으세요.',r:300},{t:'야식 투어',d:'포장마차 거리에서 떡볶이·어묵·호떡을 순서대로 맛보세요.',r:260}],
+    npcs:[{n:'버스킹 기타리스트',x:4,z:-44,color:0xff5a6e,char:'robot'},{n:'벽화 아티스트',x:-56,z:4,color:0x9b59b6,char:'blocky'},{n:'포장마차 사장님',x:52,z:18,color:0xe08f3a,char:'cat'}]},
+  yeouido:{name:'여의도 스카이라인',cc:'KR',flag:'🌇',lat:37.5219,lng:126.9245,area:210,
+    landmarks:[{n:'🏛 국회의사당 광장',x:0,z:-70},{n:'🏢 63빌딩 전망대',x:70,z:40},{n:'🌸 윤중로 벚꽃길',x:-80,z:0},{n:'🚣 여의도 한강공원',x:0,z:90},{n:'📺 방송국 거리',x:60,z:-30},{n:'🎆 불꽃축제 둔치',x:-40,z:80}],
+    quests:[{t:'벚꽃 러너',d:'윤중로 벚꽃길을 전력질주로 완주하세요!',r:380},{t:'한강 라이더',d:'한강공원에서 자전거 체크포인트를 도세요.',r:320},{t:'불꽃축제 디렉터',d:'둔치에서 불꽃 발사 스팟을 모두 찾으세요.',r:340}],
+    npcs:[{n:'방송 리포터',x:56,z:-26,color:0x3aa0ff,char:'blocky'},{n:'한강 라이더',x:4,z:84,color:0x27d4b8,char:'robot'},{n:'벚꽃 상인',x:-76,z:4,color:0xff9ec7,char:'cat'}]},
+  jamsil:{name:'잠실 블록타운',cc:'KR',flag:'🎢',lat:37.5133,lng:127.1000,area:170,
+    landmarks:[{n:'🗼 롯데타워 전망대',x:0,z:-60},{n:'🎢 놀이공원 정문',x:-65,z:10},{n:'⚾ 잠실 야구장',x:70,z:20},{n:'🛶 석촌호수 산책로',x:-50,z:60},{n:'🛍 지하 쇼핑몰',x:20,z:45},{n:'🌉 올림픽대교 뷰',x:60,z:-55}],
+    quests:[{t:'롯데타워 등반',d:'전망대 꼭대기 비컨까지 점프로 올라가세요!',r:420},{t:'홈런 더비',d:'야구장에서 숨은 야구공 9개를 모으세요.',r:300},{t:'호수 둘레길',d:'석촌호수를 한 바퀴 돌아 산책 도장을 찍으세요.',r:260}],
+    npcs:[{n:'놀이공원 마스코트',x:-60,z:6,color:0xff6ab0,char:'blob'},{n:'야구 선수',x:66,z:16,color:0xffb02e,char:'blocky'},{n:'호수지기',x:-46,z:56,color:0x27d4b8,char:'cat'}]}
 };
 var exploreSession=null;
 function renderExplore(m,key){
@@ -2443,6 +2459,13 @@ function renderExplore(m,key){
       '<span style="width:1px;height:20px;background:var(--border)"></span><span style="font-size:12px;color:var(--muted);font-weight:700">모션</span>'+
       [['wave','👋 인사'],['cheer','🙌 환호'],['dance','💃 댄스'],['jump','⤴ 점프']].map(function(mo){return '<button class="exMo" data-m="'+mo[0]+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap">'+mo[1]+'</button>';}).join('')+
     '</div>'+
+    // 조이스틱(터치·마우스 공용 이동) — 왼쪽 아래
+    '<div id="exJoy" style="position:absolute;left:20px;bottom:86px;z-index:32;width:120px;height:120px;border-radius:50%;background:rgba(20,26,36,.28);border:2px solid rgba(255,255,255,.35);touch-action:none;user-select:none">'+
+      '<div id="exStick" style="position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.3);pointer-events:none"></div>'+
+      '<div style="position:absolute;left:0;right:0;bottom:-20px;text-align:center;font-size:11px;color:rgba(255,255,255,.9);font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.5);pointer-events:none">이동</div>'+
+    '</div>'+
+    // 점프 버튼 — 오른쪽 아래
+    '<button id="exJump" style="position:absolute;right:20px;bottom:92px;z-index:32;width:68px;height:68px;border-radius:50%;background:rgba(255,176,46,.92);border:0;color:#1a1205;font-weight:800;font-size:13px;box-shadow:0 3px 10px rgba(0,0,0,.3);cursor:pointer;touch-action:none">점프</button>'+
     '<div id="exEmoFx" style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);z-index:25;font-size:70px;opacity:0;transition:opacity .2s,transform .4s;pointer-events:none"></div>'+
   '</div>';
   exploreEngine(P0,key);
@@ -2500,6 +2523,17 @@ function exploreEngine(P0,key){
   root.querySelectorAll('.exMo').forEach(function(btn){ btn.onclick=function(){ doMotion(btn.getAttribute('data-m')); }; });
   root.querySelectorAll('.exView').forEach(function(btn){ btn.onclick=function(){ viewMode=btn.getAttribute('data-v'); }; });
   root.querySelectorAll('.exTab[data-city]').forEach(function(btn){ btn.onclick=function(){ dispose(); renderExplore(document.getElementById('main'),btn.getAttribute('data-city')); }; });
+  // 조이스틱(이동) — 터치/마우스 공용
+  var joy=document.getElementById('exJoy'), stick=document.getElementById('exStick'), jvx=0,jvz=0,joyId=null;
+  if(joy){ var JR=44;
+    function setStick(dx,dz){ var l=Math.hypot(dx,dz); if(l>JR){ dx=dx/l*JR; dz=dz/l*JR; } stick.style.transform='translate('+dx+'px,'+dz+'px)'; jvx=dx/JR; jvz=dz/JR; }
+    function joyMove(e){ if(joyId===null)return; var t=(e.touches?e.touches[0]:e); var r=joy.getBoundingClientRect(); setStick(t.clientX-(r.left+r.width/2),t.clientY-(r.top+r.height/2)); e.preventDefault(); }
+    function joyEnd(){ joyId=null; jvx=jvz=0; stick.style.transform='translate(0,0)'; }
+    joy.addEventListener('pointerdown',function(e){ joyId=e.pointerId; try{joy.setPointerCapture(e.pointerId);}catch(x){} joyMove(e); });
+    joy.addEventListener('pointermove',function(e){ if(e.pointerId===joyId)joyMove(e); });
+    joy.addEventListener('pointerup',joyEnd); joy.addEventListener('pointercancel',joyEnd);
+  }
+  var jmpBtn=document.getElementById('exJump'); if(jmpBtn){ jmpBtn.addEventListener('pointerdown',function(e){ e.preventDefault(); if(P.onGround){ P.vy=JUMP; P.onGround=false; } }); }
   var tv=document.getElementById('exTv'); if(tv)tv.onclick=function(){ exploreTV(); };
   var dx=document.getElementById('exDex'); if(dx)dx.onclick=function(){ toast('도감: 방문한 랜드마크·수집품이 기록됩니다(준비 중)'); };
   var av=document.getElementById('exAva'); if(av)av.onclick=function(){ go('shop'); };
@@ -2520,6 +2554,7 @@ function exploreEngine(P0,key){
   function frame(now){ raf=requestAnimationFrame(frame); var dt=(now-last)/1000; last=now; if(dt>0.05)dt=0.05;
     var sprint=keys['shift']?1.9:1, sp=BASE*sprint;
     var ix=0,iz=0; if(keys['w']||keys['arrowup'])iz-=1; if(keys['s']||keys['arrowdown'])iz+=1; if(keys['a']||keys['arrowleft'])ix-=1; if(keys['d']||keys['arrowright'])ix+=1;
+    if(jvx||jvz){ ix+=jvx; iz+=jvz; }
     var fwd=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw)), right=new THREE.Vector3(-fwd.z,0,fwd.x);
     var mvx=fwd.x*(-iz)+right.x*ix, mvz=fwd.z*(-iz)+right.z*ix, ml=Math.hypot(mvx,mvz); var moving=ml>0.01;
     if(moving){ mvx=mvx/ml*sp*dt; mvz=mvz/ml*sp*dt; var nx=P.x+mvx; if(!isSolidProp(nx,P.y,P.z))P.x=nx; var nz=P.z+mvz; if(!isSolidProp(P.x,P.y,nz))P.z=nz; charObj.group.rotation.y=Math.atan2(mvx,mvz); }
