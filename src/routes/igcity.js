@@ -83,8 +83,9 @@ export function voxelizeCity(features, opts = {}) {
   // 골 블록 1개(검증 통과 + 탐험 목표). 비어있는 모서리에.
   put(gx - 1, 1, gz - 1, GOAL, null);
 
-  // 상한 넘으면 잘라서 안전
-  const voxels = vox.slice(0, MAX_VOX);
+  // 상한 넘으면 잘라서 안전 — 단, 골 블록은 반드시 포함(잘려서 빠지면 레벨 검증 실패)
+  let voxels = vox.slice(0, MAX_VOX);
+  if (!voxels.some((v) => v.t === GOAL)) { if (voxels.length >= MAX_VOX) voxels = voxels.slice(0, MAX_VOX - 1); voxels.push({ x: gx - 1, y: 1, z: gz - 1, t: GOAL }); }
   return { voxels, spawn, geo: { lat: latMid, lng: (bb.w + bb.e) / 2, label: opts.name || '' }, size: { gx, gz }, cell, count: voxels.length };
 }
 
