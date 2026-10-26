@@ -2467,7 +2467,7 @@ function renderExplore(m,key){
     '<button class="exPanelToggle" aria-label="구역 패널">🗺</button>'+
     // 상단 도시 탭
     '<div class="exTabs" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 8px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
-      '<span class="exTab" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap">🌐 복셀 지구본</span>'+
+      '<span class="exTab" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap">🌐 '+T('복셀 지구본')+'</span>'+
       Object.keys(CITY_PRESETS).map(function(k){var c=CITY_PRESETS[k];return '<button class="exTab" data-city="'+k+'" style="padding:6px 10px;border-radius:9px;font-size:13px;white-space:nowrap;border:1px solid '+(k===key?'var(--brand)':'transparent')+';background:'+(k===key?'var(--brand)':'var(--surface2)')+';color:'+(k===key?'#1a1205':'var(--fg)')+';font-weight:600;cursor:pointer">'+c.flag+' '+T(c.name).split(' ')[0]+'</button>';}).join('')+
     '</div>'+
     // 좌측 패널
