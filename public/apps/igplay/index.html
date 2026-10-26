@@ -231,8 +231,13 @@ body.has-touch .touchctrl{display:grid}
   /* 레이더·상단 버튼 축소 */
   .exRadar{transform:scale(.6);transform-origin:top right;top:48px !important;right:2px !important}
   .exTopBar{transform:scale(.8);transform-origin:top right;top:8px !important;right:6px !important}
-  /* 하단 표정/모션 바: 조이스틱·점프와 안 겹치게 폭 제한하고 아래로 */
-  .exEmoBar{left:50% !important;max-width:98vw !important;bottom:6px !important;padding:5px 8px !important}
+  /* 하단 표정/모션 바: 화면 하단에 가로 전체폭으로 고정, 버튼은 2줄로 전부 표시 */
+  .exEmoBar{left:0 !important;right:0 !important;bottom:0 !important;transform:none !important;width:auto !important;max-width:none !important;border-radius:14px 14px 0 0 !important;padding:7px 8px calc(7px + env(safe-area-inset-bottom,0px)) !important}
+  .exEmoBar button{font-size:12px;padding:5px 9px}
+  /* 조이스틱·점프는 하단 바 위로 */
+  #exJoy{bottom:118px !important;left:14px !important;width:104px !important;height:104px !important}
+  #exStick{width:46px !important;height:46px !important;margin:-23px 0 0 -23px !important}
+  #exJump{bottom:124px !important;right:14px !important;width:62px !important;height:62px !important}
 }
 </style>
 
@@ -2489,7 +2494,7 @@ function renderExplore(m,key){
       '<button class="exTop" id="exAva" style="background:#ff6ab0;border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer">💗 아바타</button>'+
     '</div>'+
     // 하단 표정/모션 바
-    '<div class="exEmoBar" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw;overflow:auto">'+
+    '<div class="exEmoBar" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;display:flex;flex-wrap:wrap;row-gap:7px;gap:10px;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:94vw">'+
       '<span style="font-size:12px;color:var(--muted);font-weight:700">표정</span>'+
       [['😊','행복'],['😆','신남'],['😉','윙크'],['🤔','호기심'],['😲','깜짝'],['🥹','뿌듯']].map(function(e){return '<button class="exEmo" data-e="'+e[0]+'" style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:13px;cursor:pointer;white-space:nowrap">'+e[0]+' '+e[1]+'</button>';}).join('')+
       '<span style="width:1px;height:20px;background:var(--border)"></span><span style="font-size:12px;color:var(--muted);font-weight:700">모션</span>'+
