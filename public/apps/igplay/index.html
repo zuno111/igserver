@@ -2614,10 +2614,13 @@ function renderShorts(m){
     '<button class="btn brand" id="shImport" style="position:absolute;top:14px;right:14px;z-index:60;width:auto;padding:9px 16px;white-space:nowrap;line-height:1.1;height:auto">유튜브 퍼오기</button>';
   var wrap=document.getElementById('shortsWrap'); var items=[], idx=0, vidEl=null;
   function vsrc(it){ return it.externalUrl || (it.fileId?(NET.base.replace(/\/+$/,'')+'/api/files/'+it.fileId+'?key='+encodeURIComponent(NET.key)):''); }
-  function media(it){ var yt=it.youtubeId||ytId(it.externalUrl); if(yt) return '<div style="position:relative;width:100%;height:100%;background:#000">'+
-      '<img src="https://i.ytimg.com/vi/'+yt+'/hqdefault.jpg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">'+
-      '<iframe id="shv" src="https://www.youtube-nocookie.com/embed/'+yt+'?autoplay=1&mute=1&loop=1&playlist='+yt+'&playsinline=1&rel=0&controls=1" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe></div>';
-    return '<video id="shv" src="'+vsrc(it)+'" style="width:100%;height:100%;object-fit:contain;background:#000" playsinline autoplay loop muted controls></video>'; }
+  function hueOf(s){ var h=0; s=s||''; for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))%360; return h; }
+  // 깨지지 않는 포스터(그라데이션 + 썸네일은 실패 시 자동 숨김) → 탭하면 그 자리에서 재생
+  function media(it){ var yt=it.youtubeId||ytId(it.externalUrl); var h=hueOf(it.id||it.title);
+    var grad='linear-gradient(160deg,hsl('+h+',62%,40%),hsl('+((h+38)%360)+',58%,20%))';
+    var thumb=yt?'<img src="https://i.ytimg.com/vi/'+yt+'/hqdefault.jpg" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">':'';
+    return '<div id="shStage" style="position:absolute;inset:0;background:'+grad+';display:grid;place-items:center;overflow:hidden">'+thumb+
+      '<div style="position:relative;z-index:2;text-align:center;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.6)"><button class="shPlay" style="width:78px;height:78px;border-radius:50%;border:0;background:rgba(0,0,0,.5);color:#fff;font-size:30px;cursor:pointer">▶</button><div style="font-size:12px;margin-top:8px;opacity:.9">탭하여 재생</div></div></div>'; }
   function show(){
     if(!items.length){ wrap.innerHTML='<div class="empty"><h3>쇼츠가 없습니다</h3><p>오른쪽 위 "유튜브 퍼오기"로 영상을 추가하거나, 내 채널에서 영상을 올려보세요.</p></div>'; return; }
     var it=items[((idx%items.length)+items.length)%items.length];
@@ -2631,7 +2634,12 @@ function renderShorts(m){
       '<div style="position:absolute;left:16px;bottom:28px;color:#fff;text-shadow:0 1px 4px #000;max-width:70%"><b>@'+esc(it.creator||'익명')+'</b><div style="font-size:13.5px;margin-top:3px">'+esc(it.title||'')+'</div></div>'+
       '<div style="position:absolute;right:14px;top:46%;display:flex;flex-direction:column;gap:8px"><button class="btn" data-up style="width:40px;height:40px;border-radius:50%;padding:0">▲</button><button class="btn" data-dn style="width:40px;height:40px;border-radius:50%;padding:0">▼</button></div>'+
       '</div>';
-    vidEl=document.getElementById('shv'); if(vidEl&&vidEl.play){ try{var pr=vidEl.play(); if(pr&&pr.catch)pr.catch(function(){});}catch(e){} }
+    var stage=wrap.querySelector('#shStage'); var pb=wrap.querySelector('.shPlay');
+    if(pb)pb.onclick=function(){ var yt=it.youtubeId||ytId(it.externalUrl);
+      if(yt){ stage.innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/'+yt+'?autoplay=1&rel=0&playsinline=1" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>'+
+        '<a href="https://youtu.be/'+yt+'" target="_blank" rel="noopener" style="position:absolute;top:8px;left:8px;z-index:3;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:4px 9px;border-radius:8px;text-decoration:none">유튜브에서 열기 ↗</a>'; }
+      else if(vsrc(it)){ stage.innerHTML='<video src="'+vsrc(it)+'" style="width:100%;height:100%;object-fit:contain;background:#000" autoplay loop controls playsinline></video>'; }
+      else toast('연결된 영상이 없습니다'); };
     wrap.querySelector('[data-up]').onclick=function(){ idx--; show(); };
     wrap.querySelector('[data-dn]').onclick=function(){ idx++; show(); };
     wrap.querySelector('[data-like]').onclick=function(){ if(!NET.on){ it.likes=(it.likes||0)+1; saveDB(); show(); return; } api('POST','/api/igvod/'+it.id+'/like',{}).then(function(r){ it.likes=r.likes; show(); }).catch(function(e){ toast(e.message); }); };
