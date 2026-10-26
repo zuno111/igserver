@@ -2617,16 +2617,30 @@ function liveWS(room,onData,onReady){
 function sigSend(ws,sigRoom,data){ try{ ws.send(JSON.stringify({type:'publish',room:sigRoom,data:data})); }catch(e){} }
 
 // ---- 방송자 ----
+// 로그인 안 돼 있으면 게스트 계정을 즉석 생성해 바로 방송 가능하게(별도 로그인 절차 없이).
+function ensureAccount(){
+  if(NET.on) return Promise.resolve(true);
+  var em='guest_'+Math.random().toString(36).slice(2,10)+'@igplay.live';
+  var pw='g'+Math.random().toString(36).slice(2,12)+'X9';
+  var nm='게스트'+Math.floor(Math.random()*9000+1000);
+  return api('POST','/api/auth/signup',{email:em,password:pw,name:nm}).then(function(r){
+    NET.token=r.token; NET.uid=(r.user&&r.user.id)||''; NET.name=(r.user&&r.user.name)||nm; NET.on=true;
+    try{ netSave(); }catch(e){} try{ updateSrvBtn(); }catch(e){} try{ updateLoginBtn(); }catch(e){}
+    return true;
+  });
+}
 function startBroadcast(){
   if(!liveReady()){ toast('서버 연결이 필요합니다'); return; }
-  if(!NET.on){ toast('방송하려면 로그인하세요'); login&&login(); return; }
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ toast('이 브라우저는 카메라를 지원하지 않습니다'); return; }
-  askText({title:'🔴 라이브 시작',desc:'방송 제목을 입력하세요. 카메라·마이크 권한을 허용해야 합니다.',placeholder:'예: 강남 월드 같이 둘러봐요',ok:'카메라 켜기',onOk:function(title){
+  askText({title:'🔴 라이브 시작',desc:'방송 제목을 입력하세요. 다음 단계에서 카메라·마이크 권한을 허용해 주세요.',placeholder:'예: 강남 월드 같이 둘러봐요',ok:'카메라 켜기',onOk:function(title){
+    toast('카메라 권한을 허용해 주세요…');
     navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'},audio:true}).then(function(stream){
-      api('POST','/api/iglive/sessions',{title:title||'라이브 방송',peerId:'host'}).then(function(r){
+      ensureAccount().then(function(){
+        return api('POST','/api/iglive/sessions',{title:title||'라이브 방송',peerId:'host'});
+      }).then(function(r){
         var id=r.session.id; location.hash='#live/'+id; setTimeout(function(){ hostEngine(id,stream,title||'라이브 방송'); },30);
-      }).catch(function(e){ stream.getTracks().forEach(function(t){t.stop();}); toast('세션 생성 실패: '+e.message); });
-    }).catch(function(e){ toast('카메라 접근 실패: '+(e.name==='NotAllowedError'?'권한이 거부되었습니다':e.message)); });
+      }).catch(function(e){ try{stream.getTracks().forEach(function(t){t.stop();});}catch(x){} toast('방송 시작 실패: '+(e.message||'오류')); });
+    }).catch(function(e){ toast('카메라 접근 실패: '+(e.name==='NotAllowedError'?'권한이 거부되었습니다':(e.name==='NotFoundError'?'카메라를 찾을 수 없습니다':e.message))); });
   }});
 }
 function hostEngine(id,stream,title){
@@ -2684,7 +2698,7 @@ function watchEngine(id){
     '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="lvTap">🔊 소리 켜기</button>'+
       '<button class="btn brand" id="lvGift" style="margin-left:auto">🎁 선물(10 ISC)</button><button class="btn" id="lvLeave">나가기</button></div>'+
     '<div id="lvChat" style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;height:220px;overflow:auto;font-size:13px"></div>'+
-    '<div style="display:flex;gap:8px;margin-top:8px"><input id="lvMsg" class="svi" placeholder="'+(NET.on?'채팅 입력':'로그인하면 채팅할 수 있어요')+'" style="flex:1" '+(NET.on?'':'disabled')+'><button class="btn brand" id="lvSend" '+(NET.on?'':'disabled')+'>전송</button></div>'+
+    '<div style="display:flex;gap:8px;margin-top:8px"><input id="lvMsg" class="svi" placeholder="채팅 입력" style="flex:1"><button class="btn brand" id="lvSend">전송</button></div>'+
   '</div>';
   var video=document.getElementById('lvVideo'); var pc=null; var hostCid='host';
   var sigRoom='live-sig:'+id, chatRoom='live:'+id;
@@ -2713,10 +2727,10 @@ function watchEngine(id){
   function giftFx(name,amt){ var fx=document.getElementById('lvGiftFx'); if(fx){ fx.textContent='🎁 '+esc(name)+' +'+amt; if(fx.animate)fx.animate([{opacity:0,transform:'translateY(20px)'},{opacity:1},{opacity:0,transform:'translateY(-30px)'}],{duration:2200}); } }
   document.getElementById('lvTap').onclick=function(){ video.muted=false; video.play&&video.play(); toast('소리 켜짐'); };
   document.getElementById('lvLeave').onclick=function(){ cleanup(); location.hash='#live'; };
-  document.getElementById('lvGift').onclick=function(){ if(!NET.on){ toast('로그인 후 선물할 수 있어요'); return; } api('POST','/api/iglive/sessions/'+id+'/gift',{amount:10}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet&&updateWallet();} toast('🎁 10 ISC 선물 완료'); }).catch(function(e){ toast(e.message||'선물 실패'); }); };
+  document.getElementById('lvGift').onclick=function(){ ensureAccount().then(function(){ return api('POST','/api/iglive/sessions/'+id+'/gift',{amount:10}); }).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet&&updateWallet();} toast('🎁 10 ISC 선물 완료'); }).catch(function(e){ toast(e.message||'선물 실패'); }); };
   var sendB=document.getElementById('lvSend'); if(sendB)sendB.onclick=sendMsg;
   var msgI=document.getElementById('lvMsg'); if(msgI)msgI.addEventListener('keydown',function(e){ if(e.key==='Enter')sendMsg(); });
-  function sendMsg(){ var inp=document.getElementById('lvMsg'); if(!inp)return; var t=inp.value.trim(); if(!t)return; inp.value=''; api('POST','/api/iglive/sessions/'+id+'/chat',{text:t}).catch(function(e){ toast(e.message); }); }
+  function sendMsg(){ var inp=document.getElementById('lvMsg'); if(!inp)return; var t=inp.value.trim(); if(!t)return; inp.value=''; ensureAccount().then(function(){ return api('POST','/api/iglive/sessions/'+id+'/chat',{text:t}); }).catch(function(e){ toast(e.message); }); }
   function cleanup(){ try{clearInterval(helloIv);}catch(e){} api('POST','/api/iglive/sessions/'+id+'/leave',{}).catch(function(){}); try{ws.close();}catch(e){} if(pc){ try{pc.close();}catch(e){} } }
   activeSession={dispose:cleanup};
 }
