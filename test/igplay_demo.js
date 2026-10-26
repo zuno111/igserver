@@ -369,6 +369,74 @@ async function run() {
   r = await j('GET', '/api/igstore/catalog/' + paidId, { key, token: player });
   ok('구매 후 카탈로그 소유자=구매자', r.status === 200 && r.data.item.mine === true, JSON.stringify({mine:r.data.item.mine}));
 
+  // ===================== igGame (게임 공용) =====================
+  console.log('--- igGame(리더보드·세이브·룸) ---');
+  r = await j('POST', '/api/iggame/scores', { key, token: player, body: { game: 'smashearth', score: 1500 } });
+  ok('점수 제출(최초=경신)', r.status === 200 && r.data.improved === true && r.data.best === 1500, JSON.stringify(r.data));
+  r = await j('POST', '/api/iggame/scores', { key, token: player, body: { game: 'smashearth', score: 900 } });
+  ok('낮은 점수는 미경신', r.status === 200 && r.data.improved === false && r.data.best === 1500);
+  r = await j('POST', '/api/iggame/scores', { key, token: creator, body: { game: 'smashearth', score: 3000 } });
+  ok('타 유저 점수 제출', r.status === 200 && r.data.improved === true);
+  r = await j('GET', '/api/iggame/scores/smashearth', { key, token: player });
+  ok('리더보드 정렬(1위=3000)', r.status === 200 && r.data.leaderboard[0].score === 3000 && r.data.leaderboard[1].score === 1500 && r.data.me.rank === 2, JSON.stringify({top:r.data.leaderboard[0],me:r.data.me}));
+  r = await j('PUT', '/api/iggame/saves/smashearth', { key, token: player, body: { data: { level: 7, hp: 80 }, slot: 0 } });
+  ok('클라우드 세이브 저장', r.status === 200 && r.data.ok === true);
+  r = await j('GET', '/api/iggame/saves/smashearth?slot=0', { key, token: player });
+  ok('세이브 불러오기', r.status === 200 && r.data.save.data.level === 7);
+  r = await j('POST', '/api/iggame/rooms', { key, token: creator, body: { game: 'smashearth', title: '같이 부수기', max: 4 } });
+  ok('멀티 룸 생성', r.status === 201 && r.data.room.players.length === 1 && r.data.wsRoom === 'game:' + r.data.room.id, JSON.stringify(r.data.wsRoom));
+  const roomId = r.data.room.id;
+  r = await j('POST', '/api/iggame/rooms/' + roomId + '/join', { key, token: player });
+  ok('룸 참가(2명)', r.status === 200 && r.data.room.players.length === 2);
+  r = await j('GET', '/api/iggame/rooms?game=smashearth', { key });
+  ok('열린 룸 목록', r.status === 200 && r.data.rooms.some((x) => x.id === roomId));
+  r = await j('POST', '/api/iggame/rooms/' + roomId + '/leave', { key, token: creator });
+  ok('방장 퇴장 시 룸 닫힘', r.status === 200 && r.data.status === 'closed');
+
+  // ===================== igVideo (영상 제작 공용) =====================
+  console.log('--- igVideo(프로젝트·렌더잡) ---');
+  r = await j('POST', '/api/igvideo/projects', { key, token: creator, body: { title: '컷룸 프로젝트1', tool: 'cutroom', data: { clips: [1, 2, 3] } } });
+  ok('영상 프로젝트 저장', r.status === 201 && !!r.data.project.id);
+  const vpId = r.data.project.id;
+  r = await j('PUT', '/api/igvideo/projects/' + vpId, { key, token: creator, body: { data: { clips: [1, 2, 3, 4] } } });
+  ok('프로젝트 수정', r.status === 200);
+  r = await j('GET', '/api/igvideo/projects/' + vpId, { key, token: creator });
+  ok('프로젝트 불러오기(편집상태)', r.status === 200 && r.data.project.data.clips.length === 4);
+  r = await j('GET', '/api/igvideo/projects/' + vpId, { key, token: player });
+  ok('타인 프로젝트 접근 차단(404)', r.status === 404);
+  r = await j('POST', '/api/igvideo/jobs', { key, token: creator, body: { projectId: vpId, tool: 'cutroom' } });
+  ok('렌더 잡 제출(queued)', r.status === 201 && r.data.job.status === 'queued');
+  const vjId = r.data.job.id;
+  r = await j('POST', '/api/igvideo/jobs/' + vjId + '/status', { key, token: creator, body: { status: 'processing', progress: 50 } });
+  ok('잡 진행 보고(processing 50%)', r.status === 200 && r.data.job.status === 'processing' && r.data.job.progress === 50);
+  r = await j('POST', '/api/igvideo/jobs/' + vjId + '/status', { key, token: creator, body: { status: 'done', progress: 100, outputFileId: 'f_demo123' } });
+  ok('잡 완료(outputFileId 연결)', r.status === 200 && r.data.job.status === 'done' && r.data.job.outputFileId === 'f_demo123');
+
+  // ===================== igSocial (SNS 공용) =====================
+  console.log('--- igSocial(피드·팔로우·멀티발행) ---');
+  r = await j('POST', '/api/igsocial/posts', { key, token: creator, body: { text: '첫 포스트입니다' } });
+  ok('포스트 작성', r.status === 201 && r.data.post.mine === true);
+  const poId = r.data.post.id;
+  r = await j('POST', '/api/igsocial/posts/' + poId + '/like', { key, token: player });
+  ok('좋아요', r.status === 200 && r.data.liked === true && r.data.likes === 1);
+  r = await j('POST', '/api/igsocial/posts/' + poId + '/like', { key, token: player });
+  ok('좋아요 취소(토글)', r.status === 200 && r.data.liked === false && r.data.likes === 0);
+  r = await j('POST', '/api/igsocial/posts/' + poId + '/comments', { key, token: player, body: { text: '멋지네요' } });
+  ok('댓글 작성', r.status === 201);
+  r = await j('GET', '/api/igsocial/posts/' + poId + '/comments', { key });
+  ok('댓글 조회', r.status === 200 && r.data.comments.length === 1 && r.data.comments[0].text === '멋지네요');
+  // creator uid 알아내기: 포스트 author
+  const creatorUid = (await j('GET', '/api/igsocial/feed', { key })).data.posts.find((p) => p.id === poId).author;
+  r = await j('POST', '/api/igsocial/follow/' + creatorUid, { key, token: player });
+  ok('팔로우', r.status === 200 && typeof r.data.following === 'boolean', JSON.stringify(r.data));
+  r = await j('GET', '/api/igsocial/feed?scope=following', { key, token: player });
+  ok('팔로잉 피드(팔로우한 사람 글 포함)', r.status === 200 && r.data.posts.some((p) => p.id === poId), JSON.stringify(r.data.posts.map((p) => p.id)));
+  r = await j('POST', '/api/igsocial/publish', { key, token: creator, body: { postId: poId, text: '멀티발행 테스트', platforms: ['instagram', 'x', 'nope'] } });
+  ok('멀티발행 예약(유효 플랫폼만)', r.status === 201 && r.data.publish.targets.length === 2 && r.data.publish.targets.every((t) => t.status === 'pending'), JSON.stringify(r.data.publish.targets));
+  const spId = r.data.publish.id;
+  r = await j('POST', '/api/igsocial/publish/' + spId + '/result', { key, token: creator, body: { platform: 'instagram', status: 'posted', ref: 'ig_abc' } });
+  ok('플랫폼 결과 보고(posted)', r.status === 200 && r.data.targets.find((t) => t.platform === 'instagram').status === 'posted');
+
   // 보안: 제네릭 /api/data 로 ISC 내부 컬렉션 쓰기 차단
   r = await j('POST', '/api/data/_isc_wallet', { key, token: player, body: { balance: 999999 } });
   ok('내부 컬렉션(_isc_wallet) 쓰기 차단(403)', r.status === 403, JSON.stringify(r.data));
@@ -386,7 +454,7 @@ async function run() {
 // --- 서버 spawn ---
 const srv = spawn('node', ['src/index.js'], {
   cwd: new URL('..', import.meta.url).pathname,
-  env: { ...process.env, PORT, HOST: '127.0.0.1', DB_DRIVER: 'memory', NODE_ENV: 'test', RL_AUTH_MAX: '1000', RL_MAX: '5000' },
+  env: { ...process.env, PORT, HOST: '127.0.0.1', DB_DRIVER: 'memory', NODE_ENV: 'test', RL_AUTH_MAX: '1000', RL_MAX: '5000', PLAN_RATE_MAX: '100000' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let srvLog = '';

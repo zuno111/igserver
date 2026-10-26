@@ -204,6 +204,47 @@
         async download(id) { return req('GET', '/api/igstore/catalog/' + id + '/download'); },
         async library() { return req('GET', '/api/igstore/library'); },
       },
+
+      // ---- igGame (게임 공용: 리더보드·세이브·룸) ----
+      game: {
+        async submitScore(game, score, meta) { return req('POST', '/api/iggame/scores', { body: { game, score, meta } }); },
+        async leaderboard(game, limit = 20) { return (await req('GET', '/api/iggame/scores/' + encodeURIComponent(game) + '?limit=' + limit, { auth: false })); },
+        async saveGame(game, data, slot = 0) { return req('PUT', '/api/iggame/saves/' + encodeURIComponent(game), { body: { data, slot } }); },
+        async loadGame(game, slot = 0) { return (await req('GET', '/api/iggame/saves/' + encodeURIComponent(game) + '?slot=' + slot)).save; },
+        async mySaves() { return (await req('GET', '/api/iggame/saves')).saves; },
+        async rooms(game) { return (await req('GET', '/api/iggame/rooms' + (game ? '?game=' + encodeURIComponent(game) : ''), { auth: false })).rooms; },
+        async createRoom(game, title, max) { return req('POST', '/api/iggame/rooms', { body: { game, title, max } }); },
+        async joinRoom(id) { return req('POST', '/api/iggame/rooms/' + id + '/join'); },
+        async leaveRoom(id) { return req('POST', '/api/iggame/rooms/' + id + '/leave'); },
+      },
+
+      // ---- igVideo (영상 제작 공용: 프로젝트·렌더잡) ----
+      video: {
+        async projects() { return (await req('GET', '/api/igvideo/projects')).projects; },
+        async getProject(id) { return (await req('GET', '/api/igvideo/projects/' + id)).project; },
+        async saveProject(body) { return (await req('POST', '/api/igvideo/projects', { body })).project; },
+        async updateProject(id, patch) { return (await req('PUT', '/api/igvideo/projects/' + id, { body: patch })).project; },
+        async deleteProject(id) { return req('DELETE', '/api/igvideo/projects/' + id); },
+        async submitJob(body) { return (await req('POST', '/api/igvideo/jobs', { body })).job; },
+        async reportJob(id, body) { return (await req('POST', '/api/igvideo/jobs/' + id + '/status', { body })).job; },
+        async jobs() { return (await req('GET', '/api/igvideo/jobs')).jobs; },
+        async job(id) { return (await req('GET', '/api/igvideo/jobs/' + id)).job; },
+      },
+
+      // ---- igSocial (SNS 공용: 피드·팔로우·멀티발행) ----
+      social: {
+        async feed({ following = false } = {}) { return (await req('GET', '/api/igsocial/feed' + (following ? '?scope=following' : ''), { auth: !!token })).posts; },
+        async userPosts(uid) { return req('GET', '/api/igsocial/users/' + uid + '/posts', { auth: !!token }); },
+        async post(text, media) { return (await req('POST', '/api/igsocial/posts', { body: { text, media } })).post; },
+        async deletePost(id) { return req('DELETE', '/api/igsocial/posts/' + id); },
+        async like(id) { return req('POST', '/api/igsocial/posts/' + id + '/like'); },
+        async comments(id) { return (await req('GET', '/api/igsocial/posts/' + id + '/comments', { auth: false })).comments; },
+        async comment(id, text) { return req('POST', '/api/igsocial/posts/' + id + '/comments', { body: { text } }); },
+        async follow(uid) { return req('POST', '/api/igsocial/follow/' + uid); },
+        async multiPublish(body) { return (await req('POST', '/api/igsocial/publish', { body })).publish; },
+        async reportPublish(id, body) { return (await req('POST', '/api/igsocial/publish/' + id + '/result', { body })).targets; },
+        async publishes() { return (await req('GET', '/api/igsocial/publish')).publishes; },
+      },
     };
     return api;
   }

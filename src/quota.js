@@ -18,6 +18,9 @@ export function getLimits(project) {
   for (const k of ['maxRecords', 'maxUsers', 'maxFileBytes', 'rateMax']) {
     if (typeof over[k] === 'number' && over[k] >= 0) merged[k] = over[k];
   }
+  // 전역 요청 한도 상향(자체 호스팅/테스트): 환경변수 PLAN_RATE_MAX
+  const envRate = Number(process.env.PLAN_RATE_MAX);
+  if (Number.isFinite(envRate) && envRate > 0) merged.rateMax = Math.max(merged.rateMax, envRate);
   return { plan, ...merged };
 }
 
