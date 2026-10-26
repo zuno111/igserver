@@ -1112,6 +1112,7 @@ function makeCharacter(type,color){
     if(parts.blob){ var sq=st.onGround?(1+Math.sin(st.t*6)*0.04):1.12; parts.blob.scale.set(1/Math.sqrt(sq),sq*0.9,1/Math.sqrt(sq)); }
     if(parts.head)parts.head.rotation.z=Math.sin(st.t*2)*0.03;
   }
+  g.traverse(function(o){ if(o.isMesh)o.castShadow=true; });
   return {group:g, update:update, parts:parts};
 }
 var DIFFCOL={쉬움:'var(--easy)',보통:'var(--normal)',어려움:'var(--hard)','전문가':'var(--expert)'};
@@ -1513,7 +1514,7 @@ function buildVoxelMesh(voxels, solids, group){
   g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
   g.setIndex(idx);
   var mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true}));
-  mesh._isWorld=true; group.add(mesh);
+  mesh._isWorld=true; mesh.castShadow=true; mesh.receiveShadow=true; group.add(mesh);
   return {tris:faceCount*2, faces:faceCount};
 }
 
@@ -1561,7 +1562,7 @@ function buildProps(props, group){
     g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.computeVertexNormals();
     var sc=pr.scale||1;
     var mesh=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:pr.color||0xb0b8c4}));
-    mesh.scale.set(sc,sc,sc); mesh.position.set(pr.pos.x,pr.pos.y,pr.pos.z); group.add(mesh);
+    mesh.scale.set(sc,sc,sc); mesh.position.set(pr.pos.x,pr.pos.y,pr.pos.z); mesh.castShadow=true; mesh.receiveShadow=true; group.add(mesh);
     // 충돌 AABB (월드 좌표)
     var w=(pr.size?pr.size.w:1)*sc, h=(pr.size?pr.size.h:1)*sc, d=(pr.size?pr.size.d:1)*sc;
     if(pr.collide!==false) boxes.push({minx:pr.pos.x-w/2,maxx:pr.pos.x+w/2,miny:pr.pos.y,maxy:pr.pos.y+h,minz:pr.pos.z-d/2,maxz:pr.pos.z+d/2});
@@ -1574,14 +1575,19 @@ function startPlayer(lv){
   var canvas=document.getElementById('glcv'); var cont=document.getElementById('pl');
   var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   var scene=new THREE.Scene(); scene.background=new THREE.Color(0x8fb7d9);
   // 리얼 시티(메시 프롭 다수)는 넓고 건물이 멀리까지 보여야 해서 시야 거리를 넓힌다.
   var bigWorld=lv.props&&lv.props.length>4; var fogFar=bigWorld?260:64, camFar=bigWorld?700:200;
   scene.fog=new THREE.Fog(0x8fb7d9,bigWorld?80:24,fogFar);
   var camera=new THREE.PerspectiveCamera(62,16/9,0.1,camFar);
   // 리얼 시티는 밝은 회색 건물이 많아 과노출로 하얗게 날아가므로 조명을 낮춘다.
-  var hemi=new THREE.HemisphereLight(0xeaf3ff,0x3a4a3a,bigWorld?0.72:0.95); scene.add(hemi);
-  var sun=new THREE.DirectionalLight(0xffffff,bigWorld?0.6:0.9); sun.position.set(18,34,12); scene.add(sun);
+  var hemi=new THREE.HemisphereLight(0xeaf3ff,0x3a4a3a,bigWorld?0.55:0.72); scene.add(hemi);
+  scene.add(new THREE.AmbientLight(0xffffff,0.12));
+  var sun=new THREE.DirectionalLight(0xfff2d8,bigWorld?1.0:1.05); sun.position.set(24,44,16); sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048); sun.shadow.bias=-0.0005; sun.shadow.normalBias=0.5;
+  var ssc=sun.shadow.camera; var SR=bigWorld?110:34; ssc.near=1; ssc.far=bigWorld?500:160; ssc.left=-SR; ssc.right=SR; ssc.top=SR; ssc.bottom=-SR; ssc.updateProjectionMatrix();
+  scene.add(sun); scene.add(sun.target);
 
   // build world
   var solids={}; var coins=[]; var goals=[]; var coinMeshes=[]; var goalMesh=null;
@@ -1790,6 +1796,7 @@ function startPlayer(lv){
     var T=new THREE.Vector3(P.x,P.y+1.1,P.z);
     var cp=new THREE.Vector3(T.x-Math.sin(yaw)*Math.cos(pitch)*dist, T.y+Math.sin(pitch)*dist, T.z-Math.cos(yaw)*Math.cos(pitch)*dist);
     camera.position.lerp(cp,0.4); camera.lookAt(T);
+    sun.position.set(P.x+24,P.y+44,P.z+16); sun.target.position.set(P.x,P.y,P.z); sun.target.updateMatrixWorld();
     renderer.render(scene,camera);
   }
   function resize(){ var w=cont.clientWidth,h=cont.clientHeight; if(!w||!h)return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
@@ -2436,16 +2443,23 @@ function renderExplore(m,key){
 function exploreEngine(P0,key){
   var cv=document.getElementById('exCv'); if(!cv||typeof THREE==='undefined')return;
   var renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
-  var scene=new THREE.Scene(); scene.background=new THREE.Color(0xaee0ff); scene.fog=new THREE.Fog(0xaee0ff,120,420);
+  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  if(renderer.outputEncoding!==undefined)renderer.outputEncoding=THREE.sRGBEncoding;
+  var scene=new THREE.Scene(); scene.background=new THREE.Color(0xaee0ff); scene.fog=new THREE.Fog(0xaee0ff,140,440);
   var camera=new THREE.PerspectiveCamera(60,16/9,0.1,900);
-  scene.add(new THREE.HemisphereLight(0xffffff,0x9fb6a0,0.95));
-  var sun=new THREE.DirectionalLight(0xffffff,0.62); sun.position.set(80,160,40); scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xdcefff,0x8aa0a8,0.55));
+  scene.add(new THREE.AmbientLight(0xffffff,0.14));
+  var sun=new THREE.DirectionalLight(0xfff2d8,1.15); sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048); sun.shadow.bias=-0.0004; sun.shadow.normalBias=0.6;
+  var sc=sun.shadow.camera; sc.near=20; sc.far=700; sc.left=-95; sc.right=95; sc.top=95; sc.bottom=-95; sc.updateProjectionMatrix();
+  scene.add(sun); scene.add(sun.target);
   var gm=new THREE.Group(); scene.add(gm);
   // 도시 생성(샘플 지형 → 리얼 메시) + 지면
   var half=P0.area/2, mLat=111320, mLng=111320*Math.cos(P0.lat*Math.PI/180);
   var bb={s:P0.lat-half/mLat,n:P0.lat+half/mLat,w:P0.lng-half/mLng,e:P0.lng+half/mLng};
   var built; try{ built=cityReal(citySample(bb,{lot:24,gap:6,fill:0.9,skip:0.08}),{name:P0.name,maxBuildings:220}); }catch(e){ built={props:[],spawn:{x:half,y:1,z:half}}; }
   var CX=P0.area/2, CZ=P0.area/2; // 월드 중심(랜드마크 좌표 기준점)
+  sun.position.set(CX+120,240,CZ-80); sun.target.position.set(CX,0,CZ); sun.target.updateMatrixWorld();
   var propBoxes=buildProps(built.props,gm);
   // 랜드마크: 떠있는 비컨(시야를 가리지 않게 높이 띄우고 얇게)
   var lmMeshes=[];
@@ -2515,6 +2529,7 @@ function exploreEngine(P0,key){
     var T=new THREE.Vector3(P.x,P.y+1.2,P.z);
     camera.position.set(T.x-Math.sin(yaw)*Math.cos(pitch)*dist,T.y+Math.sin(pitch)*dist,T.z-Math.cos(yaw)*Math.cos(pitch)*dist);
     camera.lookAt(T);
+    sun.position.set(P.x+120,240,P.z-80); sun.target.position.set(P.x,0,P.z); sun.target.updateMatrixWorld();
     npcObjs.forEach(function(n){ n.o.update({moving:false,onGround:true,t:now*0.001,dt:dt}); n.o.group.lookAt(P.x,n.o.group.position.y,P.z); });
     lmMeshes.forEach(function(mo){ mo.position.y=22+Math.sin(now*0.003)*0.7; mo.rotation.y+=dt*1.2; });
     // NPC 근접 상호작용
