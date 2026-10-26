@@ -1537,3 +1537,285 @@ updateLoginBtn(); updateWallet(); updateSrvBtn();
 if(!location.hash)location.hash='#home';
 render();
 </script>
+<script>
+/* ============================= i18n (ko·en·hi·id) =============================
+   한국어 원문 → 영어/힌디/인도네시아어 런타임 치환. 정적·동적 DOM 모두 커버.
+   값: M[ko] = [en, hi, id]. 사전에 없으면 한국어 그대로(폴백). */
+(function () {
+  var M = {
+    "만들기": ["Create", "बनाएँ", "Buat"],
+    "서버": ["Server", "सर्वर", "Server"],
+    "로그인": ["Log in", "लॉग इन", "Masuk"],
+    "로그아웃": ["Log out", "लॉग आउट", "Keluar"],
+    "검색": ["Search", "खोज", "Cari"],
+    "취소": ["Cancel", "रद्द करें", "Batal"],
+    "닫기": ["Close", "बंद करें", "Tutup"],
+    "저장": ["Save", "सहेजें", "Simpan"],
+    "삭제": ["Delete", "हटाएँ", "Hapus"],
+    "등록": ["Register", "दर्ज करें", "Daftar"],
+    "설정": ["Set", "सेट करें", "Atur"],
+    "해제": ["Clear", "हटाएँ", "Lepas"],
+    "업로드": ["Upload", "अपलोड", "Unggah"],
+    "올리기": ["Upload", "अपलोड करें", "Unggah"],
+    "발행": ["Publish", "प्रकाशित करें", "Terbitkan"],
+    "게시": ["Post", "पोस्ट करें", "Kirim"],
+    "구매": ["Buy", "खरीदें", "Beli"],
+    "매수": ["Buy", "खरीदें", "Beli"],
+    "토큰 매수": ["Buy token", "टोकन खरीदें", "Beli token"],
+    "투자": ["Invest", "निवेश करें", "Investasi"],
+    "공유": ["Share", "साझा करें", "Bagikan"],
+    "구독자": ["Subscribers", "सब्सक्राइबर", "Pelanggan"],
+    "댓글": ["Comments", "टिप्पणियाँ", "Komentar"],
+    "다음 레벨": ["Next level", "अगला लेवल", "Level berikutnya"],
+    "돌아가기": ["Back", "वापस", "Kembali"],
+    "다시": ["Retry", "फिर से", "Ulangi"],
+    "보기": ["View", "देखें", "Lihat"],
+    "열기": ["Open", "खोलें", "Buka"],
+    "시작": ["Start", "शुरू करें", "Mulai"],
+    "써보기": ["Try it", "आज़माएँ", "Coba"],
+    "닉네임": ["Nickname", "उपनाम", "Nama panggilan"],
+    "닉네임 설정": ["Set nickname", "उपनाम सेट करें", "Atur nama panggilan"],
+    "이메일": ["Email", "ईमेल", "Email"],
+    "제목": ["Title", "शीर्षक", "Judul"],
+    "설명": ["Description", "विवरण", "Deskripsi"],
+    "설명(선택)": ["Description (optional)", "विवरण (वैकल्पिक)", "Deskripsi (opsional)"],
+    "소개(선택)": ["Intro (optional)", "परिचय (वैकल्पिक)", "Perkenalan (opsional)"],
+    "무료": ["Free", "मुफ़्त", "Gratis"],
+    "무료 받기": ["Get free", "मुफ़्त पाएँ", "Dapatkan gratis"],
+    "ISC 유료": ["Paid (ISC)", "सशुल्क (ISC)", "Berbayar (ISC)"],
+    "광고 보고 무료": ["Free with ad", "विज्ञापन देखकर मुफ़्त", "Gratis dengan iklan"],
+    "광고 보고 받기": ["Watch ad to get", "विज्ञापन देखकर पाएँ", "Tonton iklan untuk dapat"],
+    "광고 시청": ["Watch ad", "विज्ञापन देखें", "Tonton iklan"],
+    "토큰 홀더 전용": ["Token holders only", "केवल टोकन होल्डर", "Khusus pemegang token"],
+    "홀더 전용": ["Holders only", "केवल होल्डर", "Khusus pemegang"],
+    "보상받기": ["Claim reward", "इनाम लें", "Ambil hadiah"],
+    "ISC 받기": ["Get ISC", "ISC पाएँ", "Dapatkan ISC"],
+    "ISC 적립": ["ISC earned", "ISC अर्जित", "ISC diperoleh"],
+    "불러오는 중…": ["Loading…", "लोड हो रहा है…", "Memuat…"],
+    "불러오기 실패": ["Failed to load", "लोड करने में विफल", "Gagal memuat"],
+    "불러오기": ["Load", "लोड करें", "Muat"],
+    "랭킹": ["Ranking", "रैंकिंग", "Peringkat"],
+    "랭킹 보기": ["View ranking", "रैंकिंग देखें", "Lihat peringkat"],
+    "마켓": ["Market", "मार्केट", "Pasar"],
+    "스토어": ["Store", "स्टोर", "Toko"],
+    "상점": ["Shop", "दुकान", "Toko"],
+    "전체": ["All", "सभी", "Semua"],
+    "추천": ["For you", "आपके लिए", "Untuk Anda"],
+    "숏폼": ["Shorts", "शॉर्ट्स", "Shorts"],
+    "월드": ["Worlds", "वर्ल्ड्स", "Dunia"],
+    "내 채널": ["My channel", "मेरा चैनल", "Channel saya"],
+    "코인": ["Coins", "सिक्के", "Koin"],
+    "플레이": ["Play", "खेलें", "Main"],
+    "점프": ["Jump", "कूदें", "Lompat"],
+    "회": [" plays", " बार", "x"],
+    "개": ["", "", ""],
+    "명": ["", "", ""],
+    "만": ["M", "M", "jt"],
+    "천": ["K", "K", "rb"],
+    "전문가": ["Expert", "विशेषज्ञ", "Ahli"],
+    "입문": ["Beginner", "शुरुआती", "Pemula"],
+    "쉬움": ["Easy", "आसान", "Mudah"],
+    "보통": ["Normal", "सामान्य", "Normal"],
+    "어려움": ["Hard", "कठिन", "Sulit"],
+    "파쿠르": ["Parkour", "पार्कौर", "Parkour"],
+    "수집": ["Collect", "संग्रह", "Koleksi"],
+    "어드벤처": ["Adventure", "एडवेंचर", "Petualangan"],
+    "스피드런": ["Speedrun", "स्पीडरन", "Speedrun"],
+    "레벨이 없습니다": ["No levels", "कोई लेवल नहीं", "Tidak ada level"],
+    "레벨 제목": ["Level title", "लेवल शीर्षक", "Judul level"],
+    "새 블록 레벨": ["New block level", "नया ब्लॉक लेवल", "Level blok baru"],
+    "만들기로 첫 레벨을 올려보세요.": ["Create your first level with Create.", "Create से अपना पहला लेवल अपलोड करें।", "Buat level pertama Anda lewat Create."],
+    "★ 부스트": ["★ Boost", "★ बूस्ट", "★ Boost"],
+    "★ 부스트중": ["★ Boosting", "★ बूस्ट हो रहा", "★ Boosting"],
+    "가격(ISC)": ["Price (ISC)", "मूल्य (ISC)", "Harga (ISC)"],
+    "최소 보유 수량": ["Min. holding", "न्यूनतम होल्डिंग", "Kepemilikan min."],
+    "최소 보유량": ["Min. holding", "न्यूनतम होल्डिंग", "Kepemilikan min."],
+    "▶ 플레이": ["▶ Play", "▶ खेलें", "▶ Main"],
+    "▶ 테스트": ["▶ Test", "▶ टेस्ट", "▶ Tes"],
+    "테스트 플레이": ["Test play", "टेस्ट प्ले", "Main uji"],
+    "채널 투자 모집": ["Raise for channel", "चैनल के लिए निवेश", "Galang dana channel"],
+    "내 토큰 발행": ["Issue my token", "मेरा टोकन जारी करें", "Terbitkan token saya"],
+    "서버 연결": ["Connect server", "सर्वर कनेक्ट करें", "Hubungkan server"],
+    "서버 연결이 필요합니다": ["Server connection required", "सर्वर कनेक्शन आवश्यक", "Perlu koneksi server"],
+    "레벨·프로젝트를 ISC로 거래·투자": ["Trade & invest levels/projects with ISC", "ISC से लेवल/प्रोजेक्ट का व्यापार व निवेश", "Perdagangkan & investasi level/proyek dengan ISC"],
+    "브라우저에서 바로 플레이·제작하는 블록 레벨 플랫폼": ["Play & build block levels right in your browser", "ब्राउज़र में ही ब्लॉक लेवल खेलें व बनाएँ", "Mainkan & buat level blok langsung di browser"],
+    "레벨·크리에이터 검색": ["Search levels & creators", "लेवल व क्रिएटर खोजें", "Cari level & kreator"],
+    "ISC 지갑": ["ISC wallet", "ISC वॉलेट", "Dompet ISC"],
+    "클래식": ["Classic", "क्लासिक", "Klasik"],
+    "민트": ["Mint", "मिंट", "Mint"],
+    "바이올렛": ["Violet", "वायलेट", "Violet"],
+    "골드": ["Gold", "गोल्ड", "Emas"],
+    "크림슨": ["Crimson", "क्रिमसन", "Merah tua"],
+    "아이스": ["Ice", "आइस", "Es"],
+    "연결됨": ["Connected", "कनेक्टेड", "Terhubung"],
+    "컷룸 — 브라우저 영상 편집기": ["CutRoom — browser video editor", "CutRoom — ब्राउज़र वीडियो एडिटर", "CutRoom — editor video browser"],
+    "설치 없이 바로 쓰는 온라인 편집기": ["Online editor, no install", "बिना इंस्टॉल ऑनलाइन एडिटर", "Editor online tanpa instalasi"],
+    "레이어룸 — 온라인 이미지 편집": ["LayerRoom — online image editor", "LayerRoom — ऑनलाइन इमेज एडिटर", "LayerRoom — editor gambar online"],
+    "포토샵 없이 브라우저에서 편집": ["Edit in browser, no Photoshop", "बिना Photoshop ब्राउज़र में एडिट", "Edit di browser tanpa Photoshop"],
+    "3ds webmax — 브라우저 3D 모델링": ["3ds webmax — browser 3D modeling", "3ds webmax — ब्राउज़र 3D मॉडलिंग", "3ds webmax — pemodelan 3D browser"],
+    "설치 없이 3D 제작·렌더": ["Create & render 3D, no install", "बिना इंस्टॉल 3D बनाएँ व रेंडर करें", "Buat & render 3D tanpa instalasi"],
+    "초 후 다시 볼 수 있습니다": ["s until you can watch again", "सेकंड बाद फिर देख सकते हैं", "detik lagi bisa menonton"],
+    "튜토리얼 — 블록 한 칸부터 골까지": ["Tutorial — from one block to the goal", "ट्यूटोरियल — एक ब्लॉक से लक्ष्य तक", "Tutorial — dari satu blok ke tujuan"],
+    "igPlay 공식": ["igPlay Official", "igPlay आधिकारिक", "igPlay Resmi"],
+    "블록 파쿠르 시즌 1 — 하늘 섬 건너기": ["Block Parkour S1 — crossing sky islands", "ब्लॉक पार्कौर S1 — आकाश द्वीप पार", "Parkour Blok S1 — menyeberangi pulau langit"],
+    "파쿠르랩": ["ParkourLab", "पार्कौरलैब", "ParkourLab"],
+    "코인 러시 — 숲속 대작전": ["Coin Rush — forest operation", "कॉइन रश — जंगल अभियान", "Coin Rush — operasi hutan"],
+    "12개의 코인을 가장 빠르게 모아 골에 도착하세요. 벽을 피해 최단 경로를 찾는 게 기록 단축의 관건입니다.": ["Collect 12 coins fastest and reach the goal. Finding the shortest path around walls is key to a better time.", "12 सिक्के सबसे तेज़ी से इकट्ठा कर लक्ष्य तक पहुँचें। दीवारों से बचकर सबसे छोटा रास्ता खोजना बेहतर समय की कुंजी है।", "Kumpulkan 12 koin tercepat dan capai tujuan. Menemukan jalur terpendek menghindari dinding adalah kuncinya."],
+    "에디터로 만든 블록 레벨을 브라우저에서 바로 플레이하고 공유하는 플랫폼입니다. STUDIO ig": ["Play and share block levels made in the editor, right in your browser. STUDIO ig", "एडिटर में बने ब्लॉक लेवल ब्राउज़र में खेलें व साझा करें। STUDIO ig", "Mainkan & bagikan level blok buatan editor langsung di browser. STUDIO ig"],
+    "60초 안에 끝나는 짧은 레벨": ["Short levels under 60 seconds", "60 सेकंड में खत्म छोटे लेवल", "Level singkat di bawah 60 detik"],
+    "크리에이터가 만든 월드": ["Worlds made by creators", "क्रिएटर द्वारा बनाए वर्ल्ड", "Dunia buatan kreator"],
+    "지금 뜨는 블록 레벨": ["Trending block levels", "ट्रेंडिंग ब्लॉक लेवल", "Level blok yang sedang tren"],
+    "서버 주소 (예: https://내서버:8787)": ["Server URL (e.g. https://myserver:8787)", "सर्वर URL (जैसे https://myserver:8787)", "URL server (mis. https://myserver:8787)"],
+    "프로젝트 키 (igk_...)": ["Project key (igk_...)", "प्रोजेक्ट कुंजी (igk_...)", "Kunci proyek (igk_...)"],
+    "비밀번호 (6자 이상)": ["Password (6+ chars)", "पासवर्ड (6+ अक्षर)", "Kata sandi (6+ karakter)"],
+    "닉네임 (가입 시)": ["Nickname (on sign-up)", "उपनाम (साइन-अप पर)", "Nama panggilan (saat daftar)"],
+    "댓글 추가…": ["Add a comment…", "टिप्पणी जोड़ें…", "Tambah komentar…"],
+    "언리얼/웹맥스 glTF(GLB/GLTF)를 메시 그대로 배치": ["Place Unreal/webmax glTF (GLB/GLTF) as a mesh", "Unreal/webmax glTF (GLB/GLTF) को मेश के रूप में रखें", "Tempatkan glTF (GLB/GLTF) Unreal/webmax sebagai mesh"],
+    "레이어룸 이미지(PNG)를 레벨 커버로 사용": ["Use a LayerRoom image (PNG) as the level cover", "LayerRoom इमेज (PNG) को लेवल कवर बनाएँ", "Gunakan gambar LayerRoom (PNG) sebagai sampul level"],
+    "토큰 홀더 전용 레벨로 설정": ["Set as a token-holders-only level", "टोकन-होल्डर-ओनली लेवल सेट करें", "Jadikan level khusus pemegang token"],
+    "토큰 심볼 (예: JOON)": ["Token symbol (e.g. JOON)", "टोकन प्रतीक (जैसे JOON)", "Simbol token (mis. JOON)"],
+    "토큰 심볼(예: JOON)": ["Token symbol (e.g. JOON)", "टोकन प्रतीक (जैसे JOON)", "Simbol token (mis. JOON)"],
+    "심볼 (예: JOON)": ["Symbol (e.g. JOON)", "प्रतीक (जैसे JOON)", "Simbol (mis. JOON)"],
+    "토큰 이름 (예: 준호코인)": ["Token name (e.g. JoonhoCoin)", "टोकन नाम (जैसे JoonhoCoin)", "Nama token (mis. JoonhoCoin)"],
+    "1토큰당 가격(ISC)": ["Price per token (ISC)", "प्रति टोकन मूल्य (ISC)", "Harga per token (ISC)"],
+    "혜택 제목": ["Perk title", "लाभ शीर्षक", "Judul benefit"],
+    "혜택 내용(코드·링크·공지 등)": ["Perk content (code, link, notice…)", "लाभ सामग्री (कोड, लिंक, सूचना…)", "Isi benefit (kode, tautan, pengumuman…)"],
+    "광고 제목": ["Ad title", "विज्ञापन शीर्षक", "Judul iklan"],
+    "버튼(써보기)": ["Button (Try it)", "बटन (आज़माएँ)", "Tombol (Coba)"],
+    "링크 URL(선택)": ["Link URL (optional)", "लिंक URL (वैकल्पिक)", "URL tautan (opsional)"],
+    "제목·태그 검색": ["Search title & tags", "शीर्षक व टैग खोजें", "Cari judul & tag"],
+    "콘텐츠 링크(https://... 다운로드/실행 주소)": ["Content link (https://… download/run URL)", "कंटेंट लिंक (https://… डाउनलोड/रन URL)", "Tautan konten (https://… URL unduh/jalankan)"],
+    "태그(쉼표로 구분, 선택)": ["Tags (comma-separated, optional)", "टैग (कॉमा से अलग, वैकल्पिक)", "Tag (pisah koma, opsional)"],
+    "투자 금액(ISC)": ["Investment amount (ISC)", "निवेश राशि (ISC)", "Jumlah investasi (ISC)"],
+    "목표 모금액(ISC)": ["Funding goal (ISC)", "फंडिंग लक्ष्य (ISC)", "Target dana (ISC)"],
+    "결과가 없습니다": ["No results", "कोई परिणाम नहीं", "Tidak ada hasil"],
+    "플레이 기록과 댓글에 표시됩니다.": ["Shown on your play history and comments.", "आपके प्ले इतिहास व टिप्पणियों में दिखेगा।", "Ditampilkan di riwayat main & komentar Anda."],
+    "서버 연결 (igServer)": ["Server connection (igServer)", "सर्वर कनेक्शन (igServer)", "Koneksi server (igServer)"],
+    "현재": ["Now", "अभी", "Saat ini"],
+    "연결 해제": ["Disconnect", "डिस्कनेक्ट", "Putuskan"],
+    "이 서버에 자동 연결됩니다. 계정만 로그인하세요.": ["Auto-connects to this server. Just log in to your account.", "इस सर्वर से स्वतः कनेक्ट। बस अपने खाते में लॉग इन करें।", "Terhubung otomatis ke server ini. Cukup masuk ke akun Anda."],
+    "로그인 / 가입": ["Log in / Sign up", "लॉग इन / साइन अप", "Masuk / Daftar"],
+    "레벨을 찾을 수 없습니다": ["Level not found", "लेवल नहीं मिला", "Level tidak ditemukan"],
+    "토큰 홀더 전용 레벨": ["Token-holders-only level", "केवल टोकन-होल्डर लेवल", "Level khusus pemegang token"],
+    "토큰": ["Token", "टोकन", "Token"],
+    "마켓 등록": ["List on market", "मार्केट में सूचीबद्ध करें", "Daftarkan di pasar"],
+    "블록": ["Blocks", "ब्लॉक", "Blok"],
+    "첫 댓글을 남겨보세요.": ["Be the first to comment.", "पहली टिप्पणी करें।", "Jadilah yang pertama berkomentar."],
+    "클리어!": ["Cleared!", "पूरा हुआ!", "Selesai!"],
+    "좌클릭/탭: 블록 놓기 · 우클릭 또는 지우개: 제거 · 드래그: 시점 회전 · 휠: 확대": ["Left-click/tap: place block · Right-click or eraser: remove · Drag: rotate view · Wheel: zoom", "लेफ्ट-क्लिक/टैप: ब्लॉक रखें · राइट-क्लिक या इरेज़र: हटाएँ · ड्रैग: व्यू घुमाएँ · व्हील: ज़ूम", "Klik kiri/ketuk: taruh blok · Klik kanan atau penghapus: hapus · Seret: putar tampilan · Roda: zoom"],
+    "에셋 임포트": ["Import asset", "एसेट इम्पोर्ट", "Impor aset"],
+    "3D 임포트(OBJ)": ["Import 3D (OBJ)", "3D इम्पोर्ट (OBJ)", "Impor 3D (OBJ)"],
+    "GLB 임포트": ["Import GLB", "GLB इम्पोर्ट", "Impor GLB"],
+    "커버 이미지": ["Cover image", "कवर इमेज", "Gambar sampul"],
+    "특정 토큰을 일정 수량 이상 보유한 사람만 플레이할 수 있게 합니다. 비워두면 전체 공개.": ["Only holders of a set amount of a token can play. Leave blank for public.", "किसी टोकन की तय मात्रा रखने वाले ही खेल सकते हैं। खाली छोड़ें तो सार्वजनिक।", "Hanya pemegang token dalam jumlah tertentu yang bisa bermain. Kosongkan untuk publik."],
+    "저장 전 레벨을 플레이해봅니다.": ["Play the level before saving.", "सहेजने से पहले लेवल खेलें।", "Mainkan level sebelum menyimpan."],
+    "◀ 에디터로": ["◀ To editor", "◀ एडिटर पर", "◀ Ke editor"],
+    "아직 콘텐츠가 없습니다": ["No content yet", "अभी कोई कंटेंट नहीं", "Belum ada konten"],
+    "만들기로 첫 블록 레벨을 올려보세요.": ["Upload your first block level with Create.", "Create से अपना पहला ब्लॉक लेवल अपलोड करें।", "Unggah level blok pertama Anda lewat Create."],
+    "전역 클리어 타임 기록": ["Global clear-time records", "वैश्विक क्लियर-टाइम रिकॉर्ड", "Rekor waktu global"],
+    "클리어 타임 기록": ["Clear-time records", "क्लियर-टाइम रिकॉर्ड", "Rekor waktu"],
+    "아직 기록이 없습니다": ["No records yet", "अभी कोई रिकॉर्ड नहीं", "Belum ada rekor"],
+    "레벨을 클리어하면 여기에 타임이 기록됩니다.": ["Clear the level and your time shows here.", "लेवल पूरा करें, आपका समय यहाँ दिखेगा।", "Selesaikan level dan waktu Anda muncul di sini."],
+    "ISC로 스킨 구매 · 내 레벨 부스트 · 창작자 후원": ["Buy skins · boost levels · support creators with ISC", "ISC से स्किन खरीदें · लेवल बूस्ट करें · क्रिएटर को सपोर्ट करें", "Beli skin · boost level · dukung kreator dengan ISC"],
+    "보유 잔액": ["Balance", "बैलेंस", "Saldo"],
+    "광고 보고 ISC 받기": ["Watch ad for ISC", "विज्ञापन देखकर ISC पाएँ", "Tonton iklan untuk ISC"],
+    "플레이어 스킨": ["Player skins", "प्लेयर स्किन", "Skin pemain"],
+    "내 레벨 부스트": ["Boost my levels", "मेरे लेवल बूस्ट करें", "Boost level saya"],
+    "하우스애드 관리": ["Manage house ads", "हाउस विज्ञापन प्रबंधन", "Kelola iklan rumah"],
+    "(관리자)": ["(admin)", "(एडमिन)", "(admin)"],
+    "장착중": ["Equipped", "लगाया गया", "Terpasang"],
+    "장착": ["Equip", "लगाएँ", "Pasang"],
+    "부스트할 내 레벨이 없습니다. 만들기로 레벨을 올려보세요.": ["No levels to boost. Upload one with Create.", "बूस्ट करने के लिए कोई लेवल नहीं। Create से अपलोड करें।", "Tidak ada level untuk di-boost. Unggah lewat Create."],
+    "24시간 부스트 · 50 ISC": ["24h boost · 50 ISC", "24 घंटे बूस्ट · 50 ISC", "Boost 24 jam · 50 ISC"],
+    "등록된 커스텀 광고가 없습니다. 기본 셀프프로모션이 노출됩니다.": ["No custom ads. Default self-promo is shown.", "कोई कस्टम विज्ञापन नहीं। डिफ़ॉल्ट सेल्फ-प्रोमो दिखेगा।", "Tidak ada iklan khusus. Promo bawaan ditampilkan."],
+    "광고": ["Ad", "विज्ञापन", "Iklan"],
+    "게임·앱·3D·이미지·음원·영상·문서를 올리고 받기": ["Upload & get games, apps, 3D, images, audio, video, docs", "गेम, ऐप, 3D, इमेज, ऑडियो, वीडियो, डॉक अपलोड व प्राप्त करें", "Unggah & ambil game, app, 3D, gambar, audio, video, dokumen"],
+    "스토어 이용은 서버 계정이 필요합니다. 상단 \"서버\"에서 연결하세요.": ["Using the store needs a server account. Connect via “Server” above.", "स्टोर के लिए सर्वर खाता चाहिए। ऊपर “Server” से कनेक्ट करें।", "Memakai toko perlu akun server. Hubungkan via “Server” di atas."],
+    "게임·앱·3D·이미지·음원·영상·문서를 ISC로 거래": ["Trade games, apps, 3D, images, audio, video, docs with ISC", "ISC से गेम, ऐप, 3D, इमेज, ऑडियो, वीडियो, डॉक का व्यापार", "Perdagangkan game, app, 3D, gambar, audio, video, dokumen dengan ISC"],
+    "받은 콘텐츠": ["Received content", "प्राप्त कंटेंट", "Konten diterima"],
+    "받은 콘텐츠가 없습니다.": ["No received content.", "कोई प्राप्त कंटेंट नहीं।", "Belum ada konten diterima."],
+    "내가 올린 콘텐츠": ["My uploads", "मेरे अपलोड", "Unggahan saya"],
+    "올린 콘텐츠가 없습니다.": ["No uploads.", "कोई अपलोड नहीं।", "Belum ada unggahan."],
+    "콘텐츠가 없습니다": ["No content", "कोई कंटेंट नहीं", "Tidak ada konten"],
+    "오른쪽 위 \"올리기\"로 첫 콘텐츠를 등록해보세요.": ["Add your first content via “Upload” top-right.", "ऊपर-दाएँ “Upload” से पहला कंटेंट जोड़ें।", "Tambah konten pertama via “Upload” kanan atas."],
+    "콘텐츠 올리기": ["Upload content", "कंटेंट अपलोड करें", "Unggah konten"],
+    "게임": ["Game", "गेम", "Game"],
+    "앱": ["App", "ऐप", "App"],
+    "3D에셋(GLB/OBJ)": ["3D asset (GLB/OBJ)", "3D एसेट (GLB/OBJ)", "Aset 3D (GLB/OBJ)"],
+    "이미지": ["Image", "इमेज", "Gambar"],
+    "음원": ["Audio", "ऑडियो", "Audio"],
+    "영상": ["Video", "वीडियो", "Video"],
+    "문서/프리셋": ["Doc/preset", "डॉक/प्रीसेट", "Dok/preset"],
+    "번들": ["Bundle", "बंडल", "Bundel"],
+    "공개 방식": ["Access", "एक्सेस", "Akses"],
+    "잠시 광고를 시청하면 콘텐츠가 열립니다.": ["Watch a short ad to unlock the content.", "छोटा विज्ञापन देखें, कंटेंट खुल जाएगा।", "Tonton iklan singkat untuk membuka konten."],
+    "마켓 거래·투자는 서버 계정이 필요합니다. 상단 \"서버\"에서 연결하세요.": ["Market trading/investing needs a server account. Connect via “Server” above.", "मार्केट ट्रेडिंग/निवेश के लिए सर्वर खाता चाहिए। ऊपर “Server” से कनेक्ट करें।", "Perdagangan/investasi pasar perlu akun server. Hubungkan via “Server” di atas."],
+    "투자한 지분이 없습니다.": ["No investments.", "कोई निवेश नहीं।", "Tidak ada investasi."],
+    "투자 지분": ["Investment share", "निवेश हिस्सा", "Bagian investasi"],
+    "열린 매물이 없습니다": ["No open listings", "कोई खुली लिस्टिंग नहीं", "Tidak ada listing terbuka"],
+    "워치 화면에서 내 레벨을 마켓에 등록해보세요.": ["List your level on the market from the watch screen.", "वॉच स्क्रीन से अपना लेवल मार्केट में सूचीबद्ध करें।", "Daftarkan level Anda di pasar dari layar tonton."],
+    "마켓에 등록": ["List on market", "मार्केट में सूचीबद्ध करें", "Daftarkan di pasar"],
+    "판매": ["Sell", "बेचें", "Jual"],
+    "투자 모집": ["Raise funds", "निवेश जुटाएँ", "Galang dana"],
+    "채널의 성장에 투자받습니다. 모금액은 창작 활동에 쓰입니다.": ["Raise investment for channel growth. Funds go to creative work.", "चैनल वृद्धि के लिए निवेश जुटाएँ। राशि रचनात्मक कार्य में लगेगी।", "Galang investasi untuk pertumbuhan channel. Dana untuk karya kreatif."],
+    "팬이 ISC로 매수하는 창작자 토큰입니다. 심볼은 2~10자 영문 대문자/숫자.": ["A creator token fans buy with ISC. Symbol: 2–10 uppercase letters/digits.", "फैन ISC से खरीदते हैं ऐसा क्रिएटर टोकन। प्रतीक: 2–10 बड़े अक्षर/अंक।", "Token kreator yang dibeli fan dengan ISC. Simbol: 2–10 huruf besar/angka."],
+    "홀더 혜택": ["Holder perks", "होल्डर लाभ", "Benefit pemegang"],
+    "아직 보유하지 않음": ["Not held yet", "अभी नहीं रखा", "Belum dimiliki"],
+    "아직 등록된 혜택이 없습니다.": ["No perks yet.", "अभी कोई लाभ नहीं।", "Belum ada benefit."],
+    "홀더 혜택 게시": ["Post holder perk", "होल्डर लाभ पोस्ट करें", "Posting benefit pemegang"]
+  };
+  var LANGS = [["ko", "한국어"], ["en", "English"], ["hi", "हिन्दी"], ["id", "Indonesia"]];
+  var IDX = { en: 0, hi: 1, id: 2 };
+  function detect() {
+    try { var s = localStorage.getItem('igplay_lang'); if (s && ['ko', 'en', 'hi', 'id'].indexOf(s) >= 0) return s; } catch (e) {}
+    var n = (navigator.language || 'ko').slice(0, 2).toLowerCase();
+    return ['ko', 'en', 'hi', 'id'].indexOf(n) >= 0 ? n : 'ko';
+  }
+  var LOCALE = detect();
+  function tr(ko) { if (LOCALE === 'ko') return ko; var e = M[ko]; return (e && e[IDX[LOCALE]] != null && e[IDX[LOCALE]] !== '') ? e[IDX[LOCALE]] : (e && e[IDX[LOCALE]] === '' ? '' : ko); }
+  var orig = new WeakMap();
+  function tText(tn) {
+    if (!orig.has(tn)) orig.set(tn, tn.nodeValue);
+    var raw = orig.get(tn); var key = raw.trim();
+    if (!key || !/[가-힣]/.test(key) || !(key in M)) return;
+    var t = tr(key); var want = raw.replace(key, t);
+    if (tn.nodeValue !== want) tn.nodeValue = want;
+  }
+  function tAttr(el, a) {
+    var store = '__ig_' + a;
+    if (el[store] == null) el[store] = el.getAttribute(a) || '';
+    var raw = el[store]; var key = raw.trim();
+    if (!key || !/[가-힣]/.test(key) || !(key in M)) return;
+    var want = raw.replace(key, tr(key));
+    if (el.getAttribute(a) !== want) el.setAttribute(a, want);
+  }
+  function walk(node) {
+    if (node.nodeType === 3) { tText(node); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.tagName;
+    if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'CANVAS' || tag === 'OPTION') { if (tag === 'OPTION') { /* option text ok */ } else return; }
+    if (node.getAttribute && node.getAttribute('placeholder') != null) tAttr(node, 'placeholder');
+    if (node.getAttribute && node.getAttribute('title') != null) tAttr(node, 'title');
+    for (var c = node.firstChild; c; c = c.nextSibling) walk(c);
+  }
+  function translateAll() {
+    walk(document.body);
+    try { if (document.title && (document.title.trim() in M)) document.title = tr(document.title.trim()); } catch (e) {}
+    document.documentElement.lang = LOCALE;
+  }
+  function buildSel() {
+    var bar = document.getElementById('topbar'); if (!bar || document.getElementById('langSel')) return;
+    var sel = document.createElement('select'); sel.id = 'langSel';
+    sel.style.cssText = 'background:var(--surface2);border:1px solid var(--border2);color:var(--fg);border-radius:999px;padding:7px 9px;font:600 13px inherit;outline:none;flex:0 0 auto';
+    LANGS.forEach(function (l) { var o = document.createElement('option'); o.value = l[0]; o.textContent = l[1]; if (l[0] === LOCALE) o.selected = true; sel.appendChild(o); });
+    sel.onchange = function () { LOCALE = sel.value; try { localStorage.setItem('igplay_lang', LOCALE); } catch (e) {} translateAll(); };
+    var login = document.getElementById('loginBtn'); bar.insertBefore(sel, login || null);
+  }
+  var obs = new MutationObserver(function (muts) {
+    for (var i = 0; i < muts.length; i++) { var ad = muts[i].addedNodes; for (var k = 0; k < ad.length; k++) walk(ad[k]); }
+  });
+  function start() { buildSel(); translateAll(); obs.observe(document.body, { childList: true, subtree: true }); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>
+
