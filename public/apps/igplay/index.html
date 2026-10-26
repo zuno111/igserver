@@ -244,8 +244,672 @@ body.has-touch .touchctrl{display:grid}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>/* leaflet 1.9.4 inlined */
+/* required styles */
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+	position: absolute;
+	left: 0;
+	top: 0;
+	}
+.leaflet-container {
+	overflow: hidden;
+	}
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	        user-select: none;
+	  -webkit-user-drag: none;
+	}
+/* Prevents IE11 from highlighting tiles in blue */
+.leaflet-tile::selection {
+	background: transparent;
+}
+/* Safari renders non-retina tile on retina better with this, but Chrome is worse */
+.leaflet-safari .leaflet-tile {
+	image-rendering: -webkit-optimize-contrast;
+	}
+/* hack that prevents hw layers "stretching" when loading new tiles */
+.leaflet-safari .leaflet-tile-container {
+	width: 1600px;
+	height: 1600px;
+	-webkit-transform-origin: 0 0;
+	}
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	display: block;
+	}
+/* .leaflet-container svg: reset svg max-width decleration shipped in Joomla! (joomla.org) 3.x */
+/* .leaflet-container img: map is broken in FF if you have max-width: 100% on tiles */
+.leaflet-container .leaflet-overlay-pane svg {
+	max-width: none !important;
+	max-height: none !important;
+	}
+.leaflet-container .leaflet-marker-pane img,
+.leaflet-container .leaflet-shadow-pane img,
+.leaflet-container .leaflet-tile-pane img,
+.leaflet-container img.leaflet-image-layer,
+.leaflet-container .leaflet-tile {
+	max-width: none !important;
+	max-height: none !important;
+	width: auto;
+	padding: 0;
+	}
+
+.leaflet-container img.leaflet-tile {
+	/* See: https://bugs.chromium.org/p/chromium/issues/detail?id=600120 */
+	mix-blend-mode: plus-lighter;
+}
+
+.leaflet-container.leaflet-touch-zoom {
+	-ms-touch-action: pan-x pan-y;
+	touch-action: pan-x pan-y;
+	}
+.leaflet-container.leaflet-touch-drag {
+	-ms-touch-action: pinch-zoom;
+	/* Fallback for FF which doesn't support pinch-zoom */
+	touch-action: none;
+	touch-action: pinch-zoom;
+}
+.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom {
+	-ms-touch-action: none;
+	touch-action: none;
+}
+.leaflet-container {
+	-webkit-tap-highlight-color: transparent;
+}
+.leaflet-container a {
+	-webkit-tap-highlight-color: rgba(51, 181, 229, 0.4);
+}
+.leaflet-tile {
+	filter: inherit;
+	visibility: hidden;
+	}
+.leaflet-tile-loaded {
+	visibility: inherit;
+	}
+.leaflet-zoom-box {
+	width: 0;
+	height: 0;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	z-index: 800;
+	}
+/* workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=888319 */
+.leaflet-overlay-pane svg {
+	-moz-user-select: none;
+	}
+
+.leaflet-pane         { z-index: 400; }
+
+.leaflet-tile-pane    { z-index: 200; }
+.leaflet-overlay-pane { z-index: 400; }
+.leaflet-shadow-pane  { z-index: 500; }
+.leaflet-marker-pane  { z-index: 600; }
+.leaflet-tooltip-pane   { z-index: 650; }
+.leaflet-popup-pane   { z-index: 700; }
+
+.leaflet-map-pane canvas { z-index: 100; }
+.leaflet-map-pane svg    { z-index: 200; }
+
+.leaflet-vml-shape {
+	width: 1px;
+	height: 1px;
+	}
+.lvml {
+	behavior: none;
+	display: inline-block;
+	position: absolute;
+	}
+
+
+/* control positioning */
+
+.leaflet-control {
+	position: relative;
+	z-index: 800;
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+.leaflet-top,
+.leaflet-bottom {
+	position: absolute;
+	z-index: 1000;
+	pointer-events: none;
+	}
+.leaflet-top {
+	top: 0;
+	}
+.leaflet-right {
+	right: 0;
+	}
+.leaflet-bottom {
+	bottom: 0;
+	}
+.leaflet-left {
+	left: 0;
+	}
+.leaflet-control {
+	float: left;
+	clear: both;
+	}
+.leaflet-right .leaflet-control {
+	float: right;
+	}
+.leaflet-top .leaflet-control {
+	margin-top: 10px;
+	}
+.leaflet-bottom .leaflet-control {
+	margin-bottom: 10px;
+	}
+.leaflet-left .leaflet-control {
+	margin-left: 10px;
+	}
+.leaflet-right .leaflet-control {
+	margin-right: 10px;
+	}
+
+
+/* zoom and fade animations */
+
+.leaflet-fade-anim .leaflet-popup {
+	opacity: 0;
+	-webkit-transition: opacity 0.2s linear;
+	   -moz-transition: opacity 0.2s linear;
+	        transition: opacity 0.2s linear;
+	}
+.leaflet-fade-anim .leaflet-map-pane .leaflet-popup {
+	opacity: 1;
+	}
+.leaflet-zoom-animated {
+	-webkit-transform-origin: 0 0;
+	    -ms-transform-origin: 0 0;
+	        transform-origin: 0 0;
+	}
+svg.leaflet-zoom-animated {
+	will-change: transform;
+}
+
+.leaflet-zoom-anim .leaflet-zoom-animated {
+	-webkit-transition: -webkit-transform 0.25s cubic-bezier(0,0,0.25,1);
+	   -moz-transition:    -moz-transform 0.25s cubic-bezier(0,0,0.25,1);
+	        transition:         transform 0.25s cubic-bezier(0,0,0.25,1);
+	}
+.leaflet-zoom-anim .leaflet-tile,
+.leaflet-pan-anim .leaflet-tile {
+	-webkit-transition: none;
+	   -moz-transition: none;
+	        transition: none;
+	}
+
+.leaflet-zoom-anim .leaflet-zoom-hide {
+	visibility: hidden;
+	}
+
+
+/* cursors */
+
+.leaflet-interactive {
+	cursor: pointer;
+	}
+.leaflet-grab {
+	cursor: -webkit-grab;
+	cursor:    -moz-grab;
+	cursor:         grab;
+	}
+.leaflet-crosshair,
+.leaflet-crosshair .leaflet-interactive {
+	cursor: crosshair;
+	}
+.leaflet-popup-pane,
+.leaflet-control {
+	cursor: auto;
+	}
+.leaflet-dragging .leaflet-grab,
+.leaflet-dragging .leaflet-grab .leaflet-interactive,
+.leaflet-dragging .leaflet-marker-draggable {
+	cursor: move;
+	cursor: -webkit-grabbing;
+	cursor:    -moz-grabbing;
+	cursor:         grabbing;
+	}
+
+/* marker & overlays interactivity */
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-image-layer,
+.leaflet-pane > svg path,
+.leaflet-tile-container {
+	pointer-events: none;
+	}
+
+.leaflet-marker-icon.leaflet-interactive,
+.leaflet-image-layer.leaflet-interactive,
+.leaflet-pane > svg path.leaflet-interactive,
+svg.leaflet-image-layer.leaflet-interactive path {
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+
+/* visual tweaks */
+
+.leaflet-container {
+	background: #ddd;
+	outline-offset: 1px;
+	}
+.leaflet-container a {
+	color: #0078A8;
+	}
+.leaflet-zoom-box {
+	border: 2px dotted #38f;
+	background: rgba(255,255,255,0.5);
+	}
+
+
+/* general typography */
+.leaflet-container {
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	}
+
+
+/* general toolbar styles */
+
+.leaflet-bar {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+	border-radius: 4px;
+	}
+.leaflet-bar a {
+	background-color: #fff;
+	border-bottom: 1px solid #ccc;
+	width: 26px;
+	height: 26px;
+	line-height: 26px;
+	display: block;
+	text-align: center;
+	text-decoration: none;
+	color: black;
+	}
+.leaflet-bar a,
+.leaflet-control-layers-toggle {
+	background-position: 50% 50%;
+	background-repeat: no-repeat;
+	display: block;
+	}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+	background-color: #f4f4f4;
+	}
+.leaflet-bar a:first-child {
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	}
+.leaflet-bar a:last-child {
+	border-bottom-left-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom: none;
+	}
+.leaflet-bar a.leaflet-disabled {
+	cursor: default;
+	background-color: #f4f4f4;
+	color: #bbb;
+	}
+
+.leaflet-touch .leaflet-bar a {
+	width: 30px;
+	height: 30px;
+	line-height: 30px;
+	}
+.leaflet-touch .leaflet-bar a:first-child {
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	}
+.leaflet-touch .leaflet-bar a:last-child {
+	border-bottom-left-radius: 2px;
+	border-bottom-right-radius: 2px;
+	}
+
+/* zoom control */
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+	font: bold 18px 'Lucida Console', Monaco, monospace;
+	text-indent: 1px;
+	}
+
+.leaflet-touch .leaflet-control-zoom-in, .leaflet-touch .leaflet-control-zoom-out  {
+	font-size: 22px;
+	}
+
+
+/* layers control */
+
+.leaflet-control-layers {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+	background: #fff;
+	border-radius: 5px;
+	}
+.leaflet-control-layers-toggle {
+	background-image: none;
+	width: 36px;
+	height: 36px;
+	}
+.leaflet-retina .leaflet-control-layers-toggle {
+	background-image: none;
+	background-size: 26px 26px;
+	}
+.leaflet-touch .leaflet-control-layers-toggle {
+	width: 44px;
+	height: 44px;
+	}
+.leaflet-control-layers .leaflet-control-layers-list,
+.leaflet-control-layers-expanded .leaflet-control-layers-toggle {
+	display: none;
+	}
+.leaflet-control-layers-expanded .leaflet-control-layers-list {
+	display: block;
+	position: relative;
+	}
+.leaflet-control-layers-expanded {
+	padding: 6px 10px 6px 6px;
+	color: #333;
+	background: #fff;
+	}
+.leaflet-control-layers-scrollbar {
+	overflow-y: scroll;
+	overflow-x: hidden;
+	padding-right: 5px;
+	}
+.leaflet-control-layers-selector {
+	margin-top: 2px;
+	position: relative;
+	top: 1px;
+	}
+.leaflet-control-layers label {
+	display: block;
+	font-size: 13px;
+	font-size: 1.08333em;
+	}
+.leaflet-control-layers-separator {
+	height: 0;
+	border-top: 1px solid #ddd;
+	margin: 5px -10px 5px -6px;
+	}
+
+/* Default icon URLs */
+.leaflet-default-icon-path { /* used only in path-guessing heuristic, see L.Icon.Default */
+	background-image: none;
+	}
+
+
+/* attribution and scale controls */
+
+.leaflet-container .leaflet-control-attribution {
+	background: #fff;
+	background: rgba(255, 255, 255, 0.8);
+	margin: 0;
+	}
+.leaflet-control-attribution,
+.leaflet-control-scale-line {
+	padding: 0 5px;
+	color: #333;
+	line-height: 1.4;
+	}
+.leaflet-control-attribution a {
+	text-decoration: none;
+	}
+.leaflet-control-attribution a:hover,
+.leaflet-control-attribution a:focus {
+	text-decoration: underline;
+	}
+.leaflet-attribution-flag {
+	display: inline !important;
+	vertical-align: baseline !important;
+	width: 1em;
+	height: 0.6669em;
+	}
+.leaflet-left .leaflet-control-scale {
+	margin-left: 5px;
+	}
+.leaflet-bottom .leaflet-control-scale {
+	margin-bottom: 5px;
+	}
+.leaflet-control-scale-line {
+	border: 2px solid #777;
+	border-top: none;
+	line-height: 1.1;
+	padding: 2px 5px 1px;
+	white-space: nowrap;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.8);
+	text-shadow: 1px 1px #fff;
+	}
+.leaflet-control-scale-line:not(:first-child) {
+	border-top: 2px solid #777;
+	border-bottom: none;
+	margin-top: -2px;
+	}
+.leaflet-control-scale-line:not(:first-child):not(:last-child) {
+	border-bottom: 2px solid #777;
+	}
+
+.leaflet-touch .leaflet-control-attribution,
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	box-shadow: none;
+	}
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	border: 2px solid rgba(0,0,0,0.2);
+	background-clip: padding-box;
+	}
+
+
+/* popup */
+
+.leaflet-popup {
+	position: absolute;
+	text-align: center;
+	margin-bottom: 20px;
+	}
+.leaflet-popup-content-wrapper {
+	padding: 1px;
+	text-align: left;
+	border-radius: 12px;
+	}
+.leaflet-popup-content {
+	margin: 13px 24px 13px 20px;
+	line-height: 1.3;
+	font-size: 13px;
+	font-size: 1.08333em;
+	min-height: 1px;
+	}
+.leaflet-popup-content p {
+	margin: 17px 0;
+	margin: 1.3em 0;
+	}
+.leaflet-popup-tip-container {
+	width: 40px;
+	height: 20px;
+	position: absolute;
+	left: 50%;
+	margin-top: -1px;
+	margin-left: -20px;
+	overflow: hidden;
+	pointer-events: none;
+	}
+.leaflet-popup-tip {
+	width: 17px;
+	height: 17px;
+	padding: 1px;
+
+	margin: -10px auto 0;
+	pointer-events: auto;
+
+	-webkit-transform: rotate(45deg);
+	   -moz-transform: rotate(45deg);
+	    -ms-transform: rotate(45deg);
+	        transform: rotate(45deg);
+	}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+	background: white;
+	color: #333;
+	box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+	}
+.leaflet-container a.leaflet-popup-close-button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	border: none;
+	text-align: center;
+	width: 24px;
+	height: 24px;
+	font: 16px/24px Tahoma, Verdana, sans-serif;
+	color: #757575;
+	text-decoration: none;
+	background: transparent;
+	}
+.leaflet-container a.leaflet-popup-close-button:hover,
+.leaflet-container a.leaflet-popup-close-button:focus {
+	color: #585858;
+	}
+.leaflet-popup-scrolled {
+	overflow: auto;
+	}
+
+.leaflet-oldie .leaflet-popup-content-wrapper {
+	-ms-zoom: 1;
+	}
+.leaflet-oldie .leaflet-popup-tip {
+	width: 24px;
+	margin: 0 auto;
+
+	-ms-filter: "progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)";
+	filter: progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678);
+	}
+
+.leaflet-oldie .leaflet-control-zoom,
+.leaflet-oldie .leaflet-control-layers,
+.leaflet-oldie .leaflet-popup-content-wrapper,
+.leaflet-oldie .leaflet-popup-tip {
+	border: 1px solid #999;
+	}
+
+
+/* div icon */
+
+.leaflet-div-icon {
+	background: #fff;
+	border: 1px solid #666;
+	}
+
+
+/* Tooltip */
+/* Base styles for the element that has a tooltip */
+.leaflet-tooltip {
+	position: absolute;
+	padding: 6px;
+	background-color: #fff;
+	border: 1px solid #fff;
+	border-radius: 3px;
+	color: #222;
+	white-space: nowrap;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	pointer-events: none;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	}
+.leaflet-tooltip.leaflet-interactive {
+	cursor: pointer;
+	pointer-events: auto;
+	}
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	position: absolute;
+	pointer-events: none;
+	border: 6px solid transparent;
+	background: transparent;
+	content: "";
+	}
+
+/* Directions */
+
+.leaflet-tooltip-bottom {
+	margin-top: 6px;
+}
+.leaflet-tooltip-top {
+	margin-top: -6px;
+}
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-top:before {
+	left: 50%;
+	margin-left: -6px;
+	}
+.leaflet-tooltip-top:before {
+	bottom: 0;
+	margin-bottom: -12px;
+	border-top-color: #fff;
+	}
+.leaflet-tooltip-bottom:before {
+	top: 0;
+	margin-top: -12px;
+	margin-left: -6px;
+	border-bottom-color: #fff;
+	}
+.leaflet-tooltip-left {
+	margin-left: -6px;
+}
+.leaflet-tooltip-right {
+	margin-left: 6px;
+}
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	top: 50%;
+	margin-top: -6px;
+	}
+.leaflet-tooltip-left:before {
+	right: 0;
+	margin-right: -12px;
+	border-left-color: #fff;
+	}
+.leaflet-tooltip-right:before {
+	left: 0;
+	margin-left: -12px;
+	border-right-color: #fff;
+	}
+
+/* Printing */
+
+@media print {
+	/* Prevent printers from removing background-images of controls. */
+	.leaflet-control {
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+		}
+	}
+
+</style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>/* 아래 앱 스크립트의 복셀 헬퍼 function L() 이 Leaflet 전역 L 을 덮어쓰므로, 로드 직후 보관 */window.__LEAF=window.L;</script>
 <script>
 "use strict";
 /* ============================= store ============================= */
@@ -253,7 +917,7 @@ var DB_KEY='igplay_v1';
 var db;
 function loadDB(){ try{var r=localStorage.getItem(DB_KEY); if(r)return norm(JSON.parse(r));}catch(e){}
   return norm({nick:null,likes:{},subs:{},comments:{},times:{},myLevels:[],plays:{}}); }
-function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; return d; }
+function norm(d){ if(d.isc==null)d.isc=120; if(!d.skins)d.skins=['classic']; if(!d.skin)d.skin='classic'; if(!d.boosts)d.boosts={}; if(!d.firstClears)d.firstClears={}; if(!d.tips)d.tips={}; if(!d.char)d.char='blocky'; if(!d.catalog)d.catalog=[]; if(!d.shorts)d.shorts=[]; if(!d.market)d.market=[]; if(!d.ownedStore)d.ownedStore=[]; return d; }
 function saveDB(){ try{localStorage.setItem(DB_KEY,JSON.stringify(db));}catch(e){} }
 db=loadDB();
 
@@ -1474,7 +2138,6 @@ function storeAccessBadge(it){
   return '<span class="vf" style="color:var(--ok,#2ec27e)">무료</span>';
 }
 function renderStore(m){
-  if(!NET.on){ m.innerHTML='<div class="wrap"><div class="sechead"><h2>스토어</h2><p>게임·앱·3D·이미지·음원·영상·문서를 올리고 받기</p></div><div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l2-5h14l2 5M3 9h18l-1.5 11H4.5z"/></svg><h3>서버 연결이 필요합니다</h3><p>스토어 이용은 서버 계정이 필요합니다. 상단 "서버"에서 연결하세요.</p><button class="btn brand" style="margin-top:12px" onclick="openServerDialog()">서버 연결</button></div></div>'; return; }
   var html='<div class="wrap"><div class="sechead" style="display:flex;justify-content:space-between;align-items:flex-start"><div><h2>스토어</h2><p>게임·앱·3D·이미지·음원·영상·문서를 ISC로 거래</p></div><button class="btn brand" id="stPub">올리기</button></div>';
   html+='<div style="margin:8px 0 12px"><input id="stQ" placeholder="제목·태그 검색" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--fg);outline:none"></div>';
   html+='<div class="chips">'+STORE_KINDS.map(function(t){return '<button class="chip'+(t[0]===storeTab?' on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
@@ -1485,8 +2148,22 @@ function renderStore(m){
   var qi=m.querySelector('#stQ'); qi.onkeydown=function(e){ if(e.key==='Enter') loadStore(m,qi.value.trim()); };
   loadStore(m,'');
 }
+function storeItemsLocal(){ var me2=(NET.uid||'me'); return (db.catalog||[]).map(function(it){ var o={}; for(var k in it)o[k]=it[k]; o.mine=it.creatorId===me2; o.entitled=o.mine||(db.ownedStore||[]).indexOf(it.id)>=0; return o; }); }
 function loadStore(m,q){
   var lst=document.getElementById('stlist'); if(!lst)return;
+  if(!NET.on){ // 로컬 모드: db.catalog
+    var all=storeItemsLocal();
+    if(storeTab==='mine'){ var pub=all.filter(function(it){return it.mine;}); var owned=all.filter(function(it){return it.entitled&&!it.mine;});
+      var h='<div class="sechead" style="margin-top:4px"><h2 style="font-size:16px">받은 콘텐츠 '+owned.length+'</h2></div>';
+      if(!owned.length)h+='<div class="empty"><p>받은 콘텐츠가 없습니다.</p></div>'; else h+='<div class="grid" id="stOwned"></div>';
+      h+='<div class="sechead" style="margin-top:16px"><h2 style="font-size:16px">내가 올린 콘텐츠 '+pub.length+'</h2></div>';
+      if(!pub.length)h+='<div class="empty"><p>올린 콘텐츠가 없습니다.</p></div>'; else h+='<div class="grid" id="stPubbed"></div>';
+      lst.innerHTML=h; var g1=document.getElementById('stOwned'); if(g1)owned.forEach(function(it){g1.appendChild(storeCard(it,m));}); var g2=document.getElementById('stPubbed'); if(g2)pub.forEach(function(it){g2.appendChild(storeCard(it,m));}); return;
+    }
+    var items=all.filter(function(it){ if(storeTab!=='all'&&it.kind!==storeTab)return false; if(q){ var hay=(it.title+' '+(it.tags||[]).join(' ')).toLowerCase(); if(hay.indexOf(q.toLowerCase())<0)return false; } return true; });
+    if(!items.length){ lst.innerHTML='<div class="empty"><h3>콘텐츠가 없습니다</h3><p>오른쪽 위 "올리기"로 첫 콘텐츠를 등록해보세요.</p></div>'; return; }
+    lst.innerHTML='<div class="grid"></div>'; var grid=lst.querySelector('.grid'); items.forEach(function(it){ grid.appendChild(storeCard(it,m)); }); return;
+  }
   if(storeTab==='mine'){
     api('GET','/api/igstore/library').then(function(r){
       var owned=r.owned||[], pub=r.published||[];
@@ -1525,11 +2202,12 @@ function storeCard(it,m){
     '<div class="csub">'+esc(it.creator||'익명')+' · '+storeAccessBadge(it)+(it.downloads?(' · 받음 '+fmt(it.downloads)):'')+'</div>'+
     btn+'</div></div>';
   var bind=function(sel,fn){ var b=c.querySelector(sel); if(b)b.onclick=fn; };
-  bind('[data-open]',function(){ storeDownload(it); });
-  bind('[data-free]',function(){ api('POST','/api/igstore/catalog/'+it.id+'/claim',{}).then(function(){ toast('받기 완료'); renderStore(m); }).catch(function(e){ toast(e.message); }); });
-  bind('[data-tok]',function(){ api('POST','/api/igstore/catalog/'+it.id+'/claim',{}).then(function(){ toast('토큰 해제 완료'); renderStore(m); }).catch(function(e){ toast(e.message||'토큰이 부족합니다'); }); });
-  bind('[data-buy]',function(){ api('POST','/api/igstore/catalog/'+it.id+'/buy',{}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast('구매 완료'); renderStore(m); }).catch(function(e){ toast(e.message); }); });
-  bind('[data-ad]',function(){ storeAdWatch(it,m); });
+  function ownLocal(){ if((db.ownedStore||[]).indexOf(it.id)<0){ db.ownedStore.push(it.id); saveDB(); } }
+  bind('[data-open]',function(){ if(!NET.on){ if(it.externalUrl){ window.open(it.externalUrl,'_blank'); toast('열기: '+esc(it.title||'')); } else toast('연결된 파일이 없습니다'); return; } storeDownload(it); });
+  bind('[data-free]',function(){ if(!NET.on){ ownLocal(); toast('받기 완료'); renderStore(m); return; } api('POST','/api/igstore/catalog/'+it.id+'/claim',{}).then(function(){ toast('받기 완료'); renderStore(m); }).catch(function(e){ toast(e.message); }); });
+  bind('[data-tok]',function(){ if(!NET.on){ toast('토큰 해제는 서버 연결이 필요합니다'); return; } api('POST','/api/igstore/catalog/'+it.id+'/claim',{}).then(function(){ toast('토큰 해제 완료'); renderStore(m); }).catch(function(e){ toast(e.message||'토큰이 부족합니다'); }); });
+  bind('[data-buy]',function(){ if(!NET.on){ if(spend(it.price||0)){ ownLocal(); toast('구매 완료'); renderStore(m); } else toast('ISC가 부족합니다'); return; } api('POST','/api/igstore/catalog/'+it.id+'/buy',{}).then(function(r){ if(r.wallet){db.isc=r.wallet.balance;updateWallet();} toast('구매 완료'); renderStore(m); }).catch(function(e){ toast(e.message); }); });
+  bind('[data-ad]',function(){ if(!NET.on){ storeAdWatchLocal(it,m,function(){ ownLocal(); }); return; } storeAdWatch(it,m); });
   return c;
 }
 // 소유 콘텐츠 열기/다운로드
@@ -1553,9 +2231,16 @@ function storeAdWatch(it,m){
     api('POST','/api/igstore/catalog/'+it.id+'/adview',{watchedMs:Date.now()-t0}).then(function(){ wrap.remove(); toast('해제 완료'); renderStore(m); }).catch(function(e){ wrap.remove(); toast(e.message); });
   } },1000);
 }
+// 로컬 광고 시청(서버 검증 없이 5초)
+function storeAdWatchLocal(it,m,onDone){
+  var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80'; var sec=5;
+  wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;text-align:center"><h3 style="font-size:18px">광고 시청</h3><p style="margin:10px 0">잠시 광고를 시청하면 콘텐츠가 열립니다.</p><div id="adCnt" style="font-size:34px;font-weight:700;color:var(--brand);margin:8px 0">'+sec+'</div><div class="obtns" style="justify-content:center"><button class="btn" id="adCancel">취소</button></div></div>';
+  document.body.appendChild(wrap); var cnt=wrap.querySelector('#adCnt');
+  wrap.querySelector('#adCancel').onclick=function(){ clearInterval(iv); wrap.remove(); };
+  var iv=setInterval(function(){ sec--; if(cnt)cnt.textContent=sec>0?sec:'완료'; if(sec<=0){ clearInterval(iv); wrap.remove(); if(onDone)onDone(); toast('해제 완료'); renderStore(m); } },1000);
+}
 // 콘텐츠 올리기(발행)
 function publishStoreDialog(m){
-  if(!NET.on){ toast('서버 연결이 필요합니다'); openServerDialog(); return; }
   var wrap=document.createElement('div'); wrap.className='overlay'; wrap.style.position='fixed'; wrap.style.zIndex='80';
   var inputS='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:10px';
   wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:22px;text-align:left;max-width:460px;max-height:86vh;overflow:auto">'+
@@ -1582,15 +2267,60 @@ function publishStoreDialog(m){
     var tags=wrap.querySelector('#pTags').value.trim(); if(tags) body.tags=tags.split(',').map(function(s){return s.trim();}).filter(Boolean);
     if(acc.value==='paid'){ var pr=Math.round(+wrap.querySelector('#pPrice').value||0); if(pr<1){ toast('가격을 입력하세요'); return; } body.price=pr; }
     if(acc.value==='token'){ var sym=wrap.querySelector('#pSym').value.trim().toUpperCase(); var mn=Math.round(+wrap.querySelector('#pMin').value||0); if(!sym){ toast('토큰 심볼을 입력하세요'); return; } body.gateSymbol=sym; body.gateMin=mn||1; }
+    if(!NET.on){ var id='ci_loc_'+Date.now().toString(36); db.catalog.unshift({id:id,kind:body.kind,title:body.title,desc:body.desc||'',creator:me(),creatorId:(NET.uid||'me'),ownerId:(NET.uid||'me'),access:body.access,price:body.price||0,gateSymbol:body.gateSymbol||null,gateMin:body.gateMin||0,externalUrl:body.externalUrl||null,tags:body.tags||[],cover:null,downloads:0}); saveDB(); toast('올리기 완료'); close(); storeTab='mine'; renderStore(m); return; }
     api('POST','/api/igstore/catalog',body).then(function(){ toast('올리기 완료'); close(); storeTab='mine'; renderStore(m); }).catch(function(e){ toast(e.message); });
   };
 }
 
+/* ---------- 브라우저 도시 생성기 (서버 없이 월드 만들기) ---------- */
+function _inPoly(x,z,poly){ var inside=false; for(var i=0,j=poly.length-1;i<poly.length;j=i++){ var xi=poly[i][0],zi=poly[i][1],xj=poly[j][0],zj=poly[j][1]; if(((zi>z)!==(zj>z))&&(x<(xj-xi)*(z-zi)/((zj-zi)||1e-9)+xi))inside=!inside; } return inside; }
+function cityVoxelize(features,opts){ opts=opts||{}; var bb=features.bbox; var MAX=20000,GROUND=1,BUILD=2,GOAL=4,ROAD=0x3a3f46,GRASS=0x3f7a4b;
+  var latMid=(bb.s+bb.n)/2, mLat=111320, mLng=111320*Math.cos(latMid*Math.PI/180);
+  var cell=Math.max(1,opts.cell||4), maxSpan=Math.max(20,opts.maxSpan||200);
+  var widthM=(bb.e-bb.w)*mLng, heightM=(bb.n-bb.s)*mLat; cell=Math.max(cell,widthM/maxSpan,heightM/maxSpan);
+  var gx=Math.max(1,Math.round(widthM/cell)), gz=Math.max(1,Math.round(heightM/cell));
+  function toCell(lat,lon){ return [Math.round((lon-bb.w)*mLng/cell),Math.round((bb.n-lat)*mLat/cell)]; }
+  var solid={},ground={},vox=[];
+  function put(x,y,z,t,c){ var k=x+','+y+','+z; if(solid[k])return; solid[k]=1; var o={x:x,y:y,z:z,t:t}; if(c!=null)o.c=c; vox.push(o); if(y===0)ground[x+','+z]=o; }
+  for(var x=0;x<gx;x++)for(var z=0;z<gz;z++)put(x,0,z,GROUND,GRASS);
+  (features.roads||[]).forEach(function(r){ var g=r.geometry||[]; for(var i=0;i+1<g.length;i++){ var a=toCell(g[i].lat,g[i].lon),b=toCell(g[i+1].lat,g[i+1].lon); var steps=Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]))||1; for(var s=0;s<=steps;s++){ var xx=Math.round(a[0]+(b[0]-a[0])*s/steps),zz=Math.round(a[1]+(b[1]-a[1])*s/steps); var gc=ground[xx+','+zz]; if(gc)gc.c=ROAD; } } });
+  (features.buildings||[]).forEach(function(bd,bi){ var g=bd.geometry||[]; if(g.length<3)return; var poly=g.map(function(p){return toCell(p.lat,p.lon);}); var minx=1e9,maxx=-1e9,minz=1e9,maxz=-1e9; poly.forEach(function(p){ if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0]; if(p[1]<minz)minz=p[1]; if(p[1]>maxz)maxz=p[1]; }); minx=Math.max(0,minx);maxx=Math.min(gx-1,maxx);minz=Math.max(0,minz);maxz=Math.min(gz-1,maxz); var hM=Number(bd.height)||(Number(bd.levels)||2)*3; var h=Math.max(1,Math.min(24,Math.round(hM/cell))); var shade=0x8a93a0+(bi%5)*0x060606; for(var X=minx;X<=maxx;X++)for(var Z=minz;Z<=maxz;Z++){ if(!_inPoly(X+0.5,Z+0.5,poly))continue; for(var Y=1;Y<=h;Y++)put(X,Y,Z,BUILD,shade); if(vox.length>MAX)return; } });
+  var spawn={x:Math.floor(gx/2),y:1,z:Math.floor(gz/2)}; put(gx-1,1,gz-1,GOAL,null);
+  var voxels=vox.slice(0,MAX); if(!voxels.some(function(v){return v.t===GOAL;})){ if(voxels.length>=MAX)voxels=voxels.slice(0,MAX-1); voxels.push({x:gx-1,y:1,z:gz-1,t:GOAL}); }
+  return {voxels:voxels,spawn:spawn,geo:{lat:latMid,lng:(bb.w+bb.e)/2,label:opts.name||''},size:{gx:gx,gz:gz}};
+}
+function cityReal(features,opts){ opts=opts||{}; var bb=features.bbox; var latMid=(bb.s+bb.n)/2, mLat=111320, mLng=111320*Math.cos(latMid*Math.PI/180);
+  var widthM=Math.max(4,(bb.e-bb.w)*mLng), heightM=Math.max(4,(bb.n-bb.s)*mLat);
+  function toM(lat,lon){ return [(lon-bb.w)*mLng,(bb.n-lat)*mLat]; }
+  var maxB=Math.max(10,opts.maxBuildings||140), props=[];
+  function boxProp(cx,cy,cz,w,h,d,color){ var hw=w/2,hd=d/2; var verts=[[-hw,0,-hd],[hw,0,-hd],[hw,h,-hd],[-hw,h,-hd],[-hw,0,hd],[hw,0,hd],[hw,h,hd],[-hw,h,hd]]; var quads=[[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[3,2,6,7],[4,5,1,0]]; var faces=[]; quads.forEach(function(q){ faces.push(q[0],q[1],q[2],q[0],q[2],q[3]); }); props.push({verts:verts,faces:faces,pos:{x:cx,y:cy,z:cz},scale:1,color:color,size:{w:w,h:h,d:d},collide:true}); }
+  boxProp(widthM/2,0,heightM/2,widthM,0.6,heightM,0x37415a);
+  var built=0; (features.buildings||[]).forEach(function(bd,bi){ if(built>=maxB)return; var g=bd.geometry||[]; if(g.length<4)return; var pts=g.map(function(p){return toM(p.lat,p.lon);}); if(pts.length>1&&pts[0][0]===pts[pts.length-1][0]&&pts[0][1]===pts[pts.length-1][1])pts=pts.slice(0,-1); var n=pts.length; if(n<3)return; var cx=0,cz=0,minx=1e9,maxx=-1e9,minz=1e9,maxz=-1e9; pts.forEach(function(p){ cx+=p[0];cz+=p[1]; if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0]; if(p[1]<minz)minz=p[1]; if(p[1]>maxz)maxz=p[1]; }); cx/=n;cz/=n; var hM=Math.max(3,Math.min(240,Number(bd.height)||(Number(bd.levels)||3)*3)); var local=pts.map(function(p){return [p[0]-cx,p[1]-cz];}); var verts=[]; for(var i=0;i<n;i++)verts.push([local[i][0],0,local[i][1]]); for(i=0;i<n;i++)verts.push([local[i][0],hM,local[i][1]]); var faces=[]; for(i=1;i<n-1;i++)faces.push(0,i+1,i); for(i=1;i<n-1;i++)faces.push(n,n+i,n+i+1); for(i=0;i<n;i++){ var j=(i+1)%n; faces.push(i,j,n+j,i,n+j,n+i); } var PAL=[0x6b7280,0x8a93a0,0x9aa7b4,0x5f7f9a,0x7d6a5b,0xb7bcc4,0x4a5a6e,0xa98f74]; var color=hM>70?[0x3f5a7a,0x4a6b8a,0x5c6f8c][bi%3]:PAL[bi%PAL.length]; props.push({verts:verts,faces:faces,pos:{x:cx,y:0.3,z:cz},scale:1,color:color,size:{w:maxx-minx,h:hM,d:maxz-minz},collide:true}); built++; });
+  var spawn={x:Math.round(widthM/2),y:1,z:Math.round(heightM/2)};
+  var voxels=[{x:0,y:0,z:0,t:1},{x:Math.round(widthM)-2,y:1,z:Math.round(heightM)-2,t:4}];
+  return {voxels:voxels,props:props,spawn:spawn,geo:{lat:latMid,lng:(bb.w+bb.e)/2,label:opts.name||''},size:{w:Math.round(widthM),d:Math.round(heightM)}};
+}
+function citySample(bb){ var mLat=111320, mLng=111320*Math.cos(((bb.s+bb.n)/2)*Math.PI/180); var dLat=function(m){return m/mLat;},dLng=function(m){return m/mLng;}; var W0=bb.w,N0=bb.n;
+  function rect(x,z,w,d){ var lat0=N0-dLat(z),lon0=W0+dLng(x),lat1=N0-dLat(z+d),lon1=W0+dLng(x+w); return [{lat:lat0,lon:lon0},{lat:lat0,lon:lon1},{lat:lat1,lon:lon1},{lat:lat1,lon:lon0},{lat:lat0,lon:lon0}]; }
+  var widthM=(bb.e-bb.w)*mLng, heightM=(bb.n-bb.s)*mLat; var lot=46,gap=14,margin=12;
+  var cols=Math.max(2,Math.floor((widthM-margin)/(lot+gap))), rows=Math.max(2,Math.floor((heightM-margin)/(lot+gap)));
+  var seed=Math.abs(Math.floor((bb.w+bb.n)*1000))%9999+7; var rnd=function(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; };
+  var buildings=[],roads=[]; for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){ var x=margin+c*(lot+gap),z=margin+r*(lot+gap); var bw=lot*(0.7+rnd()*0.26),bd=lot*(0.7+rnd()*0.26); var h=Math.round(16+rnd()*90+(rnd()<0.22?rnd()*90:0)); buildings.push({geometry:rect(x+(lot-bw)/2,z+(lot-bd)/2,bw,bd),height:h}); }
+  for(c=0;c<=cols;c++){ var xx=c*(lot+gap); roads.push({geometry:[{lat:N0,lon:W0+dLng(xx)},{lat:N0-dLat(rows*(lot+gap)),lon:W0+dLng(xx)}]}); }
+  for(r=0;r<=rows;r++){ var zz=r*(lot+gap); roads.push({geometry:[{lat:N0-dLat(zz),lon:W0},{lat:N0-dLat(zz),lon:W0+dLng(cols*(lot+gap))}]}); }
+  return {bbox:bb,buildings:buildings,roads:roads};
+}
+function cityFetchOSM(bb){ var q='[out:json][timeout:25];(way["building"]('+bb.s+','+bb.w+','+bb.n+','+bb.e+');way["highway"]('+bb.s+','+bb.w+','+bb.n+','+bb.e+'););out geom;'; var ctl=new AbortController(); var to=setTimeout(function(){try{ctl.abort();}catch(e){}},12000);
+  return fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'text/plain'},body:q,signal:ctl.signal}).then(function(res){ clearTimeout(to); if(!res.ok)throw new Error('osm'); return res.json(); }).then(function(data){ var buildings=[],roads=[]; (data.elements||[]).forEach(function(el){ if(el.type!=='way'||!el.geometry)return; if(el.tags&&el.tags.building)buildings.push({geometry:el.geometry,height:el.tags.height,levels:el.tags['building:levels']}); else if(el.tags&&el.tags.highway)roads.push({geometry:el.geometry}); }); if(!buildings.length)throw new Error('empty'); return {bbox:bb,buildings:buildings,roads:roads}; });
+}
+// bbox→도시 레벨(로컬 저장). OSM 우선, 막히면 샘플 지형으로라도 생성.
+function buildCityLocal(bbox,name,mode){ return cityFetchOSM(bbox).then(function(f){ return {f:f,osm:true}; }).catch(function(){ return {f:citySample(bbox),osm:false}; }).then(function(o){ var built=mode==='real'?cityReal(o.f,{name:name}):cityVoxelize(o.f,{name:name}); var id='lv_loc_'+Date.now().toString(36); var lv={id:id,title:name||(mode==='real'?'리얼 시티':'복셀 시티'),creator:me(),creatorId:(NET.uid||'me'),genre:'어드벤처',difficulty:'보통',voxels:built.voxels,props:built.props||[],spawn:built.spawn,desc:'지도에서 만든 '+(mode==='real'?'리얼':'복셀')+' 도시 월드',geo:built.geo,plays:0,likes:0,source:'igcity'}; db.myLevels.push(lv); saveDB(); return {lv:lv,osm:o.osm,buildings:(o.f.buildings||[]).length}; }); }
+
 /* ============================= 월드 (지도) ============================= */
 // 실제 지도(OpenStreetMap, 무료 타일) 위에 레벨·영상·라이브·상점을 위치 핀으로 올린다.
 function renderWorld(m){
-  if(!NET.on){ m.innerHTML='<div class="wrap"><div class="sechead"><h2>월드</h2><p>실제 지도 위의 레벨·영상·라이브·상점</p></div><div class="empty"><h3>서버 연결이 필요합니다</h3><p>월드 지도는 서버 계정이 필요합니다. 상단 "서버"에서 연결하세요.</p><button class="btn brand" style="margin-top:12px" onclick="openServerDialog()">서버 연결</button></div></div>'; return; }
-  if(typeof L==='undefined'){ m.innerHTML='<div class="wrap"><div class="empty"><h3>지도를 불러오지 못했습니다</h3></div></div>'; return; }
+  var L=window.__LEAF; // Leaflet (전역 L 은 복셀 헬퍼에 의해 덮여 있음)
+  if(!L||typeof L.map!=='function'){ m.innerHTML='<div class="wrap"><div class="empty"><h3>지도를 불러오지 못했습니다</h3></div></div>'; return; }
   m.innerHTML='<div style="position:absolute;inset:0"><div id="worldmap" style="position:absolute;inset:0"></div>'+
     '<div style="position:absolute;top:12px;left:12px;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--muted);pointer-events:none">월드 · 핀을 눌러 콘텐츠로 이동</div>'+
     '<button class="btn brand" id="cityBtn" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:500">이 구역 월드로 올리기</button>'+
@@ -1601,16 +2331,19 @@ function renderWorld(m){
   var map=L.map('worldmap',{zoomControl:true,attributionControl:true}).setView([37.5665,126.9780],13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
   var layer=L.layerGroup().addTo(map);
+  function drawPins(pins){ layer.clearLayers();
+    (pins||[]).forEach(function(p){ var col=COLORS[p.kind]||'#ffffff';
+      var mk=L.circleMarker([p.lat,p.lng],{radius:9,color:'#0b0f16',fillColor:col,fillOpacity:0.9,weight:2}).addTo(layer);
+      var html='<b>'+esc(p.title||'')+'</b><br><span style="color:#888">'+esc(p.kind)+(p.label?(' · '+esc(p.label)):'')+'</span>';
+      if(p.kind==='level')html+='<br><a href="#watch/'+p.id+'">플레이</a>';
+      mk.bindPopup(html);
+    });
+  }
+  // 로컬 레벨(geo 있는 것)을 핀으로
+  function localPins(){ return allLevels().filter(function(l){return l.geo&&l.geo.lat!=null;}).map(function(l){return {kind:'level',id:l.id,title:l.title,lat:l.geo.lat,lng:l.geo.lng,label:l.geo.label||''};}); }
   function load(){ var b=map.getBounds();
-    api('GET','/api/igmap/pins?minLat='+b.getSouth()+'&maxLat='+b.getNorth()+'&minLng='+b.getWest()+'&maxLng='+b.getEast()).then(function(r){
-      layer.clearLayers();
-      (r.pins||[]).forEach(function(p){ var col=COLORS[p.kind]||'#ffffff';
-        var mk=L.circleMarker([p.lat,p.lng],{radius:9,color:'#0b0f16',fillColor:col,fillOpacity:0.9,weight:2}).addTo(layer);
-        var html='<b>'+esc(p.title||'')+'</b><br><span style="color:#888">'+esc(p.kind)+(p.label?(' · '+esc(p.label)):'')+'</span>';
-        if(p.kind==='level')html+='<br><a href="#watch/'+p.id+'">플레이</a>';
-        mk.bindPopup(html);
-      });
-    }).catch(function(){});
+    if(NET.on){ api('GET','/api/igmap/pins?minLat='+b.getSouth()+'&maxLat='+b.getNorth()+'&minLng='+b.getWest()+'&maxLng='+b.getEast()).then(function(r){ drawPins(r.pins); }).catch(function(){ drawPins(localPins()); }); }
+    else { drawPins(localPins()); }
   }
   map.on('moveend',load); setTimeout(function(){ map.invalidateSize(); load(); },80);
   // 이 구역(현재 지도 범위) 땅을 OSM 건물·도로로 복셀화해 월드 레벨로 올림
@@ -1620,9 +2353,10 @@ function renderWorld(m){
     if((bbox.n-bbox.s)>0.02||(bbox.e-bbox.w)>0.02){ toast('더 확대하세요(약 1km 이하 구역)'); return; }
     var name=prompt('이 구역 이름(예: 청담동)',''); if(name===null)return;
     cityBtn.disabled=true; cityBtn.textContent='지형 가져오는 중…';
-    api('POST','/api/igcity/build',{bbox:bbox,name:name||'시티',mode:mode}).then(function(r){
-      toast((mode==='real'?'리얼':'복셀')+' 월드 생성 · 건물 '+(r.buildings||0)+'개'); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; load();
-    }).catch(function(e){ toast(e.message||'실패'); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; });
+    function done(msg){ toast(msg); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; load(); }
+    function fail(e){ toast((e&&e.message)||'실패'); cityBtn.disabled=false; cityBtn.textContent='이 구역 월드로 올리기'; }
+    if(NET.on){ api('POST','/api/igcity/build',{bbox:bbox,name:name||'시티',mode:mode}).then(function(r){ done((mode==='real'?'리얼':'복셀')+' 월드 생성 · 건물 '+(r.buildings||0)+'개'); }).catch(fail); }
+    else { buildCityLocal(bbox,name||'시티',mode).then(function(r){ done((mode==='real'?'리얼':'복셀')+' 월드 생성 · 건물 '+r.buildings+'개'+(r.osm?'':' (지도데이터 대신 샘플지형)')); }).catch(fail); }
   }
   if(cityBtn)cityBtn.onclick=function(){
     // 모드 선택: 복셀 / 리얼
@@ -1639,7 +2373,6 @@ function renderWorld(m){
 /* ============================= 쇼츠 (플샷/숏폼) ============================= */
 // 세로 쇼츠 피드. igVod의 short(60초 이하)을 상하로 넘기며 재생. 좋아요·댓글·공유.
 function renderShorts(m){
-  if(!NET.on){ m.innerHTML='<div class="wrap"><div class="sechead"><h2>숏폼</h2><p>60초 이하 세로 영상</p></div><div class="empty"><h3>서버 연결이 필요합니다</h3><p>상단 "서버"에서 연결하세요.</p><button class="btn brand" style="margin-top:12px" onclick="openServerDialog()">서버 연결</button></div></div>'; return; }
   m.innerHTML='<div id="shortsWrap" style="position:absolute;inset:0;background:#000;display:grid;place-items:center"></div>';
   var wrap=document.getElementById('shortsWrap'); var items=[], idx=0, vidEl=null;
   function vsrc(it){ return it.externalUrl || (it.fileId?(NET.base.replace(/\/+$/,'')+'/api/files/'+it.fileId+'?key='+encodeURIComponent(NET.key)):''); }
@@ -1659,11 +2392,10 @@ function renderShorts(m){
     vidEl=document.getElementById('shv'); if(vidEl)vidEl.play().catch(function(){});
     wrap.querySelector('[data-up]').onclick=function(){ idx--; show(); };
     wrap.querySelector('[data-dn]').onclick=function(){ idx++; show(); };
-    wrap.querySelector('[data-like]').onclick=function(){ api('POST','/api/igvod/'+it.id+'/like',{}).then(function(r){ it.likes=r.likes; show(); }).catch(function(e){ toast(e.message); }); };
-    wrap.querySelector('[data-cmt]').onclick=function(){ shortsComments(it); };
+    wrap.querySelector('[data-like]').onclick=function(){ if(!NET.on){ it.likes=(it.likes||0)+1; saveDB(); show(); return; } api('POST','/api/igvod/'+it.id+'/like',{}).then(function(r){ it.likes=r.likes; show(); }).catch(function(e){ toast(e.message); }); };
+    wrap.querySelector('[data-cmt]').onclick=function(){ if(!NET.on){ toast('댓글은 서버 연결 시 사용할 수 있습니다'); return; } shortsComments(it); };
     wrap.querySelector('[data-shr]').onclick=function(){ try{navigator.clipboard.writeText(location.origin+location.pathname+'#shorts');toast('링크 복사됨');}catch(e){toast('공유');} };
-    // 재생 시 조회수 집계
-    api('GET','/api/igvod/'+it.id,{}).catch(function(){});
+    if(NET.on) api('GET','/api/igvod/'+it.id,{}).catch(function(){});
   }
   function shortsComments(it){
     var ov=document.createElement('div'); ov.className='overlay'; ov.style.position='fixed'; ov.style.zIndex='80';
@@ -1674,14 +2406,25 @@ function renderShorts(m){
     ov.querySelector('#scsend').onclick=function(){ var t=ov.querySelector('#scin').value.trim(); if(!t)return; api('POST','/api/igvod/'+it.id+'/comments',{text:t}).then(function(){ ov.querySelector('#scin').value=''; load(); }).catch(function(e){ toast(e.message); }); };
     load();
   }
-  api('GET','/api/igvod/shorts').then(function(r){ items=r.items||[]; show(); }).catch(function(){ wrap.innerHTML='<div class="empty"><p>불러오기 실패</p></div>'; });
+  if(NET.on){ api('GET','/api/igvod/shorts').then(function(r){ items=r.items||[]; show(); }).catch(function(){ wrap.innerHTML='<div class="empty"><p>불러오기 실패</p></div>'; }); }
+  else { items=db.shorts||[]; show(); }
   function onkey(e){ if(e.key==='ArrowDown'){ idx++; show(); } else if(e.key==='ArrowUp'){ idx--; show(); } }
   window.addEventListener('keydown',onkey);
   activeSession={dispose:function(){ window.removeEventListener('keydown',onkey); if(vidEl){try{vidEl.pause();}catch(e){}} }};
 }
 
 function renderMarket(m){
-  if(!NET.on){ m.innerHTML='<div class="wrap"><div class="sechead"><h2>마켓</h2><p>레벨·프로젝트를 ISC로 거래·투자</p></div><div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h18v4H3zM5 7v13h14V7"/></svg><h3>서버 연결이 필요합니다</h3><p>마켓 거래·투자는 서버 계정이 필요합니다. 상단 "서버"에서 연결하세요.</p><button class="btn brand" style="margin-top:12px" onclick="openServerDialog()">서버 연결</button></div></div>'; return; }
+  if(!NET.on){ // 로컬: 내가 만든 레벨을 매물 후보로 보여주고, 실거래는 계정 연결 시 열림
+    var mine=(db.myLevels||[]);
+    var h='<div class="wrap"><div class="sechead"><h2>마켓</h2><p>레벨·프로젝트를 ISC로 거래·투자</p></div>';
+    h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:12.5px;color:var(--muted)">실제 ISC 거래·투자 정산은 계정 연결 시 열립니다. 아래는 내가 만든 매물 후보입니다.</div>';
+    if(!mine.length){ h+='<div class="empty"><h3>등록할 레벨이 없습니다</h3><p>게임 만들기에서 레벨을 만들어보세요.</p></div></div>'; m.innerHTML=h; return; }
+    h+='<div class="grid"></div></div>'; m.innerHTML=h; var grid=m.querySelector('.grid');
+    mine.forEach(function(l){ var c=document.createElement('div'); c.className='card'; c.style.cursor='pointer';
+      c.innerHTML='<div class="thumb"><div style="display:grid;place-items:center;height:100%;color:var(--faint);font-size:12px">레벨</div><span class="plv"><b style="background:var(--brand)"></b>매물 후보</span></div><div class="meta"><div class="ava" style="background:'+avaColor(l.id)+'">'+esc((l.title||'?').charAt(0))+'</div><div class="mtext"><div class="ctitle">'+esc(l.title||'레벨')+'</div><div class="csub">'+esc(me())+' · 내 레벨</div><button class="btn" style="width:100%;margin-top:8px">플레이</button></div></div>';
+      c.onclick=function(){ go('watch/'+l.id); }; grid.appendChild(c); });
+    return;
+  }
   var html='<div class="wrap"><div class="sechead"><h2>마켓</h2><p>레벨·프로젝트를 ISC로 거래·투자</p></div>';
   html+='<div class="chips">'+[['all','전체'],['level','레벨'],['project','프로젝트'],['mine','내 지분']].map(function(t){return '<button class="chip'+(t[0]===mktTab?' on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
   html+='<div id="mktlist">불러오는 중…</div></div>';
