@@ -132,8 +132,10 @@ export function realCity(features, opts = {}) {
     for (let i = 1; i < n - 1; i++) { faces.push(0, i + 1, i); }               // bottom fan
     for (let i = 1; i < n - 1; i++) { faces.push(n, n + i, n + i + 1); }       // top fan
     for (let i = 0; i < n; i++) { const j = (i + 1) % n; faces.push(i, j, n + j, i, n + j, n + i); } // sides
-    const shade = 0x8a93a0 + (bi % 6) * 0x050505;
-    props.push({ verts, faces, pos: { x: cx, y: 0.3, z: cz }, scale: 1, color: shade, size: { w: maxx - minx, h: hM, d: maxz - minz }, collide: true });
+    // 도시다운 건물 색 팔레트(콘크리트/유리블루/벽돌/화이트/다크글래스) — 높이에 따라 고층은 유리톤
+    const PAL = [0x6b7280, 0x8a93a0, 0x9aa7b4, 0x5f7f9a, 0x7d6a5b, 0xb7bcc4, 0x4a5a6e, 0xa98f74];
+    const color = hM > 70 ? [0x3f5a7a, 0x4a6b8a, 0x5c6f8c][bi % 3] : PAL[bi % PAL.length];
+    props.push({ verts, faces, pos: { x: cx, y: 0.3, z: cz }, scale: 1, color, size: { w: maxx - minx, h: hM, d: maxz - minz }, collide: true });
     built++;
   });
 

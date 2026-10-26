@@ -862,10 +862,13 @@ function startPlayer(lv){
   var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
   var scene=new THREE.Scene(); scene.background=new THREE.Color(0x8fb7d9);
-  scene.fog=new THREE.Fog(0x8fb7d9,24,64);
-  var camera=new THREE.PerspectiveCamera(62,16/9,0.1,200);
-  var hemi=new THREE.HemisphereLight(0xeaf3ff,0x3a4a3a,0.95); scene.add(hemi);
-  var sun=new THREE.DirectionalLight(0xffffff,0.9); sun.position.set(18,34,12); scene.add(sun);
+  // 리얼 시티(메시 프롭 다수)는 넓고 건물이 멀리까지 보여야 해서 시야 거리를 넓힌다.
+  var bigWorld=lv.props&&lv.props.length>4; var fogFar=bigWorld?260:64, camFar=bigWorld?700:200;
+  scene.fog=new THREE.Fog(0x8fb7d9,bigWorld?80:24,fogFar);
+  var camera=new THREE.PerspectiveCamera(62,16/9,0.1,camFar);
+  // 리얼 시티는 밝은 회색 건물이 많아 과노출로 하얗게 날아가므로 조명을 낮춘다.
+  var hemi=new THREE.HemisphereLight(0xeaf3ff,0x3a4a3a,bigWorld?0.72:0.95); scene.add(hemi);
+  var sun=new THREE.DirectionalLight(0xffffff,bigWorld?0.6:0.9); sun.position.set(18,34,12); scene.add(sun);
 
   // build world
   var solids={}; var coins=[]; var goals=[]; var coinMeshes=[]; var goalMesh=null;
