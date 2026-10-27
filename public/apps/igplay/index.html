@@ -2438,17 +2438,40 @@ function cityFetchOSM(bb){ var q='[out:json][timeout:25];(way["building"]('+bb.s
 function buildCityLocal(bbox,name,mode){ return cityFetchOSM(bbox).then(function(f){ return {f:f,osm:true}; }).catch(function(){ return {f:citySample(bbox),osm:false}; }).then(function(o){ var built=mode==='real'?cityReal(o.f,{name:name}):cityVoxelize(o.f,{name:name}); var id='lv_loc_'+Date.now().toString(36); var lv={id:id,title:name||(mode==='real'?'리얼 시티':'복셀 시티'),creator:me(),creatorId:(NET.uid||'me'),genre:'어드벤처',difficulty:'보통',voxels:built.voxels,props:built.props||[],spawn:built.spawn,desc:'지도에서 만든 '+(mode==='real'?'리얼':'복셀')+' 도시 월드',geo:built.geo,plays:0,likes:0,source:'igcity'}; db.myLevels.push(lv); saveDB(); return {lv:lv,osm:o.osm,buildings:(o.f.buildings||[]).length}; }); }
 
 /* ============================= 탐험 모드 (복셀 지구본 / 대도시) ============================= */
+// 지역 대표 랜드마크를 복셀(블록 조합)로 세운다. type별 실루엣 구조물.
+function buildLandmarkStructure(type){
+  var g=new THREE.Group(); var MAT=function(c){return new THREE.MeshLambertMaterial({color:c});};
+  function box(w,h,d,c,x,y,z){ var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),MAT(c)); m.position.set(x||0,y||0,z||0); m.castShadow=true; m.receiveShadow=true; g.add(m); return m; }
+  function cyl(r1,r2,h,c,x,y,z,seg){ var m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,seg||8),MAT(c)); m.position.set(x||0,y||0,z||0); m.castShadow=true; g.add(m); return m; }
+  function cone(r,h,c,x,y,z,seg){ var m=new THREE.Mesh(new THREE.ConeGeometry(r,h,seg||4),MAT(c)); m.position.set(x||0,y||0,z||0); m.castShadow=true; g.add(m); return m; }
+  function sphereTop(r,c,x,y,z){ var m=new THREE.Mesh(new THREE.SphereGeometry(r,12,8,0,Math.PI*2,0,Math.PI/2),MAT(c)); m.position.set(x||0,y||0,z||0); m.castShadow=true; g.add(m); return m; }
+  switch(type){
+    case 'tower': { var tc=0xb9752e; [[-3,-3],[3,-3],[-3,3],[3,3]].forEach(function(p){ var leg=box(1,17,1,tc,p[0],8.5,p[1]); leg.rotation.x=(p[1]>0?-0.08:0.08); leg.rotation.z=(p[0]>0?0.08:-0.08); }); box(5.5,1,5.5,tc,0,10,0); box(3,9,3,tc,0,16,0); cone(1.7,5,tc,0,22,0,4); box(0.3,4,0.3,0xff5a4a,0,26,0); break; }
+    case 'lotte': case 'skyscraper': { cyl(3.4,4.6,24,0x8fb8d9,0,12,0,6); cyl(1.7,3.4,9,0xb8d6ef,0,28.5,0,6); cone(1.3,7,0x6a90c0,0,36,0,6); break; }
+    case 'statue': { box(6,3,6,0x7a8a78,0,1.5,0); box(3.4,3,3.4,0x9aa898,0,4.5,0); cyl(1.7,2,9,0x6fae9f,0,10.5,0); box(1.9,1.9,1.9,0x6fae9f,0,16,0); for(var i=0;i<7;i++){ var a=(i/6-0.5)*2.2; cone(0.22,1.3,0x6fae9f,Math.sin(a)*1.2,17.6,Math.cos(a)*0.5,4); } var arm=box(0.8,5,0.8,0x6fae9f,2.4,14.5,0); arm.rotation.z=-0.5; cone(0.9,1.7,0xffd27a,3.9,17.6,0,6); break; }
+    case 'pyramid': { cone(10,13,0xd9b870,0,6.5,0,4); cone(5.5,7.5,0xd9b870,15,3.7,7,4); cone(3.2,4.8,0xd9b870,-13,2.4,-8,4); break; }
+    case 'bigben': { box(4.2,21,4.2,0xb08a5a,0,10.5,0); box(4.8,3,4.8,0xc9a46e,0,22,0); [[0,2.45],[0,-2.45],[2.45,0],[-2.45,0]].forEach(function(p){ box(2,2,0.2,0xfff6e0,p[0],22,p[1]); }); cone(2.8,5.5,0x6a7a55,0,25.5,0,4); break; }
+    case 'colosseum': { var rc=0xcbb48c; for(var k=0;k<18;k++){ var a2=k/18*Math.PI*2, cx=Math.cos(a2)*8.5, cz=Math.sin(a2)*8.5; var p1=box(2.6,8,1.8,rc,cx,4,cz); p1.rotation.y=-a2; var p2=box(2.2,4.5,1.3,rc,cx,10,cz); p2.rotation.y=-a2; } break; }
+    case 'opera': { [[-4,0,2.6],[0,0,3.2],[4,0,2.6],[-2,-4,2],[2.3,-4,2]].forEach(function(p){ var s=new THREE.Mesh(new THREE.SphereGeometry(p[2],12,10,0,Math.PI),MAT(0xf2f2f2)); s.position.set(p[0],2.4,p[1]); s.rotation.x=-0.3; s.castShadow=true; g.add(s); }); box(17,2,13,0xb8bcc4,0,1,-1); break; }
+    case 'ferris': { var torus=new THREE.Mesh(new THREE.TorusGeometry(8.5,0.4,8,26),MAT(0xdfe6ef)); torus.position.y=11; torus.castShadow=true; g.add(torus); for(var s2=0;s2<8;s2++){ var a3=s2/8*Math.PI*2; box(1.5,1.5,1.5,0x6ab0ff,Math.cos(a3)*8.5,11+Math.sin(a3)*8.5,0); } box(1,13,1,0x9aa6b4,0,6.5,0); break; }
+    case 'arch': { box(3,11,3,0xcdb48a,-7.5,5.5,0); box(3,11,3,0xcdb48a,7.5,5.5,0); box(18,3,3,0xcdb48a,0,12,0); var arcT=new THREE.Mesh(new THREE.TorusGeometry(6.5,1,8,18,Math.PI),MAT(0xcdb48a)); arcT.position.set(0,11,0); arcT.castShadow=true; g.add(arcT); break; }
+    case 'palace': { box(15,4,10,0x9a5a3a,0,2,0); box(17,1.2,12,0x2a3a55,0,5.4,0); var roof=cone(12,4.2,0x3a4a6a,0,7.6,0,4); roof.rotation.y=Math.PI/4; roof.scale.set(1,1,0.72); break; }
+    case 'dome': { cyl(6,6,7,0xe4ddcf,0,3.5,0,12); sphereTop(6,0xc9bfa8,0,7,0); box(2,4,0.6,0xd8cfb8,0,10.5,0); break; }
+    default: { box(4,10,4,0x9aa6b4,0,5,0); cone(3,4,0xffb02e,0,12,0,4); }
+  }
+  return g;
+}
 var CITY_PRESETS={
   seoul:{name:'서울 (Seoul)',cc:'KR',flag:'🇰🇷',lat:37.5796,lng:126.9770,area:260,
-    landmarks:[{n:'🏯 경복궁 근정전 광장',x:0,z:-60},{n:'🏮 광화문 대로',x:0,z:20},{n:'🏘 북촌 한옥마을',x:-80,z:-30},{n:'🍲 수라간 텃밭 & 화덕',x:70,z:25},{n:'🚣 한강 피크닉 공원',x:0,z:100},{n:'🗼 남산 전망 언덕',x:95,z:-95}],
+    landmarks:[{n:'🏯 경복궁 근정전 광장',x:0,z:-60,s:'palace'},{n:'🏮 광화문 대로',x:0,z:20},{n:'🏘 북촌 한옥마을',x:-80,z:-30},{n:'🍲 수라간 텃밭 & 화덕',x:70,z:25},{n:'🚣 한강 피크닉 공원',x:0,z:100},{n:'🗼 남산 전망 언덕',x:95,z:-95,s:'tower'}],
     quests:[{t:'역사 탐정: 경복궁의 비밀',d:'세종대왕과 대화하고 한국어 퀴즈를 맞혀 미니 경복궁 정자 도면을 획득하세요.',r:350},{t:'미식 여행가: 오방색 비빔밥',d:'수라간 텃밭에서 재료를 수확해 화덕에서 비빔밥을 완성하세요!',r:300}],
     npcs:[{n:'세종대왕',x:0,z:-52,color:0xd94f4f,char:'blocky'},{n:'수라간 상궁',x:66,z:22,color:0xe08f3a,char:'blocky'},{n:'한옥지기',x:-78,z:-28,color:0x6a8fd9,char:'cat'}]},
   paris:{name:'파리 (Paris)',cc:'FR',flag:'🇫🇷',lat:48.8566,lng:2.3522,area:260,
-    landmarks:[{n:'🗼 에펠탑 광장',x:0,z:-60},{n:'🥐 몽마르트 언덕',x:-70,z:-20},{n:'🖼 루브르 정원',x:60,z:10},{n:'🚤 센강 산책로',x:0,z:90}],
+    landmarks:[{n:'🗼 에펠탑 광장',x:0,z:-60,s:'tower'},{n:'🥐 몽마르트 언덕',x:-70,z:-20},{n:'🖼 루브르 정원',x:60,z:10},{n:'🚤 센강 산책로',x:0,z:90}],
     quests:[{t:'예술가의 하루',d:'몽마르트에서 캔버스 조각을 모아 그림을 완성하세요.',r:320}],
     npcs:[{n:'화가',x:-66,z:-18,color:0x9b59b6,char:'blocky'}]},
   tokyo:{name:'도쿄 (Tokyo)',cc:'JP',flag:'🇯🇵',lat:35.6762,lng:139.6503,area:260,
-    landmarks:[{n:'⛩ 센소지 절',x:0,z:-55},{n:'🌸 우에노 공원',x:-70,z:0},{n:'🏙 시부야 교차로',x:70,z:20},{n:'🗼 도쿄타워 언덕',x:0,z:95}],
+    landmarks:[{n:'⛩ 센소지 절',x:0,z:-55,s:'palace'},{n:'🌸 우에노 공원',x:-70,z:0},{n:'🏙 시부야 교차로',x:70,z:20},{n:'🗼 도쿄타워 언덕',x:0,z:95,s:'tower'}],
     quests:[{t:'마츠리 축제',d:'센소지에서 등불을 모아 축제를 밝히세요.',r:300}],
     npcs:[{n:'신관',x:0,z:-48,color:0xcf4f6f,char:'blocky'}]},
   gangnam:{name:'강남 리얼 시티',cc:'KR',flag:'🏙️',lat:37.4979,lng:127.0276,area:200,
@@ -2460,13 +2483,33 @@ var CITY_PRESETS={
     quests:[{t:'버스킹 스타',d:'버스킹 광장에서 환호 모션으로 관객을 모으세요!',r:360},{t:'벽화 탐험대',d:'골목의 복셀 벽화 5개를 찾아 도감에 담으세요.',r:300},{t:'야식 투어',d:'포장마차 거리에서 떡볶이·어묵·호떡을 순서대로 맛보세요.',r:260}],
     npcs:[{n:'버스킹 기타리스트',x:4,z:-44,color:0xff5a6e,char:'robot'},{n:'벽화 아티스트',x:-56,z:4,color:0x9b59b6,char:'blocky'},{n:'포장마차 사장님',x:52,z:18,color:0xe08f3a,char:'cat'}]},
   yeouido:{name:'여의도 스카이라인',cc:'KR',flag:'🌇',lat:37.5219,lng:126.9245,area:210,
-    landmarks:[{n:'🏛 국회의사당 광장',x:0,z:-70},{n:'🏢 63빌딩 전망대',x:70,z:40},{n:'🌸 윤중로 벚꽃길',x:-80,z:0},{n:'🚣 여의도 한강공원',x:0,z:90},{n:'📺 방송국 거리',x:60,z:-30},{n:'🎆 불꽃축제 둔치',x:-40,z:80}],
+    landmarks:[{n:'🏛 국회의사당 광장',x:0,z:-70,s:'dome'},{n:'🏢 63빌딩 전망대',x:70,z:40,s:'skyscraper'},{n:'🌸 윤중로 벚꽃길',x:-80,z:0},{n:'🚣 여의도 한강공원',x:0,z:90},{n:'📺 방송국 거리',x:60,z:-30},{n:'🎆 불꽃축제 둔치',x:-40,z:80}],
     quests:[{t:'벚꽃 러너',d:'윤중로 벚꽃길을 전력질주로 완주하세요!',r:380},{t:'한강 라이더',d:'한강공원에서 자전거 체크포인트를 도세요.',r:320},{t:'불꽃축제 디렉터',d:'둔치에서 불꽃 발사 스팟을 모두 찾으세요.',r:340}],
     npcs:[{n:'방송 리포터',x:56,z:-26,color:0x3aa0ff,char:'blocky'},{n:'한강 라이더',x:4,z:84,color:0x27d4b8,char:'robot'},{n:'벚꽃 상인',x:-76,z:4,color:0xff9ec7,char:'cat'}]},
   jamsil:{name:'잠실 블록타운',cc:'KR',flag:'🎢',lat:37.5133,lng:127.1000,area:170,
-    landmarks:[{n:'🗼 롯데타워 전망대',x:0,z:-60},{n:'🎢 놀이공원 정문',x:-65,z:10},{n:'⚾ 잠실 야구장',x:70,z:20},{n:'🛶 석촌호수 산책로',x:-50,z:60},{n:'🛍 지하 쇼핑몰',x:20,z:45},{n:'🌉 올림픽대교 뷰',x:60,z:-55}],
+    landmarks:[{n:'🗼 롯데타워 전망대',x:0,z:-60,s:'lotte'},{n:'🎢 놀이공원 정문',x:-65,z:10},{n:'⚾ 잠실 야구장',x:70,z:20},{n:'🛶 석촌호수 산책로',x:-50,z:60},{n:'🛍 지하 쇼핑몰',x:20,z:45},{n:'🌉 올림픽대교 뷰',x:60,z:-55}],
     quests:[{t:'롯데타워 등반',d:'전망대 꼭대기 비컨까지 점프로 올라가세요!',r:420},{t:'홈런 더비',d:'야구장에서 숨은 야구공 9개를 모으세요.',r:300},{t:'호수 둘레길',d:'석촌호수를 한 바퀴 돌아 산책 도장을 찍으세요.',r:260}],
-    npcs:[{n:'놀이공원 마스코트',x:-60,z:6,color:0xff6ab0,char:'blob'},{n:'야구 선수',x:66,z:16,color:0xffb02e,char:'blocky'},{n:'호수지기',x:-46,z:56,color:0x27d4b8,char:'cat'}]}
+    npcs:[{n:'놀이공원 마스코트',x:-60,z:6,color:0xff6ab0,char:'blob'},{n:'야구 선수',x:66,z:16,color:0xffb02e,char:'blocky'},{n:'호수지기',x:-46,z:56,color:0x27d4b8,char:'cat'}]},
+  newyork:{name:'뉴욕 (New York)',cc:'US',flag:'🗽',lat:40.7128,lng:-74.0060,area:240,
+    landmarks:[{n:'🗽 자유의 여신상',x:0,z:-60,s:'statue'},{n:'🏙 엠파이어 스테이트',x:60,z:10,s:'skyscraper'},{n:'🌳 센트럴 파크',x:-70,z:0},{n:'🎭 타임스퀘어',x:30,z:50},{n:'🌉 브루클린 브리지',x:-50,z:70,s:'arch'}],
+    quests:[{t:'빅애플 투어',d:'자유의 여신상 앞에서 기념 사진 스팟을 찾으세요.',r:360},{t:'브로드웨이 스타',d:'타임스퀘어에서 댄스 모션으로 관객을 모으세요!',r:320}],
+    npcs:[{n:'옐로캡 기사',x:30,z:44,color:0xffb02e,char:'blocky'},{n:'거리 예술가',x:-66,z:4,color:0x9b59b6,char:'robot'}]},
+  london:{name:'런던 (London)',cc:'GB',flag:'🇬🇧',lat:51.5074,lng:-0.1278,area:240,
+    landmarks:[{n:'🕰 빅벤',x:0,z:-60,s:'bigben'},{n:'🎡 런던 아이',x:55,z:20,s:'ferris'},{n:'🌉 타워 브리지',x:-60,z:40,s:'arch'},{n:'👑 버킹엄 궁전',x:-40,z:-30,s:'palace'},{n:'⛪ 세인트 폴 대성당',x:70,z:-20,s:'dome'}],
+    quests:[{t:'로열 가드',d:'버킹엄 궁전 앞에서 근위병 교대식을 구경하세요.',r:340},{t:'템스강 라이더',d:'런던 아이 주변 체크포인트를 도세요.',r:300}],
+    npcs:[{n:'근위병',x:-40,z:-22,color:0xd94f4f,char:'blocky'},{n:'펍 주인',x:60,z:14,color:0xb5793a,char:'cat'}]},
+  rome:{name:'로마 (Rome)',cc:'IT',flag:'🇮🇹',lat:41.9028,lng:12.4964,area:230,
+    landmarks:[{n:'🏟 콜로세움',x:0,z:-55,s:'colosseum'},{n:'⛲ 트레비 분수',x:60,z:15},{n:'🏛 판테온',x:-60,z:0,s:'dome'},{n:'🍝 트라스테베레',x:0,z:70},{n:'⛪ 성 베드로 대성당',x:-50,z:-50,s:'dome'}],
+    quests:[{t:'글래디에이터',d:'콜로세움에서 전설의 투사가 되어보세요.',r:380},{t:'젤라토 투어',d:'로마 골목에서 젤라토 가게를 찾아다니세요.',r:280}],
+    npcs:[{n:'검투사',x:4,z:-48,color:0xcbb48c,char:'robot'},{n:'젤라토 상인',x:56,z:9,color:0xff9ec7,char:'cat'}]},
+  cairo:{name:'카이로 (Cairo)',cc:'EG',flag:'🇪🇬',lat:30.0444,lng:31.2357,area:260,
+    landmarks:[{n:'🔺 기자 피라미드',x:0,z:-60,s:'pyramid'},{n:'🦁 스핑크스',x:50,z:-20},{n:'🏺 이집트 박물관',x:-60,z:10,s:'dome'},{n:'🛶 나일강 크루즈',x:0,z:80},{n:'🕌 시타델',x:60,z:40,s:'dome'}],
+    quests:[{t:'파라오의 비밀',d:'피라미드 주변에서 숨겨진 상형문자를 찾으세요.',r:400},{t:'사막 탐험가',d:'스핑크스까지 모래언덕을 가로질러 가세요.',r:320}],
+    npcs:[{n:'고고학자',x:4,z:-50,color:0xd9b870,char:'blocky'},{n:'낙타 몰이꾼',x:46,z:-14,color:0xb5793a,char:'cat'}]},
+  sydney:{name:'시드니 (Sydney)',cc:'AU',flag:'🇦🇺',lat:-33.8688,lng:151.2093,area:230,
+    landmarks:[{n:'🎭 오페라 하우스',x:0,z:-55,s:'opera'},{n:'🌉 하버 브리지',x:-55,z:10,s:'arch'},{n:'🏖 본다이 비치',x:60,z:40},{n:'🐨 타롱가 동물원',x:-50,z:60},{n:'🌆 달링 하버',x:50,z:-30}],
+    quests:[{t:'서퍼의 꿈',d:'본다이 비치에서 최고의 파도 스팟을 찾으세요.',r:340},{t:'오페라 데뷔',d:'오페라 하우스 앞에서 환호 모션으로 무대를 열어보세요.',r:360}],
+    npcs:[{n:'서퍼',x:56,z:34,color:0x27d4b8,char:'robot'},{n:'공연 안내원',x:4,z:-48,color:0xff6ab0,char:'blocky'}]}
 };
 var exploreSession=null;
 function renderExplore(m,key){
@@ -2558,8 +2601,11 @@ function exploreEngine(P0,key){
   var propBoxes=buildProps(built.props,gm);
   // 랜드마크: 떠있는 비컨(시야를 가리지 않게 높이 띄우고 얇게)
   var lmMeshes=[];
-  P0.landmarks.forEach(function(l){ var beac=new THREE.Mesh(new THREE.OctahedronGeometry(1.5),new THREE.MeshLambertMaterial({color:0xffb02e,emissive:0x6a4400})); beac.position.set(CX+l.x,22,CZ+l.z); gm.add(beac);
-    var pole=new THREE.Mesh(new THREE.BoxGeometry(0.12,20,0.12),new THREE.MeshLambertMaterial({color:0xffd27a,transparent:true,opacity:0.35})); pole.position.set(CX+l.x,11,CZ+l.z); gm.add(pole); lmMeshes.push(beac); });
+  P0.landmarks.forEach(function(l){
+    if(l.s){ try{ var st=buildLandmarkStructure(l.s); st.position.set(CX+l.x,0.6,CZ+l.z); gm.add(st); }catch(e){} }
+    var by=l.s?36:22;
+    var beac=new THREE.Mesh(new THREE.OctahedronGeometry(1.5),new THREE.MeshLambertMaterial({color:0xffb02e,emissive:0x6a4400})); beac.position.set(CX+l.x,by,CZ+l.z); gm.add(beac);
+    var pole=new THREE.Mesh(new THREE.BoxGeometry(0.12,by-2,0.12),new THREE.MeshLambertMaterial({color:0xffd27a,transparent:true,opacity:0.35})); pole.position.set(CX+l.x,(by-2)/2,CZ+l.z); gm.add(pole); lmMeshes.push(beac); });
   // NPC
   var npcObjs=[];
   (P0.npcs||[]).forEach(function(n){ var c=makeCharacter(n.char||'blocky',n.color||0xd94f4f); c.group.position.set(CX+n.x,0.6,CZ+n.z); scene.add(c.group); npcObjs.push({o:c,data:n}); });
@@ -3509,6 +3555,7 @@ render();
    값: M[ko] = [en, hi, id]. 사전에 없으면 한국어 그대로(폴백). */
 (function () {
   var M = {
+    "뉴욕 (New York)": ["NYC"], "런던 (London)": ["London"], "로마 (Rome)": ["Rome"], "카이로 (Cairo)": ["Cairo"], "시드니 (Sydney)": ["Sydney"],
     "강남 리얼 시티": ["Gangnam Real City", "गंगनम रियल सिटी", "Kota Nyata Gangnam"],
     "홍대 복셀 거리": ["Hongdae Voxel Street", "होंगदे वॉक्सल स्ट्रीट", "Jalan Voxel Hongdae"],
     "여의도 스카이라인": ["Yeouido Skyline", "यिओइदो स्काईलाइन", "Cakrawala Yeouido"],
