@@ -3912,7 +3912,9 @@ render();
   var obs = new MutationObserver(function (muts) {
     for (var i = 0; i < muts.length; i++) { var ad = muts[i].addedNodes; for (var k = 0; k < ad.length; k++) walk(ad[k]); }
   });
-  function start() { buildSel(); translateAll(); obs.observe(document.body, { childList: true, subtree: true }); }
+  function start() { buildSel(); translateAll(); obs.observe(document.body, { childList: true, subtree: true });
+    // 초기 화면이 번역 준비 전에 그려졌을 수 있으니(이모지 접두 텍스트는 옵저버가 못 고침) 한 번 다시 그린다.
+    try{ if (LOCALE !== 'ko' && typeof render === 'function') render(); }catch(e){} }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
 </script>
