@@ -2495,6 +2495,7 @@ function renderExplore(m,key){
       '<canvas id="exRadar" width="170" height="170" style="border-radius:10px;background:#cfe8f5;display:block"></canvas>'+
       '<button id="exRace" style="margin-top:8px;width:100%;padding:8px;border-radius:9px;border:0;background:#27d4b8;color:#042b24;font-weight:800;font-size:12.5px;cursor:pointer">🏁 '+T('타임어택 레이스')+'</button>'+
       '<button id="exPark" style="margin-top:6px;width:100%;padding:8px;border-radius:9px;border:0;background:#ffb02e;color:#1a1205;font-weight:800;font-size:12.5px;cursor:pointer">🧗 '+T('파쿠르 챌린지')+'</button>'+
+      '<button id="exRank" style="margin-top:6px;width:100%;padding:8px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--fg);font-weight:700;font-size:12.5px;cursor:pointer">🏆 '+T('이 도시 랭킹')+'</button>'+
       '<div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.4">WASD 이동 · Shift 전력질주 · Space 점프<br>마우스 드래그 시점 · F 상호작용(🎁상자·🧑NPC)</div>'+
     '</div>'+
     // 상단 우측 코인/버튼
@@ -2664,7 +2665,8 @@ function exploreEngine(P0,key){
   function placeRing(){ var l=raceTarget(); if(!l){ raceRing.visible=false; racePulse.visible=false; return; } raceRing.position.set(CX+l.x,1.6,CZ+l.z); racePulse.position.set(CX+l.x,0.1,CZ+l.z); raceRing.visible=true; racePulse.visible=true; }
   function startRace(){ if(!P0.landmarks.length){ toast(T('체크포인트가 없습니다')); return; } RACE.on=true; RACE.idx=0; RACE.t0=performance.now(); placeRing(); closePanel(); toast('🏁 '+T('레이스 시작! 청록 링을 순서대로 통과하세요')); updateMissionHud(); }
   function endRace(done){ RACE.on=false; raceRing.visible=false; racePulse.visible=false;
-    if(done){ var ms=performance.now()-RACE.t0, first=!RACE.best||ms<RACE.best; if(first){ RACE.best=ms; try{localStorage[RACE.bestKey]=String(ms);}catch(e){} } earn(200); toast('🏁 '+T('완주')+' '+msClk(ms)+(first?' · '+T('신기록!'):'')+' · +200 ISC'); }
+    if(done){ var ms=performance.now()-RACE.t0, first=!RACE.best||ms<RACE.best; if(first){ RACE.best=ms; try{localStorage[RACE.bestKey]=String(ms);}catch(e){} } earn(200); toast('🏁 '+T('완주')+' '+msClk(ms)+(first?' · '+T('신기록!'):'')+' · +200 ISC');
+      try{ if(liveReady()){ ensureAccount().then(function(){ return api('POST','/api/igplay/times',{levelId:'exrace-'+(key||'seoul'),ms:ms}); }).then(function(){ showExploreRank(key,'race',ms); }).catch(function(){ showExploreRank(key,'race',ms); }); } else showExploreRank(key,'race',ms); }catch(e){} }
     updateMissionHud(); }
   function updateMissionHud(){ if(coinHudEl)coinHudEl.textContent='🪙 '+COL.got+'/'+COL.total; if(!missionEl)return;
     if(typeof PARK!=='undefined'&&PARK.on){ missionEl.style.display='block'; missionEl.innerHTML='🧗 '+T('파쿠르 진행 중')+' · '+msClk(performance.now()-PARK.t0)+' · '+T('청록 골 발판까지'); return; }
@@ -2683,7 +2685,9 @@ function exploreEngine(P0,key){
   function startParkour(){ buildParkourMesh(); PARK.grp.visible=true; PARK.on=true; PARK.t0=performance.now();
     var s=PARK.start; P.x=s.x; P.z=s.z; P.y=s.top+0.6; P.vy=0; try{ yaw=Math.atan2(PARK.plats[1].x-s.x,PARK.plats[1].z-s.z); }catch(e){} closePanel(); toast('🧗 '+T('파쿠르 시작! 발판을 점프로 건너 청록 골까지')); updateMissionHud(); }
   function endParkour(done){ if(!PARK.on)return; PARK.on=false; if(PARK.grp)PARK.grp.visible=false;
-    if(done){ var ms=performance.now()-PARK.t0; earn(250); toast('🧗 '+T('파쿠르 완주!')+' '+msClk(ms)+' · +250 ISC'); } else P.y=3;
+    if(done){ var ms=performance.now()-PARK.t0; var pk='igplay_park_'+(key||'seoul'); var pb=parseFloat(localStorage[pk]||'0')||0; var pf=(!pb||ms<pb); if(pf){try{localStorage[pk]=String(ms);}catch(e){}} earn(250); toast('🧗 '+T('파쿠르 완주!')+' '+msClk(ms)+(pf?' · '+T('신기록!'):'')+' · +250 ISC');
+      try{ if(liveReady()){ ensureAccount().then(function(){ return api('POST','/api/igplay/times',{levelId:'expark-'+(key||'seoul'),ms:ms}); }).then(function(){ showExploreRank(key,'park',ms); }).catch(function(){ showExploreRank(key,'park',ms); }); } else showExploreRank(key,'park',ms); }catch(e){} }
+    else P.y=3;
     updateMissionHud(); }
   function kd(e){ var k=e.key.toLowerCase(); keys[k]=true; if(k===' '||k.indexOf('arrow')===0)e.preventDefault(); }
   function ku(e){ keys[e.key.toLowerCase()]=false; }
@@ -2727,6 +2731,7 @@ function exploreEngine(P0,key){
   var av=document.getElementById('exAva'); if(av)av.onclick=function(){ go('shop'); };
   var rcBtn=document.getElementById('exRace'); if(rcBtn)rcBtn.onclick=function(){ if(RACE.on){ endRace(false); toast(T('레이스 취소')); } else startRace(); };
   var pkBtn=document.getElementById('exPark'); if(pkBtn)pkBtn.onclick=function(){ if(PARK.on){ endParkour(false); toast(T('파쿠르 취소')); } else startParkour(); };
+  var rkBtn=document.getElementById('exRank'); if(rkBtn)rkBtn.onclick=function(){ showExploreRank(key,'race'); closePanel(); };
   updateMissionHud();
   // 레이더
   var radar=document.getElementById('exRadar'), rctx=radar&&radar.getContext('2d'), RANGE=P0.area;
@@ -2876,6 +2881,31 @@ function openDex(key){
     '<div class="obtns" style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn brand" id="dexX">'+T('닫기')+'</button></div></div>';
   document.body.appendChild(ov); ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
   ov.querySelector('#dexX').onclick=function(){ ov.remove(); };
+}
+// ===== 탐험 서버 랭킹(레이스·파쿠르 기록을 전체 유저와 경쟁) =====
+function showExploreRank(key,mode,myMs){
+  var T=function(s){return (window.igT||function(x){return x;})(s);}; key=key||'seoul'; mode=mode||'race';
+  function clk(ms){ try{return msToClock(ms);}catch(e){var s=Math.floor(ms/1000);return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);} }
+  var ov=document.createElement('div'); ov.className='overlay'; ov.style.cssText='position:fixed;inset:0;z-index:3000;display:grid;place-items:center;background:rgba(0,0,0,.5)';
+  function load(){ var lid=(mode==='race'?'exrace-':'expark-')+key, cname=(CITY_PRESETS[key]?T(CITY_PRESETS[key].name).split(' ')[0]:key);
+    ov.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:20px 22px;max-width:440px;width:92%;max-height:84vh;overflow:auto;text-align:left">'+
+      '<div style="font-weight:800;font-size:16px;margin-bottom:12px">🏆 '+esc(cname)+' '+T('랭킹')+'</div>'+
+      '<div style="display:flex;gap:6px;margin-bottom:12px">'+
+        '<button class="rkTab btn'+(mode==='race'?' brand':'')+'" data-m="race" style="flex:1">🏁 '+T('레이스')+'</button>'+
+        '<button class="rkTab btn'+(mode==='park'?' brand':'')+'" data-m="park" style="flex:1">🧗 '+T('파쿠르')+'</button>'+
+      '</div><div id="rkBody" style="font-size:13px;color:var(--muted)">'+T('불러오는 중…')+'</div>'+
+      '<div class="obtns" style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn brand" id="rkX">'+T('닫기')+'</button></div></div>';
+    ov.querySelectorAll('.rkTab').forEach(function(b){ b.onclick=function(){ mode=b.getAttribute('data-m'); load(); }; });
+    ov.querySelector('#rkX').onclick=function(){ ov.remove(); };
+    var body=ov.querySelector('#rkBody'); var myBest=parseFloat(localStorage[(mode==='race'?'igplay_race_':'igplay_park_')+key]||'0')||0;
+    if(!liveReady()){ body.innerHTML=T('서버에 연결되면 전체 유저 랭킹이 표시됩니다.')+((myMs||myBest)?'<br>'+T('내 최고 기록')+': '+clk(myMs||myBest):''); return; }
+    api('GET','/api/igplay/ranking/'+encodeURIComponent(lid)).then(function(r){ var rows=(r.ranking||[]);
+      if(!rows.length){ body.innerHTML=T('아직 기록이 없어요. 1등에 도전하세요!'); return; }
+      var shown=false;
+      body.innerHTML=rows.map(function(t,i){ var mine=(!shown&&myMs&&Math.abs(t.ms-myMs)<3); if(mine)shown=true; return '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 9px;border-radius:8px;'+(mine?'background:var(--surface2);font-weight:700':'')+'"><span>'+(i<3?['🥇','🥈','🥉'][i]:(i+1)+'.')+' '+esc(t.name||'익명')+(mine?' ('+T('나')+')':'')+'</span><span style="font-family:monospace;color:var(--fg)">'+clk(t.ms)+'</span></div>'; }).join('');
+    }).catch(function(){ body.innerHTML=T('랭킹을 불러오지 못했습니다.'); });
+  }
+  document.body.appendChild(ov); ov.onclick=function(e){ if(e.target===ov)ov.remove(); }; load();
 }
 
 /* ============================= 라이브 (실시간 카메라 방송) ============================= */
