@@ -2832,14 +2832,31 @@ function npcTalk(n,P0,key){
   var ov=document.createElement('div'); ov.className='overlay'; ov.style.position='fixed'; ov.style.inset='0'; ov.style.zIndex='3000'; ov.style.display='grid'; ov.style.placeItems='end center';
   function card(inner){ return '<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:18px 20px;max-width:460px;width:92%;margin-bottom:90px;text-align:left">'+inner+'</div>'; }
   function head(){ return '<div style="font-weight:700;margin-bottom:6px">🧑 '+esc(n.n)+'</div>'; }
-  function quizView(){ ov.innerHTML=card(head()+
+  function tabBar(cur){ return '<div style="display:flex;gap:6px;margin:2px 0 12px">'+
+    '<button class="npcTab btn'+(cur==='quiz'?' brand':'')+'" data-t="quiz" style="flex:1;padding:6px">💬 '+T('퀴즈')+'</button>'+
+    '<button class="npcTab btn'+(cur==='mission'?' brand':'')+'" data-t="mission" style="flex:1;padding:6px">🎯 '+T('미션')+'</button></div>'; }
+  function bindTabs(){ ov.querySelectorAll('.npcTab').forEach(function(b){ b.onclick=function(){ (b.getAttribute('data-t')==='mission')?missionView():quizView(); }; }); }
+  function missionView(){ var steps=chainSteps(key), claimed=(chainGet()[key]||0);
+    var html=head()+tabBar('mission')+'<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">"'+esc(T('이 도시의 연쇄 미션이야. 하나씩 완료하면 보상을 주지!'))+'"</div><div style="display:flex;flex-direction:column;gap:8px">';
+    steps.forEach(function(s,i){ var isC=i<claimed, isCur=i===claimed, ok=isCur&&s.chk(), icon=isC?'✔':(isCur?(ok?'🎁':'🎯'):'🔒');
+      html+='<div style="border:1px solid var(--border);border-radius:10px;padding:9px 11px;opacity:'+(i>claimed?0.55:1)+'">'+
+        '<div style="display:flex;justify-content:space-between;gap:6px;font-size:13px;font-weight:600"><span>'+icon+' '+esc(T(s.t))+'</span><span style="color:var(--brand);white-space:nowrap">+'+s.r+'</span></div>'+
+        (i<=claimed?'<div style="color:var(--muted);font-size:11.5px;margin-top:3px">'+T('진행')+': '+esc(T(s.prog()))+'</div>':'')+
+        (ok?'<button class="btn brand npcClaim" data-i="'+i+'" style="margin-top:8px;width:100%;padding:6px">'+T('보상 받기')+' +'+s.r+'</button>':'')+'</div>';
+    });
+    if(claimed>=steps.length)html+='<div style="text-align:center;color:var(--brand);font-weight:700;font-size:13px;padding:6px">🏅 '+T('이 도시의 모든 미션 완료!')+'</div>';
+    html+='</div><div class="obtns" style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" id="npcX2">'+T('닫기')+'</button></div>';
+    ov.innerHTML=card(html); bindTabs(); ov.querySelector('#npcX2').onclick=function(){ ov.remove(); };
+    ov.querySelectorAll('.npcClaim').forEach(function(b){ b.onclick=function(){ var i=+b.getAttribute('data-i'), s=chainSteps(key)[i], c=chainGet(); if(!s||!s.chk()||(c[key]||0)!==i)return; c[key]=i+1; chainSave(c); earn(s.r); toast('🎯 '+T('미션 완료')+' · +'+s.r+' ISC'); missionView(); }; });
+  }
+  function quizView(){ ov.innerHTML=card(head()+tabBar('quiz')+
     '<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:10px">"'+esc(T(q.d))+'"</div>'+
     '<div style="font-size:13.5px;font-weight:700;margin-bottom:10px">❓ '+esc(T(quiz.q))+(already?' <span style="color:var(--faint);font-weight:500;font-size:12px">('+T('이미 푼 문제')+')</span>':'')+'</div>'+
     '<div id="npcOpts" style="display:flex;flex-direction:column;gap:7px">'+
       quiz.a.map(function(opt,i){return '<button class="npcOpt btn" data-i="'+i+'" style="text-align:left;justify-content:flex-start">'+esc(T(opt))+'</button>';}).join('')+
     '</div><div class="obtns" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn" id="npcX">'+T('닫기')+'</button></div>');
     ov.querySelectorAll('.npcOpt').forEach(function(b){ b.onclick=function(){ answer(+b.getAttribute('data-i')); }; });
-    ov.querySelector('#npcX').onclick=function(){ ov.remove(); };
+    ov.querySelector('#npcX').onclick=function(){ ov.remove(); }; bindTabs();
   }
   function answer(i){ var ok=i===quiz.c;
     ov.innerHTML=card(head()+
@@ -2906,6 +2923,16 @@ function showExploreRank(key,mode,myMs){
     }).catch(function(){ body.innerHTML=T('랭킹을 불러오지 못했습니다.'); });
   }
   document.body.appendChild(ov); ov.onclick=function(e){ if(e.target===ov)ov.remove(); }; load();
+}
+// ===== NPC 연쇄 퀘스트(단계별 미션: 코인→명소→레이스) =====
+function chainGet(){ try{ return JSON.parse(localStorage['igplay_chain']||'{}'); }catch(e){ return {}; } }
+function chainSave(c){ try{ localStorage['igplay_chain']=JSON.stringify(c); }catch(e){} }
+function chainSteps(key){ key=key||'seoul'; var P=CITY_PRESETS[key]||CITY_PRESETS.seoul;
+  return [
+    {t:'코인 10개 수집하기', r:150, chk:function(){ return ((dexGet().coins||{})[key]||0)>=10; }, prog:function(){ return Math.min(10,(dexGet().coins||{})[key]||0)+'/10'; }},
+    {t:'모든 명소 방문하기', r:220, chk:function(){ var v=dexGet().visited||{}; return P.landmarks.every(function(l){return v[key+'|'+l.n];}); }, prog:function(){ var v=dexGet().visited||{}; return P.landmarks.filter(function(l){return v[key+'|'+l.n];}).length+'/'+P.landmarks.length; }},
+    {t:'타임어택 레이스 완주하기', r:300, chk:function(){ return (parseFloat(localStorage['igplay_race_'+key]||'0')||0)>0; }, prog:function(){ return (parseFloat(localStorage['igplay_race_'+key]||'0')?'완료':'미완'); }}
+  ];
 }
 
 /* ============================= 라이브 (실시간 카메라 방송) ============================= */
