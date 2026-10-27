@@ -2605,7 +2605,7 @@ function exploreEngine(P0,key){
   var mpBadge=null;
   if(liveReady()){
     mpBadge=document.createElement('div');
-    mpBadge.style.cssText='position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:29;background:rgba(20,26,36,.82);color:#fff;font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;pointer-events:none;white-space:nowrap';
+    mpBadge.style.cssText='position:absolute;top:92px;left:50%;transform:translateX(-50%);z-index:29;background:rgba(20,26,36,.82);color:#fff;font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;pointer-events:none;white-space:nowrap';
     mpBadge.textContent='👥 '+T('접속 중…');
     try{ cv.parentNode.appendChild(mpBadge); }catch(e){}
     MP.ws=igOpenWS([MP.room],function(msg){
