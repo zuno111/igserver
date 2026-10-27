@@ -2495,7 +2495,7 @@ function renderExplore(m,key){
       '<canvas id="exRadar" width="170" height="170" style="border-radius:10px;background:#cfe8f5;display:block"></canvas>'+
       '<button id="exRace" style="margin-top:8px;width:100%;padding:8px;border-radius:9px;border:0;background:#27d4b8;color:#042b24;font-weight:800;font-size:12.5px;cursor:pointer">🏁 '+T('타임어택 레이스')+'</button>'+
       '<button id="exPark" style="margin-top:6px;width:100%;padding:8px;border-radius:9px;border:0;background:#ffb02e;color:#1a1205;font-weight:800;font-size:12.5px;cursor:pointer">🧗 '+T('파쿠르 챌린지')+'</button>'+
-      '<div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.4">WASD 이동 · Shift 전력질주 · Space 점프<br>마우스 드래그 시점</div>'+
+      '<div style="font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.4">WASD 이동 · Shift 전력질주 · Space 점프<br>마우스 드래그 시점 · F 상호작용(🎁상자·🧑NPC)</div>'+
     '</div>'+
     // 상단 우측 코인/버튼
     '<div class="exTopBar" style="position:absolute;top:12px;right:12px;z-index:31;display:flex;gap:6px;align-items:center">'+
@@ -2642,6 +2642,21 @@ function exploreEngine(P0,key){
     COL.total=COL.items.length;
     COL.items.forEach(function(it){ var m=new THREE.Mesh(new THREE.OctahedronGeometry(0.42),new THREE.MeshLambertMaterial({color:0xffcf33,emissive:0x5a3f00})); m.position.set(it.x,1.0,it.z); m.castShadow=true; gm.add(m); COL.meshes.push(m); });
   })();
+  // ----- 히든 보물상자(희귀 보상) -----
+  var CHEST={items:[],meshes:[]};
+  var chestOpened=(function(){ try{ return JSON.parse(localStorage['igplay_chest']||'{}'); }catch(e){ return {}; } })();
+  function chestSave(){ try{ localStorage['igplay_chest']=JSON.stringify(chestOpened); }catch(e){} }
+  (function seedChests(){ var rng=seedRand('igchest_'+(key||'seoul')), tries=0;
+    while(CHEST.items.length<3 && tries<140){ tries++; var ang=rng()*Math.PI*2, rad=16+rng()*(P0.area*0.4);
+      var cx=CX+Math.cos(ang)*rad, cz=CZ+Math.sin(ang)*rad; if(isSolidProp(cx,1,cz))continue; var idx=CHEST.items.length; CHEST.items.push({x:cx,z:cz,opened:!!chestOpened[(key||'seoul')+'|'+idx]}); }
+    CHEST.items.forEach(function(it){ var g=new THREE.Group();
+      var base=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.7,0.85),new THREE.MeshLambertMaterial({color:it.opened?0x6a5a3a:0xb8860b,emissive:it.opened?0x000000:0x3a2a00})); base.position.y=0.95; base.castShadow=true; g.add(base);
+      var lid=new THREE.Mesh(new THREE.BoxGeometry(1.16,0.3,0.9),new THREE.MeshLambertMaterial({color:it.opened?0x7a6a4a:0xffd700,emissive:it.opened?0x000000:0x4a3a00})); lid.position.y=it.opened?1.5:1.35; if(it.opened)lid.rotation.x=-0.7; g.add(lid);
+      g.position.set(it.x,0,it.z); gm.add(g); CHEST.meshes.push({g:g,lid:lid,base:base,data:it}); });
+  })();
+  function openChest(i){ var ch=CHEST.items[i]; if(!ch||ch.opened)return; ch.opened=true; chestOpened[(key||'seoul')+'|'+i]=1; chestSave();
+    var cm=CHEST.meshes[i]; if(cm){ cm.lid.rotation.x=-0.7; cm.lid.position.y=1.5; cm.lid.material.color.setHex(0x7a6a4a); cm.lid.material.emissive.setHex(0x000000); cm.base.material.color.setHex(0x6a5a3a); cm.base.material.emissive.setHex(0x000000); }
+    var r=60+Math.floor(seedRand('rw'+(key||'')+i+Math.floor(Date.now()/1000))()*200); earn(r); toast('🎁 '+T('보물상자 발견!')+' +'+r+' ISC'); }
   var RACE={on:false,idx:0,t0:0,bestKey:'igplay_race_'+(key||'seoul'),_hud:0}; RACE.best=parseFloat(localStorage[RACE.bestKey]||'0')||0;
   var raceRing=new THREE.Mesh(new THREE.TorusGeometry(2.4,0.34,10,30),new THREE.MeshLambertMaterial({color:0x27d4b8,emissive:0x0a5a4a})); raceRing.rotation.x=Math.PI/2; raceRing.visible=false; scene.add(raceRing);
   var racePulse=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,0.1,30,1,true),new THREE.MeshBasicMaterial({color:0x27d4b8,transparent:true,opacity:0.3,side:THREE.DoubleSide})); racePulse.visible=false; scene.add(racePulse);
@@ -2719,6 +2734,7 @@ function exploreEngine(P0,key){
     rctx.strokeStyle='rgba(120,150,170,.5)'; rctx.lineWidth=1; for(var g=0;g<=4;g++){ rctx.beginPath(); rctx.moveTo(g*W/4,0); rctx.lineTo(g*W/4,H); rctx.moveTo(0,g*H/4); rctx.lineTo(W,g*H/4); rctx.stroke(); }
     function toR(wx,wz){ return [W/2+((wx-P.x)/RANGE)*W, H/2+((wz-P.z)/RANGE)*H]; }
     COL.items.forEach(function(it){ if(it.got)return; var p=toR(it.x,it.z); rctx.fillStyle='#ffcf33'; rctx.fillRect(p[0]-1.5,p[1]-1.5,3,3); });
+    CHEST.items.forEach(function(it){ if(it.opened)return; var p=toR(it.x,it.z); rctx.fillStyle='#ffd700'; rctx.fillRect(p[0]-3,p[1]-3,6,6); rctx.strokeStyle='#8a5a00'; rctx.lineWidth=1; rctx.strokeRect(p[0]-3,p[1]-3,6,6); });
     P0.landmarks.forEach(function(l){ var p=toR(CX+l.x,CZ+l.z); rctx.fillStyle='#ff8a3d'; rctx.beginPath(); rctx.arc(p[0],p[1],3.5,0,7); rctx.fill(); });
     if(RACE.on){ var rl=raceTarget(); if(rl){ var rp=toR(CX+rl.x,CZ+rl.z); rctx.strokeStyle='#27d4b8'; rctx.lineWidth=2; rctx.beginPath(); rctx.arc(rp[0],rp[1],7,0,7); rctx.stroke(); } }
     (P0.npcs||[]).forEach(function(n){ var p=toR(CX+n.x,CZ+n.z); rctx.fillStyle='#e23b7a'; rctx.beginPath(); rctx.arc(p[0],p[1],4,0,7); rctx.fill(); });
@@ -2764,6 +2780,10 @@ function exploreEngine(P0,key){
     if(BILL.liveList.length&&!BILL.videoOn)drawBill(now);
     var nearBill=Math.hypot(P.x-BILL.x,P.z-BILL.z)<8;
     if(nearBill&&(keys['f']||keys['e'])){ keys['f']=keys['e']=false; location.hash = BILL.liveList.length ? ('#live/'+BILL.liveList[0].id) : '#live'; }
+    // 보물상자 근접 F 열기 + 부유 애니
+    CHEST.meshes.forEach(function(cm){ if(!cm.data.opened){ cm.g.position.y=0.2+Math.sin(now*0.003+cm.data.x)*0.12; cm.g.rotation.y+=dt*0.5; } });
+    var nearChest=-1; for(var hi=0;hi<CHEST.items.length;hi++){ var ch=CHEST.items[hi]; if(!ch.opened&&Math.hypot(P.x-ch.x,P.z-ch.z)<2.4){ nearChest=hi; break; } }
+    if(nearChest>=0&&(keys['f']||keys['e'])){ keys['f']=keys['e']=false; openChest(nearChest); }
     // NPC 근접 상호작용
     var near=null; npcObjs.forEach(function(n){ if(Math.hypot(P.x-n.o.group.position.x,P.z-n.o.group.position.z)<3.2)near=n; });
     if(near&&(keys['f']||keys['e'])){ keys['f']=keys['e']=false; npcTalk(near.data,P0,key); }
@@ -2839,17 +2859,19 @@ function dexQuiz(){ var d=dexGet(); d.quiz=(d.quiz||0)+1; dexSave(d); }
 function openDex(key){
   var T=function(s){return (window.igT||function(x){return x;})(s);};
   var d=dexGet(), visited=d.visited||{}, coins=d.coins||{}, cities=Object.keys(CITY_PRESETS);
-  var totLm=0,visLm=0,totCoin=0,gotCoin=0;
-  cities.forEach(function(c){ var P=CITY_PRESETS[c]; totLm+=P.landmarks.length; totCoin+=18; gotCoin+=Math.min(18,coins[c]||0); P.landmarks.forEach(function(l){ if(visited[c+'|'+l.n])visLm++; }); });
+  var chest=(function(){ try{ return JSON.parse(localStorage['igplay_chest']||'{}'); }catch(e){ return {}; } })();
+  function chestCnt(c){ var n=0; for(var i=0;i<3;i++){ if(chest[c+'|'+i])n++; } return n; }
+  var totLm=0,visLm=0,totCoin=0,gotCoin=0,totChest=cities.length*3,gotChest=0;
+  cities.forEach(function(c){ var P=CITY_PRESETS[c]; totLm+=P.landmarks.length; totCoin+=18; gotCoin+=Math.min(18,coins[c]||0); gotChest+=chestCnt(c); P.landmarks.forEach(function(l){ if(visited[c+'|'+l.n])visLm++; }); });
   function clk(ms){ try{ return msToClock(ms); }catch(e){ var s=Math.floor(ms/1000); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); } }
   var rows=cities.map(function(c){ var P=CITY_PRESETS[c]; var cn=Math.min(18,coins[c]||0); var best=parseFloat(localStorage['igplay_race_'+c]||'0')||0;
-    var lmv=P.landmarks.filter(function(l){return visited[c+'|'+l.n];}).length; var full=(cn===18&&lmv===P.landmarks.length);
-    return '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-weight:600">'+(full?'🏅 ':'')+P.flag+' '+esc(T(P.name).split(' ')[0])+'</span><span style="color:var(--muted);font-size:12px;font-family:monospace">🪙'+cn+'/18 · 📍'+lmv+'/'+P.landmarks.length+(best?' · 🏁'+clk(best):'')+'</span></div>';
+    var lmv=P.landmarks.filter(function(l){return visited[c+'|'+l.n];}).length; var ch=chestCnt(c); var full=(cn===18&&lmv===P.landmarks.length&&ch===3);
+    return '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-weight:600">'+(full?'🏅 ':'')+P.flag+' '+esc(T(P.name).split(' ')[0])+'</span><span style="color:var(--muted);font-size:12px;font-family:monospace">🪙'+cn+'/18 · 📍'+lmv+'/'+P.landmarks.length+' · 🎁'+ch+'/3'+(best?' · 🏁'+clk(best):'')+'</span></div>';
   }).join('');
   var ov=document.createElement('div'); ov.className='overlay'; ov.style.cssText='position:fixed;inset:0;z-index:3000;display:grid;place-items:center;background:rgba(0,0,0,.5)';
   ov.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:20px 22px;max-width:460px;width:92%;max-height:84vh;overflow:auto;text-align:left">'+
     '<div style="font-weight:800;font-size:17px;margin-bottom:4px">📖 '+T('탐험 도감')+'</div>'+
-    '<div style="color:var(--muted);font-size:12.5px;margin-bottom:14px">'+T('수집 코인')+' '+gotCoin+'/'+totCoin+' · '+T('방문 명소')+' '+visLm+'/'+totLm+' · '+T('맞힌 퀴즈')+' '+(d.quiz||0)+'</div>'+
+    '<div style="color:var(--muted);font-size:12.5px;margin-bottom:14px">'+T('수집 코인')+' '+gotCoin+'/'+totCoin+' · '+T('보물상자')+' '+gotChest+'/'+totChest+' · '+T('방문 명소')+' '+visLm+'/'+totLm+' · '+T('맞힌 퀴즈')+' '+(d.quiz||0)+'</div>'+
     '<div>'+rows+'</div>'+
     '<div class="obtns" style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn brand" id="dexX">'+T('닫기')+'</button></div></div>';
   document.body.appendChild(ov); ov.onclick=function(e){ if(e.target===ov)ov.remove(); };
