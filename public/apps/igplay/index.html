@@ -56,9 +56,16 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .spacer{flex:1}
 
 #shell{flex:1 1 auto;display:flex;min-height:0}
-#nav{width:var(--nav-w);flex:0 0 auto;background:var(--surface);border-right:1px solid var(--border);
-  padding:14px 10px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;
-  padding-left:max(10px,env(safe-area-inset-left,0px))}
+#nav{position:fixed;top:var(--bar-h);left:0;bottom:0;width:260px;max-width:82vw;z-index:1200;
+  background:var(--surface);border-right:1px solid var(--border);box-shadow:4px 0 28px rgba(0,0,0,.4);
+  padding:14px 10px calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:3px;overflow-y:auto;
+  padding-left:max(10px,env(safe-area-inset-left,0px));
+  transform:translateX(-100%);transition:transform .25s ease}
+#nav.open{transform:none}
+#navBackdrop{position:fixed;top:var(--bar-h);left:0;right:0;bottom:0;z-index:1190;background:rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:opacity .25s}
+#navBackdrop.open{opacity:1;visibility:visible}
+#navToggle{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;flex:0 0 auto;border:none;background:transparent;color:var(--fg);border-radius:9px;cursor:pointer;margin-right:2px}
+#navToggle:hover{background:var(--surface2)}
 .navitem{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--muted);font-weight:600;font-size:14px;border:none;background:none;width:100%;text-align:left}
 .navitem svg{flex:0 0 auto}
 .navitem:hover{background:var(--surface2);color:var(--fg)}
@@ -202,11 +209,7 @@ body.has-touch .touchctrl{display:grid}
 @media (max-width:860px){
   .watch{grid-template-columns:1fr}
   :root{--nav-w:0px}
-  #nav{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;flex-direction:row;height:62px;
-    padding:6px max(6px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px));border-right:none;border-top:1px solid var(--border);z-index:30;justify-content:space-around}
-  .navitem{flex-direction:column;gap:3px;font-size:10.5px;padding:6px 4px;flex:1;justify-content:center;text-align:center}
-  .navnote{display:none}
-  #main{padding-bottom:62px}
+  #main{padding-bottom:0}
   .search{max-width:none}
   .logo b, .logo .kr{display:none}
 }
@@ -219,9 +222,9 @@ body.has-touch .touchctrl{display:grid}
 .exPanelToggle{display:none}
 /* 전체화면 몰입형(탐험·숏폼)의 모바일 레이아웃 */
 @media (max-width:860px){
-  #shortsWrap{bottom:62px !important}
+  #shortsWrap{bottom:0 !important}
   /* 탐험: 상단바(56)와 하단 네비바(62) 사이를 고정으로 꽉 채움 → 100vh 오차·검은 공백 제거 */
-  .exRoot{position:fixed !important;top:56px;left:0;right:0;bottom:62px;width:auto;height:auto !important;min-height:0 !important}
+  .exRoot{position:fixed !important;top:56px;left:0;right:0;bottom:0;width:auto;height:auto !important;min-height:0 !important}
   /* 좌측 구역 패널: 기본 접힘, 토글 버튼으로 슬라이드 */
   .exPanel{top:56px !important;left:0 !important;width:240px !important;max-width:80vw !important;max-height:none !important;height:calc(100% - 64px) !important;border-radius:0 14px 14px 0 !important;transform:translateX(-104%);transition:transform .22s ease;box-shadow:0 0 24px rgba(0,0,0,.5)}
   .exPanel.open{transform:none}
@@ -232,17 +235,18 @@ body.has-touch .touchctrl{display:grid}
   .exRadar{transform:scale(.6);transform-origin:top right;top:48px !important;right:2px !important}
   .exTopBar{transform:scale(.8);transform-origin:top right;top:8px !important;right:6px !important}
   /* 하단 표정/모션 바: 뷰포트 하단(네비바 위)에 완전 고정 — 스크롤과 무관하게 항상 화면 하단에, 2줄로 전부 표시 */
-  .exEmoBar{position:fixed !important;left:0 !important;right:0 !important;bottom:62px !important;top:auto !important;transform:none !important;width:auto !important;max-width:none !important;z-index:31 !important;border-radius:14px 14px 0 0 !important;padding:7px 8px !important}
+  .exEmoBar{position:fixed !important;left:0 !important;right:0 !important;bottom:calc(6px + env(safe-area-inset-bottom,0px)) !important;top:auto !important;transform:none !important;width:auto !important;max-width:none !important;z-index:31 !important;border-radius:14px 14px 0 0 !important;padding:7px 8px !important}
   .exEmoBar button{font-size:12px;padding:5px 9px}
   /* 조이스틱·점프도 뷰포트에 고정해 하단 바 위에 항상 노출 */
-  #exJoy{position:fixed !important;bottom:166px !important;left:14px !important;top:auto !important;width:104px !important;height:104px !important;z-index:31 !important}
+  #exJoy{position:fixed !important;bottom:calc(110px + env(safe-area-inset-bottom,0px)) !important;left:14px !important;top:auto !important;width:104px !important;height:104px !important;z-index:31 !important}
   #exStick{width:46px !important;height:46px !important;margin:-23px 0 0 -23px !important}
-  #exJump{position:fixed !important;bottom:172px !important;right:14px !important;top:auto !important;width:62px !important;height:62px !important;z-index:31 !important}
+  #exJump{position:fixed !important;bottom:calc(116px + env(safe-area-inset-bottom,0px)) !important;right:14px !important;top:auto !important;width:62px !important;height:62px !important;z-index:31 !important}
 }
 </style>
 
 <div id="app">
   <header id="topbar">
+    <button id="navToggle" aria-label="메뉴" onclick="navToggle()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     <a class="logo" href="#home"><span class="mark"><i></i></span><span>ig</span><b>Play</b></a>
     <div class="search">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
@@ -263,6 +267,7 @@ body.has-touch .touchctrl{display:grid}
     </button>
   </header>
   <div id="shell">
+    <div id="navBackdrop" onclick="navOpen(false)"></div>
     <nav id="nav"></nav>
     <main id="main"></main>
   </div>
@@ -1238,12 +1243,14 @@ function drawThumb(cv,lv){
 }
 
 /* ============================= router ============================= */
+function navOpen(v){ var n=document.getElementById('nav'), bd=document.getElementById('navBackdrop'); if(!n)return; var on=(v===undefined)?!n.classList.contains('open'):!!v; n.classList.toggle('open',on); if(bd)bd.classList.toggle('open',on); }
+function navToggle(){ navOpen(); }
 function go(route){ location.hash='#'+route; }
 var activeSession=null;
 function teardown(){ if(activeSession){ try{activeSession.dispose();}catch(e){} activeSession=null; } }
 function parseHash(){ var h=location.hash.replace(/^#/,'')||'home'; var p=h.split('/'); return {name:p[0],arg:p[1]}; }
 function render(){
-  teardown();
+  teardown(); navOpen(false);
   var r=parseHash(); var m=document.getElementById('main'); m.scrollTop=0;
   buildNav(r.name);
   if(r.name==='watch'&&r.arg){ renderWatch(m,r.arg); }
