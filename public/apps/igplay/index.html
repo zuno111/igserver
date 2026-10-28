@@ -2431,7 +2431,17 @@ function citySample(bb,opts){ opts=opts||{}; var mLat=111320, mLng=111320*Math.c
   for(r=0;r<=rows;r++){ var zz=r*(lot+gap); roads.push({geometry:[{lat:N0-dLat(zz),lon:W0},{lat:N0-dLat(zz),lon:W0+dLng(cols*(lot+gap))}]}); }
   return {bbox:bb,buildings:buildings,roads:roads};
 }
-function cityFetchOSM(bb){ var q='[out:json][timeout:25];(way["building"]('+bb.s+','+bb.w+','+bb.n+','+bb.e+');way["highway"]('+bb.s+','+bb.w+','+bb.n+','+bb.e+'););out geom;';
+function cityFetchOSM(bb){
+  // 서버 프록시(미러 폴백 + 메모리 캐시) 우선 — 503 회피, 한 번 성공하면 전체 유저 공유
+  if(typeof api==='function' && liveReady()){
+    return api('GET','/api/igcity/osm?s='+bb.s+'&w='+bb.w+'&n='+bb.n+'&e='+bb.e).then(function(r){
+      if(r&&r.features&&(((r.features.buildings||[]).length)||((r.features.roads||[]).length)))return r.features;
+      throw new Error('empty');
+    }).catch(function(){ return directOSM(bb); });
+  }
+  return directOSM(bb);
+}
+function directOSM(bb){ var q='[out:json][timeout:25];(way["building"]('+bb.s+','+bb.w+','+bb.n+','+bb.e+');way["highway"]('+bb.s+','+bb.w+','+bb.n+','+bb.e+'););out geom;';
   // 공개 Overpass 인스턴스가 자주 503(과부하) → 여러 무료 미러를 순차 폴백
   var mirrors=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter','https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
   function parse(data){ var buildings=[],roads=[]; (data.elements||[]).forEach(function(el){ if(el.type!=='way'||!el.geometry)return; if(el.tags&&el.tags.building)buildings.push({geometry:el.geometry,height:el.tags.height,levels:el.tags['building:levels']}); else if(el.tags&&el.tags.highway)roads.push({geometry:el.geometry}); }); if(!buildings.length)throw new Error('empty'); return {bbox:bb,buildings:buildings,roads:roads}; }

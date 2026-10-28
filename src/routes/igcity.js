@@ -146,20 +146,40 @@ export function realCity(features, opts = {}) {
   return { voxels, props, spawn, geo: { lat: latMid, lng: (bb.w + bb.e) / 2, label: opts.name || '' }, size: { w: Math.round(widthM), d: Math.round(heightM) }, cell: 1, count: voxels.length, buildings: built };
 }
 
-// Overpass로 bbox 내 건물/도로 가져오기(실행 환경의 인터넷 사용)
+// Overpass로 bbox 내 건물/도로 가져오기 — 공개 인스턴스가 자주 503 → 여러 무료 미러 순차 폴백
+const OSM_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
 async function fetchOSM(bb) {
   const q = `[out:json][timeout:30];(way["building"](${bb.s},${bb.w},${bb.n},${bb.e});way["highway"](${bb.s},${bb.w},${bb.n},${bb.e}););out geom;`;
-  const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: q });
-  if (!res.ok) throw new Error('overpass_' + res.status);
-  const data = await res.json();
-  const buildings = [], roads = [];
-  for (const el of data.elements || []) {
-    if (el.type !== 'way' || !el.geometry) continue;
-    if (el.tags && el.tags.building) buildings.push({ geometry: el.geometry, height: el.tags.height, levels: el.tags['building:levels'] });
-    else if (el.tags && el.tags.highway) roads.push({ geometry: el.geometry });
+  let lastErr;
+  for (const url of OSM_MIRRORS) {
+    try {
+      const ctl = new AbortController(); const to = setTimeout(() => { try { ctl.abort(); } catch (e) {} }, 28000);
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: q, signal: ctl.signal });
+      clearTimeout(to);
+      if (!res.ok) { lastErr = new Error('overpass_' + res.status); continue; }
+      const data = await res.json();
+      const buildings = [], roads = [];
+      for (const el of data.elements || []) {
+        if (el.type !== 'way' || !el.geometry) continue;
+        if (el.tags && el.tags.building) buildings.push({ geometry: el.geometry, height: el.tags.height, levels: el.tags['building:levels'] });
+        else if (el.tags && el.tags.highway) roads.push({ geometry: el.geometry });
+      }
+      if (!buildings.length && !roads.length) { lastErr = new Error('empty'); continue; }
+      return { bbox: bb, buildings, roads };
+    } catch (e) { lastErr = e; }
   }
-  return { bbox: bb, buildings, roads };
+  throw lastErr || new Error('overpass_all_failed');
 }
+
+// OSM 원본 features 프록시 + 메모리 캐시 — 탐험 프리셋이 서버 캐시에서 즉시 받도록(한 번 성공하면 전체 유저 공유)
+const _osmCache = new Map(); // key -> { features, ts }
+const OSM_TTL = 1000 * 60 * 60 * 24 * 7; // 7일
+function bbKey(bb) { return ['s', 'w', 'n', 'e'].map((k) => (+bb[k]).toFixed(4)).join(','); }
 
 // 레벨 저장(igplay 'levels' 컬렉션에 직접 생성)
 async function saveLevel(pid, uid, name, built, creatorName) {
@@ -201,6 +221,23 @@ router.post('/build', requireUser, async (req, res, next) => {
     const out = await saveLevel(req.project.id, req.user.uid, name, built, req.user.name);
     broadcast(req.project.id, 'igplay:levels', { type: 'level_new', id: out.id, title: out.title, ts: Date.now() });
     res.status(201).json({ level: out, buildings: features.buildings.length, roads: features.roads.length });
+  } catch (e) { next(e); }
+});
+
+// 탐험 프리셋용: bbox → OSM 원본 features(캐시). 복셀/리얼 변환은 클라에서.
+router.get('/osm', async (req, res, next) => {
+  try {
+    const bb = { s: +req.query.s, w: +req.query.w, n: +req.query.n, e: +req.query.e };
+    if (!['s', 'w', 'n', 'e'].every((k) => Number.isFinite(bb[k]))) return res.status(400).json({ error: 'bad_bbox' });
+    if ((bb.n - bb.s) > 0.05 || (bb.e - bb.w) > 0.05) return res.status(400).json({ error: 'too_wide' });
+    const key = bbKey(bb);
+    const hit = _osmCache.get(key);
+    if (hit && (Date.now() - hit.ts) < OSM_TTL) return res.json({ features: hit.features, cached: true });
+    let features;
+    try { features = await fetchOSM(bb); }
+    catch (e) { return res.status(502).json({ error: 'osm_fail', message: e.message }); }
+    _osmCache.set(key, { features, ts: Date.now() });
+    res.json({ features, cached: false, buildings: features.buildings.length });
   } catch (e) { next(e); }
 });
 
