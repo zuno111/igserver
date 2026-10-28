@@ -181,6 +181,25 @@ const _osmCache = new Map(); // key -> { features, ts }
 const OSM_TTL = 1000 * 60 * 60 * 24 * 7; // 7일
 function bbKey(bb) { return ['s', 'w', 'n', 'e'].map((k) => (+bb[k]).toFixed(4)).join(','); }
 
+// Overpass가 전부 바쁠 때(502) 그 bbox를 큐에 넣고 백그라운드로 주기 재시도 → 열리는 순간 캐시 확보
+const _retryQueue = new Map(); // key -> bb
+let _retryTimer = null;
+function scheduleOSMRetry(bb) {
+  const key = bbKey(bb);
+  if (_osmCache.has(key) || _retryQueue.has(key)) return;
+  _retryQueue.set(key, bb);
+  if (!_retryTimer) {
+    _retryTimer = setInterval(async () => {
+      for (const [k, b] of _retryQueue) {
+        if (_osmCache.has(k)) { _retryQueue.delete(k); continue; }
+        try { const f = await fetchOSM(b); _osmCache.set(k, { features: f, ts: Date.now() }); _retryQueue.delete(k); } catch (e) { /* 다음 주기 재시도 */ }
+      }
+      if (!_retryQueue.size && _retryTimer) { clearInterval(_retryTimer); _retryTimer = null; }
+    }, 60000);
+    if (_retryTimer.unref) _retryTimer.unref();
+  }
+}
+
 // 레벨 저장(igplay 'levels' 컬렉션에 직접 생성)
 async function saveLevel(pid, uid, name, built, creatorName) {
   const id = randomId('lv_');
@@ -235,7 +254,7 @@ router.get('/osm', async (req, res, next) => {
     if (hit && (Date.now() - hit.ts) < OSM_TTL) return res.json({ features: hit.features, cached: true });
     let features;
     try { features = await fetchOSM(bb); }
-    catch (e) { return res.status(502).json({ error: 'osm_fail', message: e.message }); }
+    catch (e) { scheduleOSMRetry(bb); return res.status(502).json({ error: 'osm_fail', message: e.message }); }
     _osmCache.set(key, { features, ts: Date.now() });
     res.json({ features, cached: false, buildings: features.buildings.length });
   } catch (e) { next(e); }
