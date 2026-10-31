@@ -1,0 +1,189 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>스쿨얌 — 학교 매점 구매대행</title>
+<style>
+:root{--bg:#fff7f0;--surface:#fff;--surface2:#fff1e6;--fg:#2a211b;--muted:#8a7b6e;--border:#f0e2d4;
+--accent:#ff8a3d;--accent2:#f5731f;--accent-fg:#fff;--good:#1a8f5e;--warn:#b4712a;--bad:#c23b3b;
+--radius:14px;--f:system-ui,"Malgun Gothic","Noto Sans KR",sans-serif;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15100c;--surface:#1d160f;--surface2:#241a12;--fg:#f0e6da;--muted:#a8978a;--border:#2f241a;--accent:#ff9a52;--accent2:#ffab6b;--accent-fg:#1a1009;--good:#3bbd82;--warn:#d2994f;--bad:#e06464;color-scheme:dark;}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f);line-height:1.55;font-style:normal;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;font-weight:800;font-style:normal}
+.wrap{max-width:900px;margin:0 auto;padding:0 16px 72px}
+header{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--border)}
+.hd{max-width:900px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:20px}
+.tabs{display:flex;gap:6px;margin-left:auto}
+.tab{padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:14px;font-family:inherit}
+.tab.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-top:16px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--fg);font-family:inherit;font-size:15px}
+button{padding:10px 16px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-fg);font-weight:800;cursor:pointer;font-family:inherit;font-size:15px}
+button.ghost{background:var(--surface2);color:var(--fg);border:1px solid var(--border);font-weight:600}
+button.sm{padding:5px 10px;font-size:13px}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
+.prod{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--bg)}
+.prod .ph{height:92px;background:var(--surface2) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:28px}
+.prod .b{padding:10px}.prod .nm{font-weight:700}.prod .pr{color:var(--accent2);font-weight:800}
+.muted{color:var(--muted);font-size:13px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;background:var(--surface2)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border)}th{color:var(--muted);font-weight:600}
+.hide{display:none}.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.err{color:var(--bad);font-size:13px;margin-top:6px}.ok{color:var(--good);font-size:13px;margin-top:6px}
+.cart{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);margin:16px -16px -72px;padding:14px 16px}
+.big{font-size:26px;font-weight:800}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border-radius:999px;padding:4px 10px;margin:3px;font-size:13px}
+</style></head><body>
+<header><div class="hd"><div class="logo">🍪</div><div><div style="font-weight:800">스쿨얌</div><div class="muted" style="font-size:12px">전날 주문 · 다음날 픽업</div></div>
+<div class="tabs"><button class="tab on" data-t="order">주문</button><button class="tab" data-t="mine">내 주문</button><button class="tab" data-t="admin">운영자</button></div></div></header>
+<div class="wrap">
+
+<!-- 주문 -->
+<section id="order">
+  <div class="card">
+    <h2>학교 선택</h2>
+    <select id="shopSel" onchange="loadProducts()"><option value="">샵을 선택하세요</option></select>
+    <div id="adBox" class="hide" style="margin-top:12px;border:1px dashed var(--border);border-radius:12px;padding:12px">
+      <div class="muted">광고</div><div id="adBody" style="display:flex;gap:10px;align-items:center;margin-top:6px"></div>
+      <button class="ghost sm" style="margin-top:8px" onclick="viewAd()">광고 보고 포인트 받기</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>상품</h2>
+    <div id="prodGrid" class="grid"><div class="muted">샵을 먼저 선택하세요.</div></div>
+  </div>
+  <div class="card">
+    <h2>주문자 정보</h2>
+    <div class="row"><div><label>학년</label><input id="o_grade" placeholder="예: 3"></div><div><label>반</label><input id="o_class" placeholder="예: 2"></div></div>
+    <div class="row"><div><label>이름</label><input id="o_name"></div><div><label>전화번호</label><input id="o_phone" placeholder="숫자만"></div></div>
+    <div class="muted" style="margin-top:8px">결제: 픽업 시 현금</div>
+  </div>
+</section>
+
+<!-- 내 주문 -->
+<section id="mine" class="hide">
+  <div class="card"><h2>내 주문 조회</h2>
+    <label>전화번호</label><div class="row"><input id="m_phone" placeholder="숫자만"><button onclick="loadMine()">조회</button></div>
+    <div id="mineOut" style="margin-top:12px"></div>
+  </div>
+</section>
+
+<!-- 운영자 -->
+<section id="admin" class="hide">
+  <div class="card"><h2>운영자 인증</h2>
+    <p class="muted">시크릿 키로만 관리할 수 있습니다. igServer 관리 대시보드에서 확인하세요.</p>
+    <label>시크릿 키 (sk_...)</label><input id="a_key" class="mono" placeholder="sk_...">
+    <div class="row" style="margin-top:10px"><button onclick="adminLogin()">연결</button></div>
+    <div id="a_err" class="err"></div>
+  </div>
+  <div id="a_panel" class="hide">
+    <div class="card"><h2>설정</h2>
+      <label><input type="checkbox" id="setAds" style="width:auto;margin-right:6px" onchange="saveSetting()">광고 노출</label>
+    </div>
+    <div class="card"><h2>샵</h2>
+      <div class="row"><input id="sh_name" placeholder="샵 이름"><input id="sh_school" placeholder="학교"><button onclick="addShop()">추가</button></div>
+      <div id="shops_out"></div>
+    </div>
+    <div class="card"><h2>상품</h2>
+      <select id="p_shop"></select>
+      <div class="row"><input id="p_name" placeholder="상품명"><input id="p_price" type="number" placeholder="가격"><button onclick="addProduct()">추가</button></div>
+      <div id="prods_out"></div>
+    </div>
+    <div class="card"><h2>주문</h2><button class="ghost sm" onclick="loadOrders()">새로고침</button><div id="orders_out"></div></div>
+    <div class="card"><h2>셀러(학년 대표)</h2><button class="ghost sm" onclick="loadSellers()">새로고침</button><div id="sellers_out"></div></div>
+    <div class="card"><h2>광고</h2>
+      <div class="row"><input id="ad_title" placeholder="광고 제목"><input id="ad_link" placeholder="링크(선택)"><button onclick="addAd()">등록(활성)</button></div>
+      <div id="ads_out"></div>
+    </div>
+    <div class="card"><h2>정산 (셀러 수수료 20%)</h2><button class="ghost sm" onclick="loadSettle()">새로고침</button><div id="settle_out"></div></div>
+    <div class="card"><h2>분석</h2><button class="ghost sm" onclick="loadAnalytics()">새로고침</button><div id="ana_out"></div></div>
+  </div>
+</section>
+</div>
+
+<div id="cart" class="cart hide"><div style="display:flex;align-items:center;gap:12px">
+  <div><div class="muted">장바구니 <span id="cartN">0</span>개</div><div class="big"><span id="cartT">0</span>원</div></div>
+  <button style="margin-left:auto" onclick="placeOrder()">주문하기</button></div>
+  <div id="orderMsg" style="margin-top:8px"></div>
+</div>
+
+<script>
+const CFG=window.SCHOOLYAM_API||{base:location.origin,key:''};
+let SK='';
+function api(path,opts={},admin=false){
+  const h=Object.assign({'Content-Type':'application/json'},opts.headers||{});
+  const key=admin?SK:CFG.key;
+  const u=CFG.base+'/api/schoolyam'+path+(path.includes('?')?'&':'?')+'key='+encodeURIComponent(key);
+  return fetch(u,Object.assign({},opts,{headers:h})).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw(j.message||j.error||('HTTP '+r.status));return j;});
+}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  ['order','mine','admin'].forEach(s=>document.getElementById(s).classList.toggle('hide',s!==b.dataset.t));
+  document.getElementById('cart').classList.toggle('hide',b.dataset.t!=='order'||cart.length===0);
+});
+// ---- 손님: 샵/상품/장바구니 ----
+let shops=[],products=[],cart=[];
+function loadShops(){api('/shops').then(j=>{shops=j.shops;
+  const sel=document.getElementById('shopSel');sel.innerHTML='<option value="">샵을 선택하세요</option>'+shops.map(s=>`<option value="${s.slug}">${s.name}${s.school?(' · '+s.school):''}</option>`).join('');
+  const ps=document.getElementById('p_shop');if(ps)ps.innerHTML=shops.map(s=>`<option value="${s.slug}">${s.name}</option>`).join('');
+}).catch(()=>{});}
+function loadProducts(){const shop=document.getElementById('shopSel').value;cart=[];renderCart();
+  if(!shop){document.getElementById('prodGrid').innerHTML='<div class="muted">샵을 먼저 선택하세요.</div>';document.getElementById('adBox').classList.add('hide');return;}
+  api('/products?shop='+encodeURIComponent(shop)).then(j=>{products=j.products;
+    document.getElementById('prodGrid').innerHTML=products.length?products.map(p=>
+      `<div class="prod"><div class="ph" style="${p.photo?`background-image:url(${p.photo})`:''}">${p.photo?'':'🍬'}</div><div class="b"><div class="nm">${p.name}</div><div class="pr">${p.price.toLocaleString()}원</div><button class="sm" style="margin-top:6px;width:100%" onclick="addCart('${p.id}')">담기</button></div></div>`).join(''):'<div class="muted">등록된 상품이 없습니다.</div>';
+  }).catch(()=>{});
+  loadAd(shop);
+}
+function loadAd(shop){api('/ad/next?shop='+encodeURIComponent(shop)).then(j=>{
+  if(!j.ad){document.getElementById('adBox').classList.add('hide');return;}
+  window._ad=j.ad;document.getElementById('adBox').classList.remove('hide');
+  document.getElementById('adBody').innerHTML=(j.ad.image?`<img src="${j.ad.image}" style="height:48px;border-radius:8px">`:'')+`<div><b>${j.ad.title}</b>${j.ad.link?`<br><a href="${j.ad.link}" target="_blank" class="muted">${j.ad.link}</a>`:''}</div>`;
+}).catch(()=>{});}
+function viewAd(){const phone=document.getElementById('o_phone').value;if(!phone){alert('전화번호를 먼저 입력하세요(포인트 적립용).');return;}
+  api('/ad/view',{method:'POST',body:JSON.stringify({phone,adId:window._ad&&window._ad.id})}).then(j=>alert('적립 완료! 현재 '+j.points+'P')).catch(e=>alert(e));}
+function addCart(id){const p=products.find(x=>x.id===id);if(!p)return;const c=cart.find(x=>x.id===id);if(c)c.qty++;else cart.push({id,name:p.name,price:p.price,qty:1});renderCart();}
+function renderCart(){const n=cart.reduce((a,c)=>a+c.qty,0),t=cart.reduce((a,c)=>a+c.price*c.qty,0);
+  document.getElementById('cartN').textContent=n;document.getElementById('cartT').textContent=t.toLocaleString();
+  document.getElementById('cart').classList.toggle('hide',n===0||document.querySelector('.tab.on').dataset.t!=='order');}
+function placeOrder(){const shop=document.getElementById('shopSel').value;if(!shop||!cart.length)return;
+  const body={shop,items:cart.map(c=>({id:c.id,qty:c.qty})),name:document.getElementById('o_name').value,phone:document.getElementById('o_phone').value,grade:document.getElementById('o_grade').value,classroom:document.getElementById('o_class').value};
+  api('/orders',{method:'POST',body:JSON.stringify(body)}).then(j=>{cart=[];renderCart();
+    document.getElementById('orderMsg').innerHTML='<div class="ok">주문 완료! 다음날 교실로 픽업하세요. 주문번호 '+j.order.id+'</div>';
+  }).catch(e=>document.getElementById('orderMsg').innerHTML='<div class="err">'+e+'</div>');}
+// ---- 내 주문 ----
+function loadMine(){const phone=document.getElementById('m_phone').value;if(!phone)return;
+  api('/orders/mine?phone='+encodeURIComponent(phone)).then(j=>{
+    document.getElementById('mineOut').innerHTML=j.orders.length?j.orders.map(o=>`<div class="card" style="margin-top:10px"><b>${o.total.toLocaleString()}원</b> <span class="pill">${o.status}</span><div class="muted">${(o.items||[]).map(i=>i.name+'×'+i.qty).join(', ')}</div><div class="muted">${new Date(o.created_at).toLocaleString('ko-KR')}</div></div>`).join(''):'<div class="muted">주문 내역이 없습니다.</div>';
+  }).catch(e=>document.getElementById('mineOut').innerHTML='<div class="err">'+e+'</div>');}
+// ---- 운영자 ----
+function adminLogin(){SK=document.getElementById('a_key').value.trim();document.getElementById('a_err').textContent='';
+  if(!SK){document.getElementById('a_err').textContent='시크릿 키를 입력하세요.';return;}
+  api('/settings',{},true).then(j=>{document.getElementById('a_panel').classList.remove('hide');
+    document.getElementById('setAds').checked=!!j.settings.adsEnabled;
+    loadShops();loadProductsAdmin();loadOrders();loadSellers();loadAds();loadSettle();loadAnalytics();
+  }).catch(e=>{document.getElementById('a_panel').classList.add('hide');document.getElementById('a_err').textContent='인증 실패: '+e;});}
+function saveSetting(){api('/settings',{method:'POST',body:JSON.stringify({adsEnabled:document.getElementById('setAds').checked})},true).catch(e=>alert(e));}
+function addShop(){api('/shops',{method:'POST',body:JSON.stringify({name:document.getElementById('sh_name').value,school:document.getElementById('sh_school').value})},true).then(()=>{document.getElementById('sh_name').value='';loadShops();loadShopsAdmin();}).catch(e=>alert(e));}
+function loadShopsAdmin(){api('/shops').then(j=>{document.getElementById('shops_out').innerHTML=j.shops.map(s=>`<div class="chip">${s.name}${s.school?(' · '+s.school):''} <button class="sm ghost" onclick="delShop('${s.id}')">삭제</button></div>`).join('')||'<div class="muted">없음</div>';}).catch(()=>{});}
+function delShop(id){api('/shops/'+id,{method:'DELETE'},true).then(()=>{loadShops();loadShopsAdmin();}).catch(e=>alert(e));}
+function loadProductsAdmin(){loadShopsAdmin();const shop=document.getElementById('p_shop').value||'';api('/products'+(shop?'?shop='+shop:''),{},true).then(j=>{document.getElementById('prods_out').innerHTML=j.products.map(p=>`<div class="chip">${p.name} ${p.price.toLocaleString()}원 <button class="sm ghost" onclick="delProd('${p.id}')">삭제</button></div>`).join('')||'<div class="muted">없음</div>';}).catch(()=>{});}
+function addProduct(){api('/products',{method:'POST',body:JSON.stringify({shop:document.getElementById('p_shop').value,name:document.getElementById('p_name').value,price:Number(document.getElementById('p_price').value)})},true).then(()=>{document.getElementById('p_name').value='';document.getElementById('p_price').value='';loadProductsAdmin();}).catch(e=>alert(e));}
+function delProd(id){api('/products/'+id,{method:'DELETE'},true).then(loadProductsAdmin).catch(e=>alert(e));}
+function loadOrders(){api('/orders',{},true).then(j=>{document.getElementById('orders_out').innerHTML=j.orders.length?'<table><tr><th>시각</th><th>내역</th><th>금액</th><th>상태</th></tr>'+j.orders.map(o=>`<tr><td>${new Date(o.created_at).toLocaleString('ko-KR')}</td><td>${o.name||''} ${o.grade?('/'+o.grade+'학년'):''}<br><span class="muted">${(o.items||[]).map(i=>i.name+'×'+i.qty).join(', ')}</span></td><td>${o.total.toLocaleString()}</td><td><select class="sm" onchange="setStatus('${o.id}',this.value)">${['received','preparing','ready','done','canceled'].map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')+'</table>':'<div class="muted">주문 없음</div>';}).catch(e=>document.getElementById('orders_out').innerHTML='<div class="err">'+e+'</div>');}
+function setStatus(id,s){api('/orders/'+id+'/status',{method:'POST',body:JSON.stringify({status:s})},true).catch(e=>alert(e));}
+function loadSellers(){api('/sellers',{},true).then(j=>{document.getElementById('sellers_out').innerHTML=j.sellers.length?'<table><tr><th>학교/학년</th><th>이름</th><th>상태</th><th></th></tr>'+j.sellers.map(s=>`<tr><td>${s.school||''} ${s.grade}학년</td><td>${s.name||''}</td><td><span class="pill">${s.status}</span></td><td>${s.status==='pending'?`<button class="sm" onclick="sellerAct('${s.id}','approve')">승인</button> <button class="sm ghost" onclick="sellerAct('${s.id}','reject')">거절</button>`:''}</td></tr>`).join('')+'</table>':'<div class="muted">신청 없음</div>';}).catch(()=>{});}
+function sellerAct(id,act){api('/sellers/'+id+'/'+act,{method:'POST'},true).then(loadSellers).catch(e=>alert(e));}
+function loadAds(){api('/ads',{},true).then(j=>{document.getElementById('ads_out').innerHTML=j.ads.map(a=>`<div class="chip">${a.title} <span class="pill">${a.status}</span> ${a.status!=='active'?`<button class="sm" onclick="adAct('${a.id}','approve')">승인</button>`:''} <button class="sm ghost" onclick="adAct('${a.id}','del')">삭제</button></div>`).join('')||'<div class="muted">없음</div>';}).catch(()=>{});}
+function addAd(){api('/ads',{method:'POST',body:JSON.stringify({title:document.getElementById('ad_title').value,link:document.getElementById('ad_link').value,status:'active'})},true).then(()=>{document.getElementById('ad_title').value='';document.getElementById('ad_link').value='';loadAds();}).catch(e=>alert(e));}
+function adAct(id,act){const p=act==='del'?api('/ads/'+id,{method:'DELETE'},true):api('/ads/'+id+'/approve',{method:'POST'},true);p.then(loadAds).catch(e=>alert(e));}
+function loadSettle(){api('/settlements',{},true).then(j=>{document.getElementById('settle_out').innerHTML='<div class="muted">합계: 매출 '+j.total.amount.toLocaleString()+' / 수수료 '+j.total.fee.toLocaleString()+' / 셀러정산 '+j.total.net.toLocaleString()+'</div>'+(j.settlements.length?'<table><tr><th>시각</th><th>학년</th><th>매출</th><th>수수료</th><th>정산</th></tr>'+j.settlements.map(s=>`<tr><td>${new Date(s.ts).toLocaleString('ko-KR')}</td><td>${s.grade||''}</td><td>${(s.amount|0).toLocaleString()}</td><td>${(s.fee|0).toLocaleString()}</td><td>${(s.net|0).toLocaleString()}</td></tr>`).join('')+'</table>':'');}).catch(()=>{});}
+function loadAnalytics(){api('/analytics',{},true).then(j=>{const days=Object.entries(j.byDay).sort();const prods=Object.entries(j.byProduct).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  document.getElementById('ana_out').innerHTML='<div class="big">'+j.revenue.toLocaleString()+'원</div><div class="muted">주문 '+j.orders+'건</div>'+
+  '<div style="margin-top:10px"><b>일자별</b>'+(days.map(([d,v])=>`<div class="muted">${d} · ${v.toLocaleString()}원</div>`).join('')||'<div class="muted">—</div>')+'</div>'+
+  '<div style="margin-top:10px"><b>인기 상품</b>'+(prods.map(([n,v])=>`<div class="muted">${n} · ${v}개</div>`).join('')||'<div class="muted">—</div>')+'</div>';}).catch(()=>{});}
+document.getElementById('shopSel')&&loadShops();
+</script>
+</body></html>

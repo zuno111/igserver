@@ -1,0 +1,152 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>igGift — 기프트카드</title>
+<style>
+:root{
+  --bg:#f5f7f5;--surface:#fff;--surface2:#eef1ee;--fg:#131a16;--muted:#5b665f;--border:#e0e5e0;
+  --accent:#0b8a5c;--accent2:#0a7450;--accent-fg:#fff;--good:#1a8f5e;--warn:#b4712a;--bad:#c23b3b;
+  --radius:12px;--f:system-ui,"Malgun Gothic","Noto Sans KR",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c110e;--surface:#121a15;--surface2:#17201a;--fg:#e7efea;--muted:#92a099;--border:#232e27;
+  --accent:#2fbd84;--accent2:#36cc8f;--accent-fg:#06130d;--good:#3bbd82;--warn:#d2994f;--bad:#e06464;color-scheme:dark;
+}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f);line-height:1.55;-webkit-font-smoothing:antialiased;font-style:normal}
+h1,h2,h3{margin:0;font-weight:700;font-style:normal}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px 64px}
+header{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--border)}
+.hd{max-width:860px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:10px}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:var(--accent-fg);font-weight:800}
+.tabs{display:flex;gap:6px;margin-left:auto}
+.tab{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:14px;font-family:inherit}
+.tab.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-top:16px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--fg);font-family:inherit;font-size:15px}
+button{padding:10px 16px;border:0;border-radius:9px;background:var(--accent);color:var(--accent-fg);font-weight:700;cursor:pointer;font-family:inherit;font-size:15px}
+button.ghost{background:var(--surface2);color:var(--fg);border:1px solid var(--border)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+.muted{color:var(--muted);font-size:13px}
+.big{font-size:30px;font-weight:800;letter-spacing:.5px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.pill.active{background:rgba(26,143,94,.15);color:var(--good)}.pill.used,.pill.void,.pill.expired{background:rgba(194,59,59,.13);color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:600}
+.hide{display:none}.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.note{font-size:12px;color:var(--muted);margin-top:6px}
+.err{color:var(--bad);font-size:13px;margin-top:6px}
+</style></head><body>
+<header><div class="hd"><div class="logo">ig</div><div><div style="font-weight:800">igGift</div><div class="muted" style="font-size:12px">글로벌 기프트카드</div></div>
+<div class="tabs"><button class="tab on" data-t="use">사용</button><button class="tab" data-t="admin">운영자</button></div></div></header>
+<div class="wrap">
+
+<section id="use">
+  <div class="card">
+    <h2>카드 잔액 조회</h2>
+    <label>카드 코드</label>
+    <input id="u_code" class="mono" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off">
+    <div class="row" style="margin-top:12px"><button onclick="checkCard()">잔액 확인</button></div>
+    <div id="u_out" class="hide" style="margin-top:16px">
+      <div class="big"><span id="u_bal">0</span> <span id="u_cur" class="muted" style="font-size:16px"></span></div>
+      <div class="muted">상태 <span id="u_st" class="pill"></span> · 최초 <span id="u_init"></span></div>
+      <label>사용 금액</label>
+      <div class="row"><input id="u_amt" type="number" min="1" placeholder="차감할 금액"><button onclick="redeem()">사용</button></div>
+    </div>
+    <div id="u_err" class="err"></div>
+  </div>
+</section>
+
+<section id="admin" class="hide">
+  <div class="card">
+    <h2>운영자 인증</h2>
+    <p class="muted">운영자(시크릿) 키로만 발급·목록·정산을 볼 수 있습니다. 키는 igServer 관리 대시보드에서 확인합니다.</p>
+    <label>시크릿 키 (sk_...)</label>
+    <input id="a_key" class="mono" placeholder="sk_..." autocomplete="off">
+    <div class="row" style="margin-top:10px"><button onclick="adminLogin()">연결</button><button class="ghost" onclick="loadStats();loadCards();loadLedger()">새로고침</button></div>
+    <div id="a_err" class="err"></div>
+  </div>
+
+  <div id="a_panel" class="hide">
+    <div class="card">
+      <h2>기프트카드 발급</h2>
+      <div class="row"><div><label>금액</label><input id="i_amt" type="number" min="1" value="10000"></div>
+      <div><label>통화</label><select id="i_cur"><option>KRW</option><option>USD</option><option>EUR</option><option>JPY</option><option>GBP</option><option>CNY</option></select></div>
+      <div><label>수량</label><input id="i_cnt" type="number" min="1" max="1000" value="1"></div></div>
+      <div class="row"><div><label>받는 사람(선택)</label><input id="i_rcpt"></div><div><label>메모(선택)</label><input id="i_memo"></div></div>
+      <div class="row" style="margin-top:12px"><button onclick="issue()">발급</button></div>
+      <div id="i_out" class="note"></div>
+    </div>
+    <div class="card">
+      <h2>통계</h2><div id="st_out" class="muted">—</div>
+    </div>
+    <div class="card">
+      <h2>발급 카드</h2><div id="cards_out"><div class="muted">—</div></div>
+    </div>
+    <div class="card">
+      <h2>거래 원장</h2><div id="led_out"><div class="muted">—</div></div>
+    </div>
+  </div>
+</section>
+</div>
+<script>
+const CFG = window.IGGIFT_API || { base: location.origin, key: '' };
+let SK = '';
+function api(path, opts={}, admin=false){
+  const h = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+  const key = admin ? SK : CFG.key;
+  const u = CFG.base + '/api/iggift' + path + (path.includes('?')?'&':'?') + 'key=' + encodeURIComponent(key);
+  return fetch(u, Object.assign({}, opts, {headers:h})).then(async r=>{ const j=await r.json().catch(()=>({})); if(!r.ok) throw (j.message||j.error||('HTTP '+r.status)); return j; });
+}
+// 탭
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  document.getElementById('use').classList.toggle('hide', b.dataset.t!=='use');
+  document.getElementById('admin').classList.toggle('hide', b.dataset.t!=='admin');
+});
+// 사용자
+let curCard=null;
+function checkCard(){
+  const code=document.getElementById('u_code').value.trim(); if(!code) return;
+  document.getElementById('u_err').textContent='';
+  api('/cards/'+encodeURIComponent(code)).then(j=>{
+    curCard=j.card; const c=j.card;
+    document.getElementById('u_out').classList.remove('hide');
+    document.getElementById('u_bal').textContent=(c.balance).toLocaleString();
+    document.getElementById('u_cur').textContent=c.currency;
+    document.getElementById('u_init').textContent=(c.initial).toLocaleString()+' '+c.currency;
+    const st=document.getElementById('u_st'); st.textContent=c.status; st.className='pill '+c.status;
+  }).catch(e=>{document.getElementById('u_out').classList.add('hide');document.getElementById('u_err').textContent=e;});
+}
+function redeem(){
+  if(!curCard) return; const amt=Number(document.getElementById('u_amt').value);
+  document.getElementById('u_err').textContent='';
+  api('/cards/'+encodeURIComponent(curCard.code)+'/redeem',{method:'POST',body:JSON.stringify({amount:amt})}).then(j=>{
+    document.getElementById('u_amt').value=''; checkCard();
+  }).catch(e=>document.getElementById('u_err').textContent=e);
+}
+// 운영자
+function adminLogin(){
+  SK=document.getElementById('a_key').value.trim(); document.getElementById('a_err').textContent='';
+  if(!SK){document.getElementById('a_err').textContent='시크릿 키를 입력하세요.';return;}
+  api('/stats',{},true).then(()=>{document.getElementById('a_panel').classList.remove('hide');loadStats();loadCards();loadLedger();})
+    .catch(e=>{document.getElementById('a_panel').classList.add('hide');document.getElementById('a_err').textContent='인증 실패: '+e;});
+}
+function issue(){
+  const body={amount:Number(document.getElementById('i_amt').value),currency:document.getElementById('i_cur').value,count:Number(document.getElementById('i_cnt').value),recipient:document.getElementById('i_rcpt').value||undefined,memo:document.getElementById('i_memo').value||undefined};
+  api('/cards',{method:'POST',body:JSON.stringify(body)},true).then(j=>{
+    const cards=j.cards||[j.card];
+    document.getElementById('i_out').innerHTML='발급 완료: '+cards.map(c=>'<span class="mono">'+c.code+'</span>').join(', ');
+    loadStats();loadCards();loadLedger();
+  }).catch(e=>document.getElementById('i_out').textContent='실패: '+e);
+}
+function loadStats(){api('/stats',{},true).then(j=>{const s=j.stats;document.getElementById('st_out').innerHTML=
+  '총 '+s.total+'장 · 활성 '+s.active+' · 사용완료 '+s.used+' · 무효 '+(s.void||0)+'<br>발급총액 '+s.issued_amount.toLocaleString()+' · 잔여 '+s.outstanding.toLocaleString();}).catch(()=>{});}
+function loadCards(){api('/cards?limit=100',{},true).then(j=>{
+  const rows=j.cards.map(c=>'<tr><td class="mono">'+c.code+'</td><td>'+c.balance.toLocaleString()+' '+c.currency+'</td><td><span class="pill '+c.status+'">'+c.status+'</span></td></tr>').join('');
+  document.getElementById('cards_out').innerHTML=j.cards.length?'<table><tr><th>코드</th><th>잔액</th><th>상태</th></tr>'+rows+'</table>':'<div class="muted">발급된 카드가 없습니다.</div>';}).catch(()=>{});}
+function loadLedger(){api('/ledger?limit=50',{},true).then(j=>{
+  const rows=j.ledger.map(l=>'<tr><td>'+new Date(l.ts).toLocaleString('ko-KR')+'</td><td>'+l.type+'</td><td class="mono">'+(l.code||'')+'</td><td>'+((l.amount!=null)?l.amount.toLocaleString():'')+'</td></tr>').join('');
+  document.getElementById('led_out').innerHTML=j.ledger.length?'<table><tr><th>시각</th><th>종류</th><th>코드</th><th>금액</th></tr>'+rows+'</table>':'<div class="muted">기록이 없습니다.</div>';}).catch(()=>{});}
+</script></body></html>

@@ -30,8 +30,11 @@ import igvodRoutes from './routes/igvod.js';
 import igmapRoutes from './routes/igmap.js';
 import igcityRoutes from './routes/igcity.js';
 import messengerRoutes from './routes/messenger.js';
+import schoolyamRoutes from './routes/schoolyam.js';
+import iggiftRoutes from './routes/iggift.js';
 import { ensureIgPlay, igplayInject } from './provision.js';
 import { ensureMessenger, messengerInject } from './provision_messenger.js';
+import { ensureSchoolyam, ensureIggift, schoolyamInject, iggiftInject } from './provision_apps.js';
 
 const MODE = process.env.MODE || 'standalone';
 
@@ -46,6 +49,8 @@ async function main() {
   await ensureAdmin(); // 관리자 계정/시스템 프로젝트 보장
   await ensureIgPlay(); // igPlay 프로젝트 자동 프로비전(주소/키 자동 주입용)
   await ensureMessenger(); // 메신저 프로젝트 자동 프로비전
+  await ensureSchoolyam(); // 스쿨얌(Vercel 이관) 자동 프로비전
+  await ensureIggift();    // igGift(Vercel 이관) 자동 프로비전
 
   const app = express();
   app.disable('x-powered-by');
@@ -92,6 +97,9 @@ async function main() {
   app.use('/api/files', apiLimit, resolveProject, projectRateLimit(), enforceKeyScope, fileRoutes);
   // NAS(파일 저장·공유 서버): raw 업로드를 쓰므로 json 파서 전에 분기(files와 동일)
   app.use('/api/nas', apiLimit, resolveProject, projectRateLimit(), enforceKeyScope, nasRoutes);
+  // Vercel 이관 앱: 상품/광고 사진(base64 data URL) 때문에 넉넉한 바디 한도로 각자 분기(일반 /api json 파서 전에)
+  app.use('/api/schoolyam', apiLimit, resolveProject, projectRateLimit(), express.json({ limit: '25mb' }), schoolyamRoutes);
+  app.use('/api/iggift', apiLimit, resolveProject, projectRateLimit(), express.json({ limit: '4mb' }), iggiftRoutes);
   app.use('/api', apiLimit, express.json({ limit: '1mb' }), resolveProject, projectRateLimit());
   app.use('/api/auth', authRoutes);
   app.use('/api/data', enforceKeyScope, dataRoutes);
@@ -119,6 +127,8 @@ async function main() {
   // igPlay 페이지는 주소/공개키를 주입해 반환(정적 서빙보다 먼저)
   app.use('/app', igplayInject);
   app.use('/app', messengerInject);
+  app.use('/app', schoolyamInject);
+  app.use('/app', iggiftInject);
   app.use('/app', express.static(path.join(config.root, 'public/apps')));
   // 루트 → 대시보드로
   app.get('/', (_req, res) => res.redirect('/admin/'));
