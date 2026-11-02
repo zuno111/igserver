@@ -44,7 +44,9 @@ button{width:100%;padding:14px;border:0;border-radius:11px;font-weight:800;font-
     </div>
     <!-- 결제 버튼 -->
     <div id="payBox" style="display:none">
-      <div class="bal">igPay 잔액 <b id="bal">-</b>원</div>
+      <div class="seg" style="margin-bottom:8px"><button id="byKrw" class="on" onclick="setPayBy('krw')">원화</button><button id="byCoin" onclick="setPayBy('coin')">코인(IGC)</button></div>
+      <div class="bal" id="balKrwLine">igPay 잔액 <b id="bal">-</b>원</div>
+      <div class="bal" id="balCoinLine" style="display:none">코인 <b id="balCoin">-</b> IGC · 이번 결제 <b id="coinNeed">-</b> IGC</div>
       <button class="ok" id="payBtn" onclick="pay()">igPay로 결제</button>
       <button class="cancel" onclick="cancel()">취소</button>
     </div>
@@ -79,10 +81,17 @@ async function login(){
 // igPay 공개키는 지갑앱(/app/igpay/)에 주입돼 있음 — 한 번 가져와 캐시
 let _k=null; async function igpayKey(){ if(_k)return _k; const html=await (await fetch('/app/igpay/')).text(); const m=html.match(/IGPAY_API=\{[^}]*key:"([^"]+)"/); _k=m?m[1]:''; return _k; }
 async function showLogin(){ $('loginBox').style.display='block'; $('payBox').style.display='none'; }
+let PAYBY='krw', COIN_RATE=1000, COIN_BAL=0;
+function setPayBy(by){ PAYBY=by; $('byKrw').classList.toggle('on',by==='krw'); $('byCoin').classList.toggle('on',by==='coin');
+  $('balKrwLine').style.display=by==='krw'?'block':'none'; $('balCoinLine').style.display=by==='coin'?'block':'none';
+  if(by==='coin'){ $('coinNeed').textContent=(Math.round((AMT/COIN_RATE)*10000)/10000); } }
 async function showPay(){
   $('loginBox').style.display='none';
   try{ const key=await igpayKey(); const me=await api('/api/igpay/me?key='+encodeURIComponent(key),{token:PAYTOK});
-    $('bal').textContent=(me.wallet.krw|0).toLocaleString(); $('payBox').style.display='block';
+    $('bal').textContent=(me.wallet.krw|0).toLocaleString();
+    COIN_RATE=me.coinRate||1000; COIN_BAL=(me.wallet.coin||0);
+    $('balCoin').textContent=COIN_BAL; $('coinNeed').textContent=(Math.round((AMT/COIN_RATE)*10000)/10000);
+    $('payBox').style.display='block';
   }catch(e){ if(e.status===401){ localStorage.removeItem('igpay_token'); PAYTOK=''; showLogin(); } else $('err').textContent=e.message; }
 }
 function finishUI(txt){ $('body').innerHTML='<div class="msg" style="color:var(--good)">✓ '+AMT.toLocaleString()+'원 결제 완료<div class="note">'+txt+'</div></div>'; }
@@ -91,7 +100,7 @@ async function pay(){
   try{
     const key=await igpayKey();
     // igPay 잔액에서 차감 → paymentId
-    const r=await api('/api/igpay/pay?key='+encodeURIComponent(key),{method:'POST',token:PAYTOK,body:{amount:AMT,merchant:MERCH,memo:MEMO||(MERCH+' 결제'),source:SOURCE}});
+    const r=await api('/api/igpay/pay?key='+encodeURIComponent(key),{method:'POST',token:PAYTOK,body:{amount:AMT,merchant:MERCH,memo:MEMO||(MERCH+' 결제'),source:SOURCE,payBy:PAYBY}});
     const paymentId=r.paymentId;
     if(PI){ // igGift 충전 전용: igGift 세션 토큰으로 확정(같은 브라우저)
       const iggTok=localStorage.getItem('igg_token')||'';
@@ -107,7 +116,7 @@ async function pay(){
     }else{ finishUI('결제가 완료되었습니다'); setTimeout(()=>location.href='/app/igpay/',1400); }
   }catch(e){
     $('payBtn').disabled=false;
-    if(e.status===402){ $('err').innerHTML='igPay 잔액이 부족합니다. <a href="/app/igpay/" style="color:var(--accent)">충전하러 가기</a>'; }
+    if(e.status===402){ $('err').innerHTML=(PAYBY==='coin'?'코인 잔액이 부족합니다. ':'igPay 잔액이 부족합니다. ')+'<a href="/app/igpay/" style="color:var(--accent)">'+(PAYBY==='coin'?'코인 사러 가기':'충전하러 가기')+'</a>'; }
     else $('err').textContent=e.message;
   }
 }

@@ -25,9 +25,18 @@ function requireAdmin(req, res) { const m = who(req); if (!m || !m.admin) { res.
 async function getWallet(req, uid) {
   const repo = getRepo();
   let rec = await repo.getRecord(PID(req), 'pay_wallet', uid);
-  if (!rec) rec = await repo.putRecord({ project_id: PID(req), collection: 'pay_wallet', doc_id: uid, data: { krw: 0 }, owner_id: uid });
+  if (!rec) rec = await repo.putRecord({ project_id: PID(req), collection: 'pay_wallet', doc_id: uid, data: { krw: 0, coin: 0 }, owner_id: uid });
+  if (rec.data.coin == null) rec.data.coin = 0; // 기존 지갑 호환
   return rec.data;
 }
+// 코인 시세: 1 IGC = N원 (운영 설정). 기본 1000원.
+const DEFAULT_COIN_RATE = 1000;
+async function getCoinRate(req) {
+  const rec = await getRepo().getRecord(PID(req), 'pay_meta', 'config');
+  const r = rec?.data?.coinRate;
+  return (typeof r === 'number' && r > 0) ? r : DEFAULT_COIN_RATE;
+}
+function roundCoin(c) { return Math.round((c + Number.EPSILON) * 10000) / 10000; } // 소수 4자리
 async function saveWallet(req, uid, data) { await getRepo().putRecord({ project_id: PID(req), collection: 'pay_wallet', doc_id: uid, data, owner_id: uid }); return data; }
 async function addTx(req, uid, entry) {
   await getRepo().putRecord({ project_id: PID(req), collection: 'pay_tx', doc_id: randomId('tx_'), data: { uid, ...entry, ts: now() }, owner_id: uid });
@@ -47,7 +56,8 @@ router.get('/me', async (req, res, next) => {
     const cardRate = await getCardCashbackRate(req);
     const cardRec = await getRepo().getRecord(PID(req), 'pay_card', m.uid);
     const card = (cardRec && cardRec.data.status === 'active') ? cardPublic(cardRec.data, cardRate) : null;
-    res.json({ ok: true, uid: m.uid, name: m.name, wallet: w, savings, card, cardCashbackRate: cardRate, tx });
+    const coinRate = await getCoinRate(req);
+    res.json({ ok: true, uid: m.uid, name: m.name, wallet: { krw: w.krw | 0, coin: roundCoin(w.coin || 0) }, savings, card, cardCashbackRate: cardRate, coinRate, tx });
   } catch (e) { next(e); }
 });
 
@@ -178,6 +188,49 @@ router.post('/savings/withdraw', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ================= 코인(IGC) 환전 =================
+// 원화 지갑으로 코인을 사고(환전) 팔 수 있다. 시세는 운영 설정. 코인으로 가맹 결제 가능.
+router.get('/coin', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const rate = await getCoinRate(req);
+    const w = await getWallet(req, m.uid);
+    res.json({ ok: true, rate, coin: roundCoin(w.coin || 0), krw: w.krw | 0, coinValueKrw: Math.floor((w.coin || 0) * rate) });
+  } catch (e) { next(e); }
+});
+// 코인 구매(원화→코인)
+router.post('/coin/buy', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const krw = Math.floor(Number((req.body || {}).krw));
+    if (!(krw > 0)) return res.status(400).json({ error: 'bad_amount' });
+    const w = await getWallet(req, m.uid);
+    if ((w.krw | 0) < krw) return res.status(402).json({ error: 'insufficient', message: '지갑 잔액이 부족합니다.', balance: w.krw | 0 });
+    const rate = await getCoinRate(req);
+    const got = roundCoin(krw / rate);
+    w.krw -= krw; w.coin = roundCoin((w.coin || 0) + got);
+    await saveWallet(req, m.uid, w);
+    await addTx(req, m.uid, { type: 'coin_buy', amount: krw, balance: w.krw, memo: `코인 구매 +${got} IGC` });
+    res.json({ ok: true, wallet: { krw: w.krw | 0, coin: w.coin }, bought: got, rate });
+  } catch (e) { next(e); }
+});
+// 코인 판매(코인→원화)
+router.post('/coin/sell', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const coin = roundCoin(Number((req.body || {}).coin));
+    if (!(coin > 0)) return res.status(400).json({ error: 'bad_amount' });
+    const w = await getWallet(req, m.uid);
+    if ((w.coin || 0) < coin) return res.status(402).json({ error: 'insufficient', message: '코인 잔액이 부족합니다.', balance: w.coin || 0 });
+    const rate = await getCoinRate(req);
+    const krw = Math.floor(coin * rate);
+    w.coin = roundCoin((w.coin || 0) - coin); w.krw = (w.krw | 0) + krw;
+    await saveWallet(req, m.uid, w);
+    await addTx(req, m.uid, { type: 'coin_sell', amount: krw, balance: w.krw, memo: `코인 판매 -${coin} IGC` });
+    res.json({ ok: true, wallet: { krw: w.krw | 0, coin: w.coin }, sold: coin, krw, rate });
+  } catch (e) { next(e); }
+});
+
 // 거래 내역
 router.get('/tx', async (req, res, next) => {
   try {
@@ -193,10 +246,26 @@ router.post('/pay', async (req, res, next) => {
   try {
     const m = requireMember(req, res); if (!m) return;
     const b = req.body || {};
-    const amount = Math.floor(Number(b.amount));
+    const amount = Math.floor(Number(b.amount)); // 결제 금액은 항상 원화 기준
     const merchant = String(b.merchant || '가맹점').slice(0, 40);
+    const payBy = b.payBy === 'coin' ? 'coin' : 'krw';
     if (!(amount > 0)) return res.status(400).json({ error: 'bad_amount' });
     const w = await getWallet(req, m.uid);
+    const source = b.source ? String(b.source).slice(0, 40) : null;
+
+    // ---- 코인 결제 ----
+    if (payBy === 'coin') {
+      const rate = await getCoinRate(req);
+      const coinNeeded = roundCoin(amount / rate);
+      if ((w.coin || 0) < coinNeeded) return res.status(402).json({ error: 'insufficient', message: 'igPay 코인 잔액이 부족합니다.', balance: w.coin || 0, needed: coinNeeded });
+      w.coin = roundCoin((w.coin || 0) - coinNeeded);
+      await saveWallet(req, m.uid, w);
+      const pay = await getRepo().putRecord({ project_id: PID(req), collection: 'pay_payment', doc_id: randomId('pm_'), data: { uid: m.uid, name: m.name, merchant, source, amount, payBy: 'coin', coin: coinNeeded, cashback: 0, memo: b.memo || null, ts: now() }, owner_id: m.uid });
+      await addTx(req, m.uid, { type: 'pay', amount, balance: w.krw, counter: merchant, memo: (b.memo || (merchant + ' 결제')) + ` (코인 ${coinNeeded} IGC)` });
+      return res.json({ ok: true, paid: amount, merchant, wallet: { krw: w.krw | 0, coin: w.coin }, paymentId: pay.doc_id, cashback: 0, payBy: 'coin', coin: coinNeeded });
+    }
+
+    // ---- 원화 결제 ----
     if ((w.krw | 0) < amount) return res.status(402).json({ error: 'insufficient', message: 'igPay 잔액이 부족합니다.', balance: w.krw | 0 });
     w.krw -= amount;
     // 체크카드 보유 시 캐시백 적립(지갑으로 즉시)
@@ -212,8 +281,7 @@ router.post('/pay', async (req, res, next) => {
       }
     }
     await saveWallet(req, m.uid, w);
-    const source = b.source ? String(b.source).slice(0, 40) : null;
-    const pay = await getRepo().putRecord({ project_id: PID(req), collection: 'pay_payment', doc_id: randomId('pm_'), data: { uid: m.uid, name: m.name, merchant, source, amount, cashback, memo: b.memo || null, ts: now() }, owner_id: m.uid });
+    const pay = await getRepo().putRecord({ project_id: PID(req), collection: 'pay_payment', doc_id: randomId('pm_'), data: { uid: m.uid, name: m.name, merchant, source, amount, payBy: 'krw', cashback, memo: b.memo || null, ts: now() }, owner_id: m.uid });
     await addTx(req, m.uid, { type: 'pay', amount, balance: w.krw, counter: merchant, memo: b.memo || (merchant + ' 결제') });
     if (cashback > 0) await addTx(req, m.uid, { type: 'cashback', amount: cashback, balance: w.krw, counter: merchant, memo: '카드 캐시백' });
     res.json({ ok: true, paid: amount, merchant, wallet: w, paymentId: pay.doc_id, cashback });
@@ -310,6 +378,18 @@ router.get('/admin/payments', async (req, res, next) => {
   try { if (!requireAdmin(req, res)) return;
     const rows = await getRepo().queryRecords(PID(req), 'pay_payment', { limit: 300, sort: 'created_at:desc' });
     res.json({ ok: true, payments: rows.map((r) => ({ id: r.doc_id, ...r.data })) });
+  } catch (e) { next(e); }
+});
+// 코인 시세 설정(1 IGC = N원)
+router.post('/admin/coin-rate', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const repo = getRepo(), pid = PID(req);
+    const rate = Math.floor(Number((req.body || {}).rate));
+    if (!(rate > 0 && rate <= 100000000)) return res.status(400).json({ error: 'bad_rate', message: '시세는 1원 이상이어야 합니다.' });
+    const rec = await repo.getRecord(pid, 'pay_meta', 'config');
+    const data = { ...(rec?.data || {}), coinRate: rate };
+    await repo.putRecord({ project_id: pid, collection: 'pay_meta', doc_id: 'config', data, owner_id: null });
+    res.json({ ok: true, coinRate: rate });
   } catch (e) { next(e); }
 });
 // 카드 캐시백율 설정
