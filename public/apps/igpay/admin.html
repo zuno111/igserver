@@ -1,0 +1,104 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>igPay — 운영 콘솔</title>
+<style>
+:root{--bg:#0a0e16;--surface:#121826;--surface2:#18202f;--fg:#e6ecf5;--muted:#8a97a8;--border:#232d3e;
+  --accent:#5b8bf5;--accent2:#7aa2ff;--good:#3bbd82;--bad:#e06464;--warn:#d2994f;
+  --f:system-ui,-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--fg);font-family:var(--f);font-style:normal;line-height:1.5}
+h1,h2,h3{font-weight:800;font-style:normal}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+.top{display:flex;align-items:center;gap:10px;padding:6px 0 18px}
+.logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#06101f;font-weight:900}
+.top h1{font-size:19px}.top small{color:var(--muted);font-size:12px;display:block;font-weight:600}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+input{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--fg);font-family:inherit;font-size:14px}
+button{padding:11px 18px;border:0;border-radius:10px;background:var(--accent);color:#06101f;font-weight:800;cursor:pointer;font-family:inherit;font-size:14px}
+button.ghost{background:var(--surface2);color:var(--fg);border:1px solid var(--border)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.err{color:var(--bad);font-size:13px;margin-top:8px}.hide{display:none}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.st{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px}
+.st .n{font-size:22px;font-weight:900;color:var(--accent)}.st .l{color:var(--muted);font-size:12px;margin-top:2px}
+.st .s{color:var(--muted);font-size:11px;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:600}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800}
+.pill.charge,.pill.transfer_in{background:rgba(59,189,130,.16);color:var(--good)}
+.pill.transfer_out,.pill.withdraw,.pill.pay{background:rgba(224,100,100,.16);color:var(--bad)}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:8px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:13px;font-weight:700}
+.tab.on{background:var(--accent);color:#06101f;border-color:var(--accent)}
+.muted{color:var(--muted);font-size:13px}.empty{text-align:center;color:var(--muted);padding:26px 0;font-size:13px}
+</style></head><body>
+<div class="wrap">
+  <div class="top"><div class="logo">ig</div><div><h1>igPay 운영 콘솔<small>충전·송금·출금·결제 모니터링</small></h1></div></div>
+
+  <div class="card" id="loginCard">
+    <h3>운영자 연결</h3>
+    <p class="muted" style="margin-top:6px">igServer 관리 대시보드에서 발급된 igPay 프로젝트 시크릿 키(sk_...)로 연결합니다.</p>
+    <label>시크릿 키</label><input id="sk" class="mono" placeholder="sk_..." autocomplete="off">
+    <div class="row" style="margin-top:12px"><button onclick="connect()">연결</button></div>
+    <div class="err" id="loginErr"></div>
+  </div>
+
+  <div id="panel" class="hide">
+    <div class="tabs">
+      <button class="tab on" data-t="dash" onclick="tab('dash')">대시보드</button>
+      <button class="tab" data-t="tx" onclick="tab('tx')">거래 내역</button>
+      <button class="tab" data-t="pay" onclick="tab('pay')">가맹 결제</button>
+      <button class="tab ghost" onclick="loadAll()" style="margin-left:auto">새로고침</button>
+    </div>
+    <div class="pane" id="p-dash"><div class="card"><div class="stats" id="statGrid"></div></div></div>
+    <div class="pane hide" id="p-tx"><div class="card"><h3>전체 거래 내역</h3><div id="txTbl"></div></div></div>
+    <div class="pane hide" id="p-pay"><div class="card"><h3>가맹 결제(다른 앱에서 igPay 결제)</h3><div id="payTbl"></div></div></div>
+  </div>
+</div>
+<script>
+const CFG=window.IGPAY_API||{base:location.origin};
+let SK='';
+const $=(id)=>document.getElementById(id); const fmt=(n)=>(n|0).toLocaleString();
+async function api(path){
+  const u=CFG.base+'/api/igpay'+path+(path.includes('?')?'&':'?')+'key='+encodeURIComponent(SK);
+  const r=await fetch(u,{headers:{'Content-Type':'application/json'}});
+  const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.message||('오류 '+r.status)); return j;
+}
+async function connect(){
+  SK=$('sk').value.trim(); $('loginErr').textContent='';
+  if(!SK.startsWith('sk_')){ $('loginErr').textContent='시크릿 키(sk_...)를 입력하세요.'; return; }
+  try{ await api('/admin/stats'); $('loginCard').classList.add('hide'); $('panel').classList.remove('hide'); loadAll(); }
+  catch(e){ $('loginErr').textContent=e.message; }
+}
+function tab(t){
+  document.querySelectorAll('.tab[data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('hide',p.id!=='p-'+t));
+}
+async function loadAll(){ await Promise.all([loadStats(),loadTx(),loadPay()]); }
+async function loadStats(){
+  const {stats}=await api('/admin/stats');
+  $('statGrid').innerHTML=[
+    ['회원 수',stats.members+'명',''],
+    ['지갑 총 잔액',fmt(stats.totalBalance)+'원',stats.walletCount+'개 지갑'],
+    ['총 거래',stats.txCount+'건',''],
+    ['충전',fmt(stats.charge.sum)+'원',stats.charge.cnt+'건'],
+    ['송금',fmt(stats.transfer.sum)+'원',stats.transfer.cnt+'건'],
+    ['출금',fmt(stats.withdraw.sum)+'원',stats.withdraw.cnt+'건'],
+    ['가맹 결제',fmt(stats.pay.sum)+'원',stats.pay.cnt+'건'],
+  ].map(([l,n,s])=>`<div class="st"><div class="n">${n}</div><div class="l">${l}</div>${s?`<div class="s">${s}</div>`:''}</div>`).join('');
+}
+const TXKO={charge:'충전',transfer_out:'송금',transfer_in:'입금',withdraw:'출금',pay:'결제'};
+async function loadTx(){
+  const {tx}=await api('/admin/tx');
+  $('txTbl').innerHTML=tx.length?`<table><thead><tr><th>시각</th><th>구분</th><th>금액</th><th>상대/메모</th><th>잔액</th></tr></thead><tbody>`+
+    tx.map(t=>`<tr><td>${new Date(t.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td><span class="pill ${t.type}">${TXKO[t.type]||t.type}</span></td><td>${fmt(t.amount)}원</td><td>${t.counter||t.memo||'-'}</td><td>${fmt(t.balance)}원</td></tr>`).join('')+`</tbody></table>`:'<div class="empty">거래 내역이 없습니다</div>';
+}
+async function loadPay(){
+  const {payments}=await api('/admin/payments');
+  $('payTbl').innerHTML=payments.length?`<table><thead><tr><th>시각</th><th>결제자</th><th>가맹</th><th>금액</th></tr></thead><tbody>`+
+    payments.map(p=>`<tr><td>${new Date(p.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td>${p.name}</td><td>${p.merchant}</td><td>${fmt(p.amount)}원</td></tr>`).join('')+`</tbody></table>`:'<div class="empty">가맹 결제 내역이 없습니다</div>';
+}
+</script>
+</body></html>

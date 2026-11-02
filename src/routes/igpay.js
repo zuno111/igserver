@@ -20,6 +20,7 @@ function who(req) {
   return null;
 }
 function requireMember(req, res) { const m = who(req); if (!m) { res.status(401).json({ error: 'login_required', message: '로그인이 필요합니다.' }); return null; } return m; }
+function requireAdmin(req, res) { const m = who(req); if (!m || !m.admin) { res.status(403).json({ error: 'admin_only', message: '운영자(시크릿) 키가 필요합니다.' }); return null; } return m; }
 
 async function getWallet(req, uid) {
   const repo = getRepo();
@@ -116,6 +117,38 @@ router.post('/pay', async (req, res, next) => {
     const pay = await getRepo().putRecord({ project_id: PID(req), collection: 'pay_payment', doc_id: randomId('pm_'), data: { uid: m.uid, name: m.name, merchant, amount, memo: b.memo || null, ts: now() }, owner_id: m.uid });
     await addTx(req, m.uid, { type: 'pay', amount, balance: w.krw, counter: merchant, memo: b.memo || (merchant + ' 결제') });
     res.json({ ok: true, paid: amount, merchant, wallet: w, paymentId: pay.doc_id });
+  } catch (e) { next(e); }
+});
+
+// ================= 운영자: 통계·내역 =================
+router.get('/admin/stats', async (req, res, next) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const repo = getRepo(), pid = PID(req);
+    const members = await repo.countUsers(pid);
+    const wallets = await repo.queryRecords(pid, 'pay_wallet', { limit: 100000, sort: 'created_at:desc' });
+    const totalBalance = wallets.reduce((a, w) => a + ((w.data.krw | 0)), 0);
+    const tx = await repo.queryRecords(pid, 'pay_tx', { limit: 100000, sort: 'created_at:desc' });
+    const agg = { charge: { cnt: 0, sum: 0 }, transfer_out: { cnt: 0, sum: 0 }, withdraw: { cnt: 0, sum: 0 }, pay: { cnt: 0, sum: 0 } };
+    for (const t of tx) { const k = t.data.type; if (agg[k]) { agg[k].cnt++; agg[k].sum += (t.data.amount | 0); } }
+    res.json({ ok: true, stats: {
+      members, totalBalance, walletCount: wallets.length,
+      charge: agg.charge, transfer: agg.transfer_out, withdraw: agg.withdraw, pay: agg.pay,
+      txCount: tx.length,
+    } });
+  } catch (e) { next(e); }
+});
+router.get('/admin/tx', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const limit = Math.min(500, parseInt(req.query.limit || '200', 10));
+    const rows = await getRepo().queryRecords(PID(req), 'pay_tx', { limit, sort: 'created_at:desc' });
+    res.json({ ok: true, tx: rows.map((r) => ({ id: r.doc_id, ...r.data })) });
+  } catch (e) { next(e); }
+});
+router.get('/admin/payments', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const rows = await getRepo().queryRecords(PID(req), 'pay_payment', { limit: 300, sort: 'created_at:desc' });
+    res.json({ ok: true, payments: rows.map((r) => ({ id: r.doc_id, ...r.data })) });
   } catch (e) { next(e); }
 });
 
