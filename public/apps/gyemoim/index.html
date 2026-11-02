@@ -355,7 +355,7 @@ async function recordPay(gyeId,round,amount,extra){
 }
 async function payRound(gyeId,round,amount){
   if(window.IgPayCheckout){
-    IgPayCheckout.open({amount,merchant:'계모임',memo:round+'회차 곗돈',
+    IgPayCheckout.open({amount,merchant:'계모임',source:'gyemoim',memo:round+'회차 곗돈',
       onSuccess:async function(r){ await recordPay(gyeId,round,amount,{payment:'igpay',paymentId:r.paymentId}); toast(`${won(amount)} igPay 납입 완료`); renderDetail(); },
       onCancel:function(){ toast('납입이 취소되었습니다'); }});
   }else{

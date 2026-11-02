@@ -114,7 +114,8 @@ router.post('/pay', async (req, res, next) => {
     const w = await getWallet(req, m.uid);
     if ((w.krw | 0) < amount) return res.status(402).json({ error: 'insufficient', message: 'igPay 잔액이 부족합니다.', balance: w.krw | 0 });
     w.krw -= amount; await saveWallet(req, m.uid, w);
-    const pay = await getRepo().putRecord({ project_id: PID(req), collection: 'pay_payment', doc_id: randomId('pm_'), data: { uid: m.uid, name: m.name, merchant, amount, memo: b.memo || null, ts: now() }, owner_id: m.uid });
+    const source = b.source ? String(b.source).slice(0, 40) : null;
+    const pay = await getRepo().putRecord({ project_id: PID(req), collection: 'pay_payment', doc_id: randomId('pm_'), data: { uid: m.uid, name: m.name, merchant, source, amount, memo: b.memo || null, ts: now() }, owner_id: m.uid });
     await addTx(req, m.uid, { type: 'pay', amount, balance: w.krw, counter: merchant, memo: b.memo || (merchant + ' 결제') });
     res.json({ ok: true, paid: amount, merchant, wallet: w, paymentId: pay.doc_id });
   } catch (e) { next(e); }
@@ -131,10 +132,15 @@ router.get('/admin/stats', async (req, res, next) => {
     const tx = await repo.queryRecords(pid, 'pay_tx', { limit: 100000, sort: 'created_at:desc' });
     const agg = { charge: { cnt: 0, sum: 0 }, transfer_out: { cnt: 0, sum: 0 }, withdraw: { cnt: 0, sum: 0 }, pay: { cnt: 0, sum: 0 } };
     for (const t of tx) { const k = t.data.type; if (agg[k]) { agg[k].cnt++; agg[k].sum += (t.data.amount | 0); } }
+    // 가맹 결제 출처(앱)별 집계
+    const payments = await repo.queryRecords(pid, 'pay_payment', { limit: 100000, sort: 'created_at:desc' });
+    const bySourceMap = {};
+    for (const p of payments) { const s = p.data.source || p.data.merchant || '기타'; if (!bySourceMap[s]) bySourceMap[s] = { source: s, cnt: 0, sum: 0 }; bySourceMap[s].cnt++; bySourceMap[s].sum += (p.data.amount | 0); }
+    const bySource = Object.values(bySourceMap).sort((a, b) => b.sum - a.sum);
     res.json({ ok: true, stats: {
       members, totalBalance, walletCount: wallets.length,
       charge: agg.charge, transfer: agg.transfer_out, withdraw: agg.withdraw, pay: agg.pay,
-      txCount: tx.length,
+      txCount: tx.length, bySource,
     } });
   } catch (e) { next(e); }
 });

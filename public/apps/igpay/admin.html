@@ -52,7 +52,10 @@ th{color:var(--muted);font-weight:600}
       <button class="tab" data-t="pay" onclick="tab('pay')">가맹 결제</button>
       <button class="tab ghost" onclick="loadAll()" style="margin-left:auto">새로고침</button>
     </div>
-    <div class="pane" id="p-dash"><div class="card"><div class="stats" id="statGrid"></div></div></div>
+    <div class="pane" id="p-dash">
+      <div class="card"><div class="stats" id="statGrid"></div></div>
+      <div class="card"><h3>앱별 가맹 결제 매출</h3><div id="sourceTbl"></div></div>
+    </div>
     <div class="pane hide" id="p-tx"><div class="card"><h3>전체 거래 내역</h3><div id="txTbl"></div></div></div>
     <div class="pane hide" id="p-pay"><div class="card"><h3>가맹 결제(다른 앱에서 igPay 결제)</h3><div id="payTbl"></div></div></div>
   </div>
@@ -77,8 +80,12 @@ function tab(t){
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('hide',p.id!=='p-'+t));
 }
 async function loadAll(){ await Promise.all([loadStats(),loadTx(),loadPay()]); }
+const SRC_LABEL={iggift:'igGift',schoolyam:'School Yam',gyemoim:'계모임',dealers:'딜러스'};
 async function loadStats(){
   const {stats}=await api('/admin/stats');
+  const bs=stats.bySource||[];
+  $('sourceTbl').innerHTML=bs.length?`<table><thead><tr><th>앱(출처)</th><th>결제 건수</th><th>매출</th></tr></thead><tbody>`+
+    bs.map(s=>`<tr><td><b>${SRC_LABEL[s.source]||s.source}</b></td><td>${s.cnt}건</td><td>${fmt(s.sum)}원</td></tr>`).join('')+`</tbody></table>`:'<div class="empty">아직 앱 결제 내역이 없습니다</div>';
   $('statGrid').innerHTML=[
     ['회원 수',stats.members+'명',''],
     ['지갑 총 잔액',fmt(stats.totalBalance)+'원',stats.walletCount+'개 지갑'],
@@ -97,8 +104,8 @@ async function loadTx(){
 }
 async function loadPay(){
   const {payments}=await api('/admin/payments');
-  $('payTbl').innerHTML=payments.length?`<table><thead><tr><th>시각</th><th>결제자</th><th>가맹</th><th>금액</th></tr></thead><tbody>`+
-    payments.map(p=>`<tr><td>${new Date(p.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td>${p.name}</td><td>${p.merchant}</td><td>${fmt(p.amount)}원</td></tr>`).join('')+`</tbody></table>`:'<div class="empty">가맹 결제 내역이 없습니다</div>';
+  $('payTbl').innerHTML=payments.length?`<table><thead><tr><th>시각</th><th>앱</th><th>결제자</th><th>가맹</th><th>금액</th></tr></thead><tbody>`+
+    payments.map(p=>`<tr><td>${new Date(p.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td>${SRC_LABEL[p.source]||p.source||'-'}</td><td>${p.name}</td><td>${p.merchant}</td><td>${fmt(p.amount)}원</td></tr>`).join('')+`</tbody></table>`:'<div class="empty">가맹 결제 내역이 없습니다</div>';
 }
 </script>
 </body></html>

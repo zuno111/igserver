@@ -13,11 +13,14 @@
     if (!(amount > 0)) { if (opts.onError) opts.onError('금액이 올바르지 않습니다.'); return; }
     var merchant = opts.merchant || '가맹점';
     var memo = opts.memo || '';
+    // 출처 앱 식별자(source). 미지정 시 /app/<slug>/ 경로에서 추정.
+    var source = opts.source || (function () { var m = location.pathname.match(/\/app\/([^\/]+)/); return m ? m[1] : ''; })();
     var base = (opts.base || location.origin).replace(/\/$/, '');
     var url = base + '/app/igpay/pay.html?popup=1'
       + '&amount=' + amount
       + '&merchant=' + encodeURIComponent(merchant)
-      + '&memo=' + encodeURIComponent(memo);
+      + '&memo=' + encodeURIComponent(memo)
+      + '&source=' + encodeURIComponent(source);
 
     var overlay = document.createElement('div');
     overlay.setAttribute('data-igpay', 'overlay');

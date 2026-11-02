@@ -160,7 +160,7 @@ function placeOrder(){const shop=document.getElementById('shopSel').value;if(!sh
   const body={shop,items:cart.map(c=>({id:c.id,qty:c.qty})),name:document.getElementById('o_name').value,phone:document.getElementById('o_phone').value,grade:document.getElementById('o_grade').value,classroom:document.getElementById('o_class').value};
   if(pm==='igpay'){
     document.getElementById('orderMsg').innerHTML='<div class="muted">igPay 결제창을 여는 중…</div>';
-    IgPayCheckout.open({amount:total,merchant:'School Yam',memo:'매점 주문',
+    IgPayCheckout.open({amount:total,merchant:'School Yam',source:'schoolyam',memo:'매점 주문',
       onSuccess:function(r){ body.payment='igpay'; body.paymentId=r.paymentId; submitOrder(body,true); },
       onCancel:function(){ document.getElementById('orderMsg').innerHTML='<div class="muted">결제가 취소되었습니다.</div>'; }});
   } else { submitOrder(body,false); }

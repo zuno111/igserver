@@ -536,7 +536,7 @@ router.post('/payin/start', async (req, res, next) => {
       }
     } else if (provider === 'igpay') {
       // 자체 페이(igPay): igPay 결제창으로 이동 → igPay 잔액에서 실제 차감 후 igGift 충전
-      approveUrl = `${origin}/app/igpay/pay.html?pi=${piId}&amount=${amount}&merchant=igGift`;
+      approveUrl = `${origin}/app/igpay/pay.html?pi=${piId}&amount=${amount}&merchant=igGift&source=iggift`;
       sandbox = false; live = true;
     } else {
       // 내장 샌드박스: 실제 승인 페이지로 이동 → 승인 시 충전까지 동작(키 꽂으면 실 결제로 교체)

@@ -55,7 +55,7 @@ button{width:100%;padding:14px;border:0;border-radius:11px;font-weight:800;font-
 <script>
 const Q=new URLSearchParams(location.search);
 const PI=Q.get('pi'), AMT=parseInt(Q.get('amount')||'0',10), MERCH=Q.get('merchant')||'igGift';
-const POPUP=Q.get('popup'), RET=Q.get('return'), MEMO=Q.get('memo')||'';
+const POPUP=Q.get('popup'), RET=Q.get('return'), MEMO=Q.get('memo')||'', SOURCE=Q.get('source')||'';
 let PAYTOK=localStorage.getItem('igpay_token')||'', MODE='login';
 const $=(id)=>document.getElementById(id);
 $('amt').textContent=AMT.toLocaleString(); $('merch').textContent=MERCH;
@@ -91,7 +91,7 @@ async function pay(){
   try{
     const key=await igpayKey();
     // igPay 잔액에서 차감 → paymentId
-    const r=await api('/api/igpay/pay?key='+encodeURIComponent(key),{method:'POST',token:PAYTOK,body:{amount:AMT,merchant:MERCH,memo:MEMO||(MERCH+' 결제')}});
+    const r=await api('/api/igpay/pay?key='+encodeURIComponent(key),{method:'POST',token:PAYTOK,body:{amount:AMT,merchant:MERCH,memo:MEMO||(MERCH+' 결제'),source:SOURCE}});
     const paymentId=r.paymentId;
     if(PI){ // igGift 충전 전용: igGift 세션 토큰으로 확정(같은 브라우저)
       const iggTok=localStorage.getItem('igg_token')||'';

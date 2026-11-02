@@ -273,7 +273,7 @@ async function accept(dealer,price){
   const req=myRequests.find(r=>r.id===activeReq);
   if(!req)return;
   if(window.IgPayCheckout){
-    IgPayCheckout.open({amount:price,merchant:'딜러스',memo:dealer+' 견적',
+    IgPayCheckout.open({amount:price,merchant:'딜러스',source:'dealers',memo:dealer+' 견적',
       onSuccess:function(r){ finalizeAccept(req,dealer,price,{payment:'igpay',paymentId:r.paymentId}); },
       onCancel:function(){ toast('결제가 취소되었습니다'); }});
   }else{ finalizeAccept(req,dealer,price); }
