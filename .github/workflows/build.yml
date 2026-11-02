@@ -81,7 +81,8 @@ jobs:
   # (로컬에서 태그 push가 막혀 있어도, Actions의 GITHUB_TOKEN은 Release/태그 생성 권한이 있다)
   release:
     needs: build
-    if: github.event_name != 'pull_request'
+    # macOS 러너가 취소/실패해도 Windows·Linux 결과물이 있으면 릴리스한다(항상 실행 후 산출물로 판단).
+    if: always() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -123,4 +124,4 @@ jobs:
             Windows 고정 다운로드 링크:
             https://github.com/zuno111/igserver/releases/latest/download/igserver-win-x64.zip
           files: "*.zip"
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false

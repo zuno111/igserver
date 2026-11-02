@@ -27,8 +27,19 @@ async function getWallet(req, uid) {
   let rec = await repo.getRecord(PID(req), 'pay_wallet', uid);
   if (!rec) rec = await repo.putRecord({ project_id: PID(req), collection: 'pay_wallet', doc_id: uid, data: { krw: 0, coin: 0 }, owner_id: uid });
   if (rec.data.coin == null) rec.data.coin = 0; // 기존 지갑 호환
+  if (rec.data.goldG == null) rec.data.goldG = 0;
+  if (rec.data.silverG == null) rec.data.silverG = 0;
   return rec.data;
 }
+// 금·은 시세(1g당 원). 기본값은 데모용 — 운영에서 실시세로 설정.
+const DEFAULT_METAL = { gold: 110000, silver: 1300 };
+async function getMetalPrice(req, metal) {
+  const rec = await getRepo().getRecord(PID(req), 'pay_meta', 'config');
+  const p = rec?.data?.[metal === 'gold' ? 'goldPrice' : 'silverPrice'];
+  return (typeof p === 'number' && p > 0) ? p : DEFAULT_METAL[metal];
+}
+function roundGram(g) { return Math.round((g + Number.EPSILON) * 10000) / 10000; }
+function metalField(metal) { return metal === 'gold' ? 'goldG' : 'silverG'; }
 // 코인 시세: 1 IGC = N원 (운영 설정). 기본 1000원.
 const DEFAULT_COIN_RATE = 1000;
 async function getCoinRate(req) {
@@ -57,7 +68,13 @@ router.get('/me', async (req, res, next) => {
     const cardRec = await getRepo().getRecord(PID(req), 'pay_card', m.uid);
     const card = (cardRec && cardRec.data.status === 'active') ? cardPublic(cardRec.data, cardRate) : null;
     const coinRate = await getCoinRate(req);
-    res.json({ ok: true, uid: m.uid, name: m.name, wallet: { krw: w.krw | 0, coin: roundCoin(w.coin || 0) }, savings, card, cardCashbackRate: cardRate, coinRate, tx });
+    const goldP = await getMetalPrice(req, 'gold'), silverP = await getMetalPrice(req, 'silver');
+    const metals = {
+      prices: { gold: goldP, silver: silverP },
+      gold: { grams: roundGram(w.goldG || 0), valueKrw: Math.floor((w.goldG || 0) * goldP) },
+      silver: { grams: roundGram(w.silverG || 0), valueKrw: Math.floor((w.silverG || 0) * silverP) },
+    };
+    res.json({ ok: true, uid: m.uid, name: m.name, wallet: { krw: w.krw | 0, coin: roundCoin(w.coin || 0) }, savings, card, cardCashbackRate: cardRate, coinRate, metals, tx });
   } catch (e) { next(e); }
 });
 
@@ -231,6 +248,93 @@ router.post('/coin/sell', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ================= 금·은 실물 거래 =================
+// 원화로 금/은을 그램 단위로 사고 팔고, 보유분을 실물(바/코인)로 인출 신청한다.
+const METALS = ['gold', 'silver'];
+const METAL_KO = { gold: '금', silver: '은' };
+router.get('/metal', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const w = await getWallet(req, m.uid);
+    const goldP = await getMetalPrice(req, 'gold'), silverP = await getMetalPrice(req, 'silver');
+    res.json({ ok: true, prices: { gold: goldP, silver: silverP },
+      holdings: {
+        gold: { grams: roundGram(w.goldG || 0), valueKrw: Math.floor((w.goldG || 0) * goldP) },
+        silver: { grams: roundGram(w.silverG || 0), valueKrw: Math.floor((w.silverG || 0) * silverP) },
+      },
+      krw: w.krw | 0 });
+  } catch (e) { next(e); }
+});
+// 매수(원화→금/은)
+router.post('/metal/buy', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const b = req.body || {};
+    const metal = METALS.includes(b.metal) ? b.metal : null;
+    const krw = Math.floor(Number(b.krw));
+    if (!metal) return res.status(400).json({ error: 'bad_metal' });
+    if (!(krw > 0)) return res.status(400).json({ error: 'bad_amount' });
+    const w = await getWallet(req, m.uid);
+    if ((w.krw | 0) < krw) return res.status(402).json({ error: 'insufficient', message: '지갑 잔액이 부족합니다.', balance: w.krw | 0 });
+    const price = await getMetalPrice(req, metal);
+    const grams = roundGram(krw / price);
+    w.krw -= krw; w[metalField(metal)] = roundGram((w[metalField(metal)] || 0) + grams);
+    await saveWallet(req, m.uid, w);
+    await addTx(req, m.uid, { type: 'metal_buy', amount: krw, balance: w.krw, memo: `${METAL_KO[metal]} 매수 +${grams}g` });
+    res.json({ ok: true, metal, bought: grams, price, wallet: { krw: w.krw | 0, grams: w[metalField(metal)] } });
+  } catch (e) { next(e); }
+});
+// 매도(금/은→원화)
+router.post('/metal/sell', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const b = req.body || {};
+    const metal = METALS.includes(b.metal) ? b.metal : null;
+    const grams = roundGram(Number(b.grams));
+    if (!metal) return res.status(400).json({ error: 'bad_metal' });
+    if (!(grams > 0)) return res.status(400).json({ error: 'bad_amount' });
+    const w = await getWallet(req, m.uid);
+    if ((w[metalField(metal)] || 0) < grams) return res.status(402).json({ error: 'insufficient', message: `${METAL_KO[metal]} 보유량이 부족합니다.`, balance: w[metalField(metal)] || 0 });
+    const price = await getMetalPrice(req, metal);
+    const krw = Math.floor(grams * price);
+    w[metalField(metal)] = roundGram((w[metalField(metal)] || 0) - grams); w.krw = (w.krw | 0) + krw;
+    await saveWallet(req, m.uid, w);
+    await addTx(req, m.uid, { type: 'metal_sell', amount: krw, balance: w.krw, memo: `${METAL_KO[metal]} 매도 -${grams}g` });
+    res.json({ ok: true, metal, sold: grams, krw, price, wallet: { krw: w.krw | 0, grams: w[metalField(metal)] } });
+  } catch (e) { next(e); }
+});
+// 실물 인출 신청(보유 금/은을 실물 배송으로)
+router.post('/metal/deliver', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const b = req.body || {};
+    const metal = METALS.includes(b.metal) ? b.metal : null;
+    const grams = roundGram(Number(b.grams));
+    if (!metal) return res.status(400).json({ error: 'bad_metal' });
+    if (!(grams > 0)) return res.status(400).json({ error: 'bad_amount' });
+    if (!b.name || !b.phone || !b.address) return res.status(400).json({ error: 'bad_addr', message: '수령인·연락처·주소를 입력하세요.' });
+    const w = await getWallet(req, m.uid);
+    if ((w[metalField(metal)] || 0) < grams) return res.status(402).json({ error: 'insufficient', message: `${METAL_KO[metal]} 보유량이 부족합니다.`, balance: w[metalField(metal)] || 0 });
+    w[metalField(metal)] = roundGram((w[metalField(metal)] || 0) - grams);
+    await saveWallet(req, m.uid, w);
+    const rec = await getRepo().putRecord({ project_id: PID(req), collection: 'pay_metal_delivery', doc_id: randomId('md_'), data: {
+      uid: m.uid, name: m.name, metal, metalKo: METAL_KO[metal], grams,
+      recipient: String(b.name).slice(0, 40), phone: String(b.phone).slice(0, 30), address: String(b.address).slice(0, 200),
+      status: 'requested', ts: now(),
+    }, owner_id: m.uid });
+    await addTx(req, m.uid, { type: 'metal_deliver', amount: 0, balance: w.krw, memo: `${METAL_KO[metal]} 실물 인출 신청 ${grams}g` });
+    res.json({ ok: true, deliveryId: rec.doc_id, metal, grams, status: 'requested', wallet: { grams: w[metalField(metal)] } });
+  } catch (e) { next(e); }
+});
+// 내 실물 인출 내역
+router.get('/metal/deliveries', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const rows = await getRepo().queryRecords(PID(req), 'pay_metal_delivery', { ownerId: m.uid, limit: 50, sort: 'created_at:desc' });
+    res.json({ ok: true, deliveries: rows.map((r) => ({ id: r.doc_id, ...r.data })) });
+  } catch (e) { next(e); }
+});
+
 // 거래 내역
 router.get('/tx', async (req, res, next) => {
   try {
@@ -378,6 +482,25 @@ router.get('/admin/payments', async (req, res, next) => {
   try { if (!requireAdmin(req, res)) return;
     const rows = await getRepo().queryRecords(PID(req), 'pay_payment', { limit: 300, sort: 'created_at:desc' });
     res.json({ ok: true, payments: rows.map((r) => ({ id: r.doc_id, ...r.data })) });
+  } catch (e) { next(e); }
+});
+// 금·은 시세 설정(1g당 원)
+router.post('/admin/metal-price', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const repo = getRepo(), pid = PID(req), b = req.body || {};
+    const rec = await repo.getRecord(pid, 'pay_meta', 'config');
+    const data = { ...(rec?.data || {}) };
+    if (b.gold != null) { const g = Math.floor(Number(b.gold)); if (!(g > 0)) return res.status(400).json({ error: 'bad_gold' }); data.goldPrice = g; }
+    if (b.silver != null) { const s = Math.floor(Number(b.silver)); if (!(s > 0)) return res.status(400).json({ error: 'bad_silver' }); data.silverPrice = s; }
+    await repo.putRecord({ project_id: pid, collection: 'pay_meta', doc_id: 'config', data, owner_id: null });
+    res.json({ ok: true, goldPrice: data.goldPrice || DEFAULT_METAL.gold, silverPrice: data.silverPrice || DEFAULT_METAL.silver });
+  } catch (e) { next(e); }
+});
+// 금·은 실물 인출 신청 목록(운영)
+router.get('/admin/metal-deliveries', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const rows = await getRepo().queryRecords(PID(req), 'pay_metal_delivery', { limit: 300, sort: 'created_at:desc' });
+    res.json({ ok: true, deliveries: rows.map((r) => ({ id: r.doc_id, ...r.data })) });
   } catch (e) { next(e); }
 });
 // 코인 시세 설정(1 IGC = N원)
