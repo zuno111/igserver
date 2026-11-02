@@ -157,8 +157,9 @@
 <div id="toast" class="toast"></div>
 
 <script src="/app/_sdk/igclient.js"></script>
+<script src="/app/_sdk/igpay-checkout.js"></script>
 <script>
-const PROJECT_KEY = new URLSearchParams(location.search).get('key') || window.GYE_KEY || 'GYE_PROJECT_KEY';
+const PROJECT_KEY = new URLSearchParams(location.search).get('key') || (window.GYEMOIM_API&&window.GYEMOIM_API.key) || window.GYE_KEY || 'GYE_PROJECT_KEY';
 const ig = igClient(location.origin, PROJECT_KEY);
 let me=null, isSignup=false, curGye=null, subs=[];
 
@@ -263,7 +264,8 @@ async function renderDetail(){
   if(!curGye)return;
   const g=await ig.get('gyes',curGye); if(!g){goHome();return;}
   const d=g.data;
-  const gs=await ig.get('gyestate',curGye);
+  const gsl=await ig.list('gyestate',{limit:500});
+  const gs=gsl.find(x=>x.data.gyeId===curGye)||null;
   const state=gs?.data;
   const round=state?.round||1;
   const status=state?.status||'recruiting';
@@ -348,10 +350,19 @@ async function renderDetail(){
   document.getElementById('detail-content').innerHTML=html;
 }
 
+async function recordPay(gyeId,round,amount,extra){
+  await ig.create('payments',Object.assign({gyeId,round,userId:me.id,name:me.name,amount,paidAt:Date.now()},extra||{}));
+}
 async function payRound(gyeId,round,amount){
-  await ig.create('payments',{gyeId,round,userId:me.id,name:me.name,amount,paidAt:Date.now()});
-  toast(`${won(amount)} 납입 완료 (에스크로 보관)`);
-  renderDetail();
+  if(window.IgPayCheckout){
+    IgPayCheckout.open({amount,merchant:'계모임',memo:round+'회차 곗돈',
+      onSuccess:async function(r){ await recordPay(gyeId,round,amount,{payment:'igpay',paymentId:r.paymentId}); toast(`${won(amount)} igPay 납입 완료`); renderDetail(); },
+      onCancel:function(){ toast('납입이 취소되었습니다'); }});
+  }else{
+    await recordPay(gyeId,round,amount);
+    toast(`${won(amount)} 납입 완료 (에스크로 보관)`);
+    renderDetail();
+  }
 }
 async function placeBid(gyeId,round){
   const v=Number(document.getElementById('bid-input').value||0);
