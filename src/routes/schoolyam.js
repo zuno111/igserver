@@ -108,10 +108,12 @@ router.post('/orders', async (req, res, next) => {
       if (match) sellerId = match.doc_id;
     }
     const id = randomId('o_');
+    const payMethod = (b.payment === 'igpay') ? 'igpay' : 'cash';
     const data = {
       shop, items: clean, total, name: b.name ? String(b.name).slice(0, 60) : null,
       phone: normPhone(b.phone) || null, grade, classroom: b.classroom ? String(b.classroom).slice(0, 20) : null,
-      payment: 'cash', status: 'received', sellerId,
+      payment: payMethod, paymentId: payMethod === 'igpay' ? String(b.paymentId || '').slice(0, 60) : null,
+      status: payMethod === 'igpay' ? 'paid' : 'received', sellerId,
     };
     await repo.putRecord({ project_id: pid, collection: 'sy_orders', doc_id: id, data, owner_id: null });
     // 정산 기록(셀러 배정 시)

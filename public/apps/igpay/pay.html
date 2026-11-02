@@ -55,6 +55,7 @@ button{width:100%;padding:14px;border:0;border-radius:11px;font-weight:800;font-
 <script>
 const Q=new URLSearchParams(location.search);
 const PI=Q.get('pi'), AMT=parseInt(Q.get('amount')||'0',10), MERCH=Q.get('merchant')||'igGift';
+const POPUP=Q.get('popup'), RET=Q.get('return'), MEMO=Q.get('memo')||'';
 let PAYTOK=localStorage.getItem('igpay_token')||'', MODE='login';
 const $=(id)=>document.getElementById(id);
 $('amt').textContent=AMT.toLocaleString(); $('merch').textContent=MERCH;
@@ -84,17 +85,26 @@ async function showPay(){
     $('bal').textContent=(me.wallet.krw|0).toLocaleString(); $('payBox').style.display='block';
   }catch(e){ if(e.status===401){ localStorage.removeItem('igpay_token'); PAYTOK=''; showLogin(); } else $('err').textContent=e.message; }
 }
+function finishUI(txt){ $('body').innerHTML='<div class="msg" style="color:var(--good)">✓ '+AMT.toLocaleString()+'원 결제 완료<div class="note">'+txt+'</div></div>'; }
 async function pay(){
   $('payBtn').disabled=true; $('err').textContent='';
   try{
     const key=await igpayKey();
-    // 1) igPay 잔액에서 차감
-    await api('/api/igpay/pay?key='+encodeURIComponent(key),{method:'POST',token:PAYTOK,body:{amount:AMT,merchant:MERCH,memo:'igGift 충전'}});
-    // 2) igGift 충전 확정(igGift 세션 토큰 — 같은 브라우저)
-    const iggTok=localStorage.getItem('igg_token')||'';
-    await api('/api/iggift/p2p/payin/confirm',{method:'POST',token:iggTok,body:{pi:PI,result:'success'}});
-    $('body').innerHTML='<div class="msg" style="color:var(--good)">✓ '+AMT.toLocaleString()+'원 결제·충전 완료<div class="note">잠시 후 igGift로 돌아갑니다</div></div>';
-    setTimeout(()=>location.href='/app/iggift/',1500);
+    // igPay 잔액에서 차감 → paymentId
+    const r=await api('/api/igpay/pay?key='+encodeURIComponent(key),{method:'POST',token:PAYTOK,body:{amount:AMT,merchant:MERCH,memo:MEMO||(MERCH+' 결제')}});
+    const paymentId=r.paymentId;
+    if(PI){ // igGift 충전 전용: igGift 세션 토큰으로 확정(같은 브라우저)
+      const iggTok=localStorage.getItem('igg_token')||'';
+      await api('/api/iggift/p2p/payin/confirm',{method:'POST',token:iggTok,body:{pi:PI,result:'success'}});
+      finishUI('잠시 후 igGift로 돌아갑니다'); setTimeout(()=>location.href='/app/iggift/',1400);
+    }else if(POPUP){ // 공통 위젯(iframe 모달 또는 팝업): 결과를 호출 앱으로 전달
+      finishUI(MERCH+' 결제가 완료되었습니다');
+      const target=(window.parent&&window.parent!==window)?window.parent:window.opener;
+      try{ if(target) target.postMessage({igpay:'paid',paymentId,amount:AMT},'*'); }catch(_){}
+      setTimeout(()=>{ try{ if(window.opener) window.close(); }catch(_){} },900);
+    }else if(RET){ // 리다이렉트 폴백: 호출 페이지로 결과 파라미터와 함께 복귀
+      const sep=RET.includes('?')?'&':'?'; location.href=RET+sep+'igpay_paid='+encodeURIComponent(paymentId)+'&igpay_amount='+AMT;
+    }else{ finishUI('결제가 완료되었습니다'); setTimeout(()=>location.href='/app/igpay/',1400); }
   }catch(e){
     $('payBtn').disabled=false;
     if(e.status===402){ $('err').innerHTML='igPay 잔액이 부족합니다. <a href="/app/igpay/" style="color:var(--accent)">충전하러 가기</a>'; }
@@ -102,8 +112,11 @@ async function pay(){
   }
 }
 async function cancel(){
-  try{ const iggTok=localStorage.getItem('igg_token')||''; await api('/api/iggift/p2p/payin/confirm',{method:'POST',token:iggTok,body:{pi:PI,result:'fail'}}); }catch(e){}
-  location.href='/app/iggift/';
+  if(PI){ try{ const iggTok=localStorage.getItem('igg_token')||''; await api('/api/iggift/p2p/payin/confirm',{method:'POST',token:iggTok,body:{pi:PI,result:'fail'}}); }catch(e){}
+    location.href='/app/iggift/'; return; }
+  if(POPUP){ const target=(window.parent&&window.parent!==window)?window.parent:window.opener; try{ if(target) target.postMessage({igpay:'cancel'},'*'); }catch(_){} try{ if(window.opener) window.close(); }catch(_){} return; }
+  if(RET){ const sep=RET.includes('?')?'&':'?'; location.href=RET+sep+'igpay_cancel=1'; return; }
+  location.href='/app/igpay/';
 }
 // 시작: igPay 로그인 상태면 바로 결제, 아니면 로그인
 if(PAYTOK) showPay(); else showLogin();

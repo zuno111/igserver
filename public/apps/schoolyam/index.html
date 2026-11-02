@@ -103,11 +103,17 @@ table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}th,td{te
 </section>
 </div>
 
-<div id="cart" class="cart hide"><div style="display:flex;align-items:center;gap:12px">
-  <div><div class="muted">장바구니 <span id="cartN">0</span>개</div><div class="big"><span id="cartT">0</span>원</div></div>
-  <button style="margin-left:auto" onclick="placeOrder()">주문하기</button></div>
+<div id="cart" class="cart hide">
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border:1px solid var(--border);border-radius:9px;cursor:pointer;font-size:13px;font-weight:700"><input type="radio" name="paym" value="cash" checked> 현금(픽업)</label>
+    <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border:1px solid var(--border);border-radius:9px;cursor:pointer;font-size:13px;font-weight:700"><input type="radio" name="paym" value="igpay"> 🟦 igPay 결제</label>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div><div class="muted">장바구니 <span id="cartN">0</span>개</div><div class="big"><span id="cartT">0</span>원</div></div>
+    <button style="margin-left:auto" onclick="placeOrder()">주문하기</button></div>
   <div id="orderMsg" style="margin-top:8px"></div>
 </div>
+<script src="/app/_sdk/igpay-checkout.js"></script>
 
 <script>
 const CFG=window.SCHOOLYAM_API||{base:location.origin,key:''};
@@ -149,9 +155,19 @@ function renderCart(){const n=cart.reduce((a,c)=>a+c.qty,0),t=cart.reduce((a,c)=
   document.getElementById('cartN').textContent=n;document.getElementById('cartT').textContent=t.toLocaleString();
   document.getElementById('cart').classList.toggle('hide',n===0||document.querySelector('.tab.on').dataset.t!=='order');}
 function placeOrder(){const shop=document.getElementById('shopSel').value;if(!shop||!cart.length)return;
+  const total=cart.reduce((a,c)=>a+c.price*c.qty,0);
+  const pm=(document.querySelector('input[name="paym"]:checked')||{}).value||'cash';
   const body={shop,items:cart.map(c=>({id:c.id,qty:c.qty})),name:document.getElementById('o_name').value,phone:document.getElementById('o_phone').value,grade:document.getElementById('o_grade').value,classroom:document.getElementById('o_class').value};
+  if(pm==='igpay'){
+    document.getElementById('orderMsg').innerHTML='<div class="muted">igPay 결제창을 여는 중…</div>';
+    IgPayCheckout.open({amount:total,merchant:'School Yam',memo:'매점 주문',
+      onSuccess:function(r){ body.payment='igpay'; body.paymentId=r.paymentId; submitOrder(body,true); },
+      onCancel:function(){ document.getElementById('orderMsg').innerHTML='<div class="muted">결제가 취소되었습니다.</div>'; }});
+  } else { submitOrder(body,false); }
+}
+function submitOrder(body,paid){
   api('/orders',{method:'POST',body:JSON.stringify(body)}).then(j=>{cart=[];renderCart();
-    document.getElementById('orderMsg').innerHTML='<div class="ok">주문 완료! 다음날 교실로 픽업하세요. 주문번호 '+j.order.id+'</div>';
+    document.getElementById('orderMsg').innerHTML='<div class="ok">주문 완료! '+(paid?'igPay 결제됨 · ':'')+'다음날 교실로 픽업하세요. 주문번호 '+j.order.id+'</div>';
   }).catch(e=>document.getElementById('orderMsg').innerHTML='<div class="err">'+e+'</div>');}
 // ---- 내 주문 ----
 function loadMine(){const phone=document.getElementById('m_phone').value;if(!phone)return;
