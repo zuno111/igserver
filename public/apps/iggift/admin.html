@@ -1,0 +1,150 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>igGift P2P — 운영 콘솔</title>
+<style>
+:root{
+  --bg:#0c110e;--surface:#121a15;--surface2:#17201a;--fg:#e7efea;--muted:#92a099;--border:#232e27;
+  --accent:#2fbd84;--accent2:#36cc8f;--bad:#e06464;--warn:#d2994f;--blue:#5b8bf5;
+  --f:system-ui,-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;
+}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--fg);font-family:var(--f);font-style:normal;line-height:1.5}
+h1,h2,h3{font-weight:800;font-style:normal}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+.top{display:flex;align-items:center;gap:10px;padding:6px 0 18px}
+.logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#06130d;font-weight:900}
+.top h1{font-size:19px}.top small{color:var(--muted);font-size:12px;display:block;font-weight:600}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--fg);font-family:inherit;font-size:14px}
+button{padding:11px 18px;border:0;border-radius:10px;background:var(--accent);color:#06130d;font-weight:800;cursor:pointer;font-family:inherit;font-size:14px}
+button.ghost{background:var(--surface2);color:var(--fg);border:1px solid var(--border)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.err{color:var(--bad);font-size:13px;margin-top:8px}
+.hide{display:none}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.st{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px}
+.st .n{font-size:24px;font-weight:900;color:var(--accent)}.st .l{color:var(--muted);font-size:12px;margin-top:2px}
+.st.warn .n{color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:600}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800}
+.pill.completed{background:rgba(47,189,132,.16);color:var(--accent)}
+.pill.open{background:rgba(91,139,245,.16);color:var(--blue)}
+.pill.cancelled{background:rgba(224,100,100,.16);color:var(--bad)}
+.pill.bot{background:rgba(210,153,79,.16);color:var(--warn)}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:8px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:13px;font-weight:700}
+.tab.on{background:var(--accent);color:#06130d;border-color:var(--accent)}
+.sw{display:flex;align-items:center;gap:8px;margin-top:10px}
+.sw input{width:auto}
+.muted{color:var(--muted);font-size:13px}
+.empty{text-align:center;color:var(--muted);padding:26px 0;font-size:13px}
+</style></head><body>
+<div class="wrap">
+  <div class="top"><div class="logo">ig</div><div><h1>igGift P2P 운영 콘솔<small>거래·봇·이상거래 모니터링</small></h1></div></div>
+
+  <div class="card" id="loginCard">
+    <h3>운영자 연결</h3>
+    <p class="muted" style="margin-top:6px">igServer 관리 대시보드에서 발급된 igGift 프로젝트 시크릿 키(sk_...)로 연결합니다.</p>
+    <label>시크릿 키</label>
+    <input id="sk" class="mono" placeholder="sk_..." autocomplete="off">
+    <div class="row" style="margin-top:12px"><button onclick="connect()">연결</button></div>
+    <div class="err" id="loginErr"></div>
+  </div>
+
+  <div id="panel" class="hide">
+    <div class="tabs">
+      <button class="tab on" data-t="dash" onclick="tab('dash')">대시보드</button>
+      <button class="tab" data-t="trades" onclick="tab('trades')">거래</button>
+      <button class="tab" data-t="orders" onclick="tab('orders')">주문</button>
+      <button class="tab" data-t="flags" onclick="tab('flags')">이상거래</button>
+      <button class="tab" data-t="config" onclick="tab('config')">설정</button>
+      <button class="tab ghost" onclick="loadAll()" style="margin-left:auto">새로고침</button>
+    </div>
+
+    <div class="pane" id="p-dash">
+      <div class="card"><div class="stats" id="statGrid"></div></div>
+    </div>
+
+    <div class="pane hide" id="p-trades">
+      <div class="card"><h3>거래 내역</h3><div id="tradeTbl"></div></div>
+    </div>
+    <div class="pane hide" id="p-orders">
+      <div class="card"><h3>주문</h3><div id="orderTbl"></div></div>
+    </div>
+    <div class="pane hide" id="p-flags">
+      <div class="card"><h3>이상거래 플래그</h3><div id="flagTbl"></div></div>
+    </div>
+    <div class="pane hide" id="p-config">
+      <div class="card"><h3>거래 설정</h3>
+        <label>수수료율 (%)</label><input id="cfFee" type="number" step="0.1" min="0" max="20">
+        <label>봇 이름</label><input id="cfBotName">
+        <div class="row"><div><label>최소 거래금액</label><input id="cfMin" type="number"></div><div><label>최대 거래금액</label><input id="cfMax" type="number"></div></div>
+        <div class="sw"><input id="cfBot" type="checkbox"><label style="margin:0">본사 봇 자동매매 활성화 (매물/수요 부족 시 자동 참여)</label></div>
+        <div class="row" style="margin-top:14px"><button onclick="saveConfig()">설정 저장</button></div>
+        <div class="err" id="cfMsg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CFG = window.IGGIFT_API || { base: location.origin };
+let SK = '';
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => (n|0).toLocaleString();
+async function api(path, { method='GET', body } = {}){
+  const u=CFG.base+'/api/iggift/p2p'+path+(path.includes('?')?'&':'?')+'key='+encodeURIComponent(SK);
+  const r=await fetch(u,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.message||('오류 '+r.status));
+  return j;
+}
+async function connect(){
+  SK=$('sk').value.trim(); $('loginErr').textContent='';
+  if(!SK.startsWith('sk_')){ $('loginErr').textContent='시크릿 키(sk_...)를 입력하세요.'; return; }
+  try{ await api('/admin/stats'); $('loginCard').classList.add('hide'); $('panel').classList.remove('hide'); loadAll(); }
+  catch(e){ $('loginErr').textContent=e.message; }
+}
+function tab(t){
+  document.querySelectorAll('.tab[data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('hide',p.id!=='p-'+t));
+}
+async function loadAll(){ await Promise.all([loadStats(),loadTrades(),loadOrders(),loadFlags(),loadConfig()]); }
+async function loadStats(){
+  const {stats}=await api('/admin/stats');
+  $('statGrid').innerHTML=[
+    ['총 거래',stats.trades+'건'],['거래량',fmt(stats.volume)+'원'],['수수료 수익',fmt(stats.fee)+'원'],
+    ['봇 거래',stats.botTrades+'건'],['대기 주문',stats.openOrders+'건'],['이상거래',stats.flags+'건',stats.flags>0]
+  ].map(([l,n,w])=>`<div class="st ${w?'warn':''}"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+async function loadTrades(){
+  const {trades}=await api('/admin/trades');
+  $('tradeTbl').innerHTML=trades.length?`<table><thead><tr><th>시각</th><th>구매자</th><th>판매자</th><th>금액</th><th>수수료</th><th>유형</th></tr></thead><tbody>`+
+    trades.map(t=>`<tr><td>${new Date(t.createdAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td>${t.buyerName}</td><td>${t.sellerName}</td><td>${fmt(t.amount)}원</td><td>${fmt(t.fee)}원</td><td><span class="pill ${t.bot?'bot':'completed'}">${t.bot?'봇':'회원'}</span></td></tr>`).join('')+`</tbody></table>`:'<div class="empty">거래 내역이 없습니다</div>';
+}
+async function loadOrders(){
+  const {orders}=await api('/admin/orders');
+  $('orderTbl').innerHTML=orders.length?`<table><thead><tr><th>시각</th><th>회원</th><th>구분</th><th>금액</th><th>상태</th></tr></thead><tbody>`+
+    orders.map(o=>`<tr><td>${new Date(o.createdAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td>${o.isBot?'🤖 '+o.name:o.name}</td><td>${o.side==='buy'?'구매':'판매'}</td><td>${fmt(o.amount)}원</td><td><span class="pill ${o.status}">${({open:'대기',completed:'완료',cancelled:'취소'})[o.status]||o.status}</span></td></tr>`).join('')+`</tbody></table>`:'<div class="empty">주문이 없습니다</div>';
+}
+async function loadFlags(){
+  const {flags}=await api('/admin/flags');
+  $('flagTbl').innerHTML=flags.length?`<table><thead><tr><th>시각</th><th>회원ID</th><th>사유</th><th>건수</th><th>합계</th></tr></thead><tbody>`+
+    flags.map(f=>`<tr><td>${new Date(f.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td class="mono">${(f.uid||'').slice(0,10)}</td><td>${f.reason}</td><td>${f.count}</td><td>${fmt(f.sum)}원</td></tr>`).join('')+`</tbody></table>`:'<div class="empty">이상거래 플래그가 없습니다</div>';
+}
+async function loadConfig(){
+  const {config}=await api('/admin/config');
+  $('cfFee').value=(config.feeRate*100).toFixed(1); $('cfBotName').value=config.botName;
+  $('cfMin').value=config.minAmount; $('cfMax').value=config.maxAmount; $('cfBot').checked=config.botEnabled;
+}
+async function saveConfig(){
+  $('cfMsg').textContent='';
+  try{ await api('/admin/config',{method:'POST',body:{feeRate:parseFloat($('cfFee').value)/100,botName:$('cfBotName').value,minAmount:parseInt($('cfMin').value,10),maxAmount:parseInt($('cfMax').value,10),botEnabled:$('cfBot').checked}});
+    $('cfMsg').style.color='var(--accent)'; $('cfMsg').textContent='저장되었습니다.'; loadStats();
+  }catch(e){ $('cfMsg').style.color='var(--bad)'; $('cfMsg').textContent=e.message; }
+}
+</script>
+</body></html>

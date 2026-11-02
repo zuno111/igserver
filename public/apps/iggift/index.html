@@ -1,152 +1,380 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>igGift — 기프트카드</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>igGift — P2P 상품권 지갑</title>
 <style>
 :root{
-  --bg:#f5f7f5;--surface:#fff;--surface2:#eef1ee;--fg:#131a16;--muted:#5b665f;--border:#e0e5e0;
+  --bg:#f4f7f5;--surface:#fff;--surface2:#eef2ef;--fg:#121a16;--muted:#5d685f;--border:#e2e7e2;
   --accent:#0b8a5c;--accent2:#0a7450;--accent-fg:#fff;--good:#1a8f5e;--warn:#b4712a;--bad:#c23b3b;
-  --radius:12px;--f:system-ui,"Malgun Gothic","Noto Sans KR",sans-serif;
+  --blue:#2563eb;--radius:14px;--f:system-ui,-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0c110e;--surface:#121a15;--surface2:#17201a;--fg:#e7efea;--muted:#92a099;--border:#232e27;
-  --accent:#2fbd84;--accent2:#36cc8f;--accent-fg:#06130d;--good:#3bbd82;--warn:#d2994f;--bad:#e06464;color-scheme:dark;
+  --bg:#0b100d;--surface:#121a15;--surface2:#18211b;--fg:#e7efea;--muted:#92a099;--border:#232e27;
+  --accent:#2fbd84;--accent2:#36cc8f;--accent-fg:#06130d;--good:#3bbd82;--warn:#d2994f;--bad:#e06464;--blue:#5b8bf5;color-scheme:dark;
 }}
-*{box-sizing:border-box}html,body{margin:0}
-body{background:var(--bg);color:var(--fg);font-family:var(--f);line-height:1.55;-webkit-font-smoothing:antialiased;font-style:normal}
-h1,h2,h3{margin:0;font-weight:700;font-style:normal}
-.wrap{max-width:860px;margin:0 auto;padding:0 16px 64px}
-header{position:sticky;top:0;z-index:10;background:var(--surface);border-bottom:1px solid var(--border)}
-.hd{max-width:860px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;gap:10px}
-.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:var(--accent-fg);font-weight:800}
-.tabs{display:flex;gap:6px;margin-left:auto}
-.tab{padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:14px;font-family:inherit}
-.tab.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-top:16px}
-label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
-input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--fg);font-family:inherit;font-size:15px}
-button{padding:10px 16px;border:0;border-radius:9px;background:var(--accent);color:var(--accent-fg);font-weight:700;cursor:pointer;font-family:inherit;font-size:15px}
-button.ghost{background:var(--surface2);color:var(--fg);border:1px solid var(--border)}
-.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
-.muted{color:var(--muted);font-size:13px}
-.big{font-size:30px;font-weight:800;letter-spacing:.5px}
-.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
-.pill.active{background:rgba(26,143,94,.15);color:var(--good)}.pill.used,.pill.void,.pill.expired{background:rgba(194,59,59,.13);color:var(--bad)}
-table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
-th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border)}
-th{color:var(--muted);font-weight:600}
-.hide{display:none}.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-.note{font-size:12px;color:var(--muted);margin-top:6px}
-.err{color:var(--bad);font-size:13px;margin-top:6px}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f);line-height:1.5;-webkit-font-smoothing:antialiased;font-style:normal}
+h1,h2,h3,h4{margin:0;font-weight:800;font-style:normal}
+button,input,select,textarea{font-family:inherit;font-style:normal}
+.app{max-width:460px;margin:0 auto;min-height:100%;background:var(--bg);display:flex;flex-direction:column;position:relative}
+/* 상단바 */
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:10px}
+.logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:var(--accent-fg);font-weight:900;font-size:15px}
+.brand{font-weight:900;font-size:17px}.brand small{font-weight:600;color:var(--muted);font-size:11px;display:block;margin-top:-2px}
+.top .me{margin-left:auto;font-size:13px;color:var(--muted);text-align:right}
+.top .me b{color:var(--fg)}
+.logout{background:none;border:0;color:var(--bad);font-size:12px;cursor:pointer;padding:2px 0}
+/* 본문 */
+.body{flex:1;padding:16px 16px 92px;overflow-y:auto}
+.screen{display:none}.screen.on{display:block;animation:fade .2s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+/* 카드 */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.bal{background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--accent-fg);border:0}
+.bal .lbl{font-size:12px;opacity:.85}.bal .amt{font-size:34px;font-weight:900;letter-spacing:.5px;margin:2px 0 4px}
+.bal .sub{font-size:12px;opacity:.85}
+.bal .acts{display:flex;gap:8px;margin-top:14px}
+.bal .acts button{flex:1;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:10px;font-weight:700;font-size:14px;cursor:pointer}
+h2.sec{font-size:15px;margin:4px 2px 10px}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:11px;background:var(--bg);color:var(--fg);font-size:15px}
+textarea{min-height:70px;resize:vertical}
+.btn{width:100%;padding:13px;border:0;border-radius:11px;background:var(--accent);color:var(--accent-fg);font-weight:800;font-size:15px;cursor:pointer;margin-top:12px}
+.btn.alt{background:var(--surface2);color:var(--fg);border:1px solid var(--border)}
+.btn.blue{background:var(--blue);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.chip{flex:1;min-width:72px;padding:11px 4px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--fg);font-weight:700;font-size:13px;cursor:pointer;text-align:center}
+.chip.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.muted{color:var(--muted);font-size:13px}.small{font-size:12px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800}
+.pill.completed,.pill.active{background:rgba(26,143,94,.16);color:var(--good)}
+.pill.open{background:rgba(37,99,235,.14);color:var(--blue)}
+.pill.cancelled,.pill.used,.pill.void,.pill.expired,.pill.locked{background:rgba(194,59,59,.13);color:var(--bad)}
+.item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.item:last-child{border-bottom:0}
+.item .ic{width:40px;height:40px;border-radius:11px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.item .tt{flex:1;min-width:0}.item .tt .t1{font-weight:700;font-size:14px}.item .tt .t2{color:var(--muted);font-size:12px}
+.item .amt{font-weight:800;font-size:14px;text-align:right;white-space:nowrap}
+.amt.plus{color:var(--good)}.amt.minus{color:var(--bad)}
+.empty{text-align:center;color:var(--muted);padding:34px 0;font-size:14px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+.toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
+.toast.on{opacity:.96}
+/* 하단 탭바 */
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:30;padding-bottom:env(safe-area-inset-bottom)}
+.tb{flex:1;background:none;border:0;padding:9px 0 10px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700}
+.tb.on{color:var(--accent)}
+.tb svg{width:22px;height:22px}
+/* 모달 */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:none;align-items:flex-end;justify-content:center}
+.modal.on{display:flex}
+.sheet{background:var(--surface);width:100%;max-width:460px;border-radius:20px 20px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));max-height:88vh;overflow-y:auto;animation:up .25s ease}
+@keyframes up{from{transform:translateY(100%)}to{transform:none}}
+.sheet h3{font-size:17px;margin-bottom:4px}
+.sheet .x{float:right;background:none;border:0;font-size:22px;color:var(--muted);cursor:pointer;line-height:1}
+/* 로그인 */
+.auth{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:28px 22px;max-width:460px;margin:0 auto}
+.auth .hero{text-align:center;margin-bottom:26px}
+.auth .hero .logo{width:60px;height:60px;border-radius:17px;margin:0 auto 14px;font-size:26px}
+.auth .hero h1{font-size:24px}.auth .hero p{color:var(--muted);font-size:14px;margin-top:6px}
+.seg{display:flex;background:var(--surface2);border-radius:11px;padding:4px;margin-bottom:16px}
+.seg button{flex:1;padding:9px;border:0;background:none;border-radius:8px;font-weight:700;color:var(--muted);cursor:pointer;font-size:14px}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.err{color:var(--bad);font-size:13px;margin-top:10px;min-height:18px;text-align:center}
+.feat{display:flex;gap:10px;margin-top:22px}
+.feat .f{flex:1;text-align:center;font-size:11px;color:var(--muted)}
+.feat .f .fi{font-size:20px;margin-bottom:4px}
 </style></head><body>
-<header><div class="hd"><div class="logo">ig</div><div><div style="font-weight:800">igGift</div><div class="muted" style="font-size:12px">글로벌 기프트카드</div></div>
-<div class="tabs"><button class="tab on" data-t="use">사용</button><button class="tab" data-t="admin">운영자</button></div></div></header>
-<div class="wrap">
-
-<section id="use">
-  <div class="card">
-    <h2>카드 잔액 조회</h2>
-    <label>카드 코드</label>
-    <input id="u_code" class="mono" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off">
-    <div class="row" style="margin-top:12px"><button onclick="checkCard()">잔액 확인</button></div>
-    <div id="u_out" class="hide" style="margin-top:16px">
-      <div class="big"><span id="u_bal">0</span> <span id="u_cur" class="muted" style="font-size:16px"></span></div>
-      <div class="muted">상태 <span id="u_st" class="pill"></span> · 최초 <span id="u_init"></span></div>
-      <label>사용 금액</label>
-      <div class="row"><input id="u_amt" type="number" min="1" placeholder="차감할 금액"><button onclick="redeem()">사용</button></div>
-    </div>
-    <div id="u_err" class="err"></div>
+<div id="authView" class="auth">
+  <div class="hero"><div class="logo">ig</div><h1>igGift</h1><p>회원끼리 사고파는 P2P 상품권 거래</p></div>
+  <div class="seg"><button id="segLogin" class="on" onclick="setMode('login')">로그인</button><button id="segSignup" onclick="setMode('signup')">회원가입</button></div>
+  <div id="nameWrap" style="display:none"><label>이름</label><input id="auName" placeholder="홍길동"></div>
+  <label>이메일</label><input id="auEmail" type="email" placeholder="you@email.com" autocomplete="username">
+  <label>비밀번호</label><input id="auPw" type="password" placeholder="6자 이상" autocomplete="current-password">
+  <button class="btn" id="auBtn" onclick="doAuth()">로그인</button>
+  <div class="err" id="auErr"></div>
+  <div class="feat">
+    <div class="f"><div class="fi">🤝</div>회원 직거래<br>본사 안전</div>
+    <div class="f"><div class="fi">🤖</div>매물 부족 시<br>봇 자동매매</div>
+    <div class="f"><div class="fi">⚡</div>자동 매칭<br>즉시 체결</div>
   </div>
-</section>
-
-<section id="admin" class="hide">
-  <div class="card">
-    <h2>운영자 인증</h2>
-    <p class="muted">운영자(시크릿) 키로만 발급·목록·정산을 볼 수 있습니다. 키는 igServer 관리 대시보드에서 확인합니다.</p>
-    <label>시크릿 키 (sk_...)</label>
-    <input id="a_key" class="mono" placeholder="sk_..." autocomplete="off">
-    <div class="row" style="margin-top:10px"><button onclick="adminLogin()">연결</button><button class="ghost" onclick="loadStats();loadCards();loadLedger()">새로고침</button></div>
-    <div id="a_err" class="err"></div>
-  </div>
-
-  <div id="a_panel" class="hide">
-    <div class="card">
-      <h2>기프트카드 발급</h2>
-      <div class="row"><div><label>금액</label><input id="i_amt" type="number" min="1" value="10000"></div>
-      <div><label>통화</label><select id="i_cur"><option>KRW</option><option>USD</option><option>EUR</option><option>JPY</option><option>GBP</option><option>CNY</option></select></div>
-      <div><label>수량</label><input id="i_cnt" type="number" min="1" max="1000" value="1"></div></div>
-      <div class="row"><div><label>받는 사람(선택)</label><input id="i_rcpt"></div><div><label>메모(선택)</label><input id="i_memo"></div></div>
-      <div class="row" style="margin-top:12px"><button onclick="issue()">발급</button></div>
-      <div id="i_out" class="note"></div>
-    </div>
-    <div class="card">
-      <h2>통계</h2><div id="st_out" class="muted">—</div>
-    </div>
-    <div class="card">
-      <h2>발급 카드</h2><div id="cards_out"><div class="muted">—</div></div>
-    </div>
-    <div class="card">
-      <h2>거래 원장</h2><div id="led_out"><div class="muted">—</div></div>
-    </div>
-  </div>
-</section>
 </div>
+
+<div id="appView" class="app" style="display:none">
+  <div class="top">
+    <div class="logo">ig</div><div class="brand">igGift<small>P2P 상품권 지갑</small></div>
+    <div class="me"><div><b id="meName">회원</b>님</div><button class="logout" onclick="logout()">로그아웃</button></div>
+  </div>
+  <div class="body">
+    <!-- 홈 -->
+    <div class="screen on" id="sc-home">
+      <div class="card bal">
+        <div class="lbl">내 지갑 잔액</div>
+        <div class="amt"><span id="balKrw">0</span>원</div>
+        <div class="sub">묶인 금액 <span id="balLock">0</span>원 · 보유 상품권 <span id="cardCnt">0</span>장</div>
+        <div class="acts"><button onclick="openCharge()">충전</button><button onclick="openWithdraw()">환전</button><button onclick="go('pay')">QR결제</button></div>
+      </div>
+      <h2 class="sec">내 상품권</h2>
+      <div class="card" id="myCards"><div class="empty">보유한 상품권이 없습니다</div></div>
+      <h2 class="sec">최근 거래</h2>
+      <div class="card" id="homeTrades"><div class="empty">거래 내역이 없습니다</div></div>
+    </div>
+
+    <!-- 구매 -->
+    <div class="screen" id="sc-buy">
+      <h2 class="sec">상품권 자동 구매</h2>
+      <div class="card">
+        <p class="muted small">금액만 입력하면 시스템이 판매자를 자동 매칭합니다. 매물이 부족하면 본사 봇이 즉시 판매에 참여해 거래 불발이 없습니다.</p>
+        <label>구매 금액</label>
+        <input id="buyAmt" type="number" inputmode="numeric" placeholder="예: 100000">
+        <div class="chips" id="buyChips"></div>
+        <button class="btn" onclick="doOrder('buy')">자동 구매하기</button>
+        <div class="note">현재 지갑 잔액 <b id="buyBal">0</b>원으로 결제됩니다. 부족하면 먼저 충전하세요.</div>
+      </div>
+      <h2 class="sec">판매 대기 매물</h2>
+      <div class="card" id="obSell"><div class="empty">대기 중인 판매 매물이 없습니다</div></div>
+    </div>
+
+    <!-- 판매 -->
+    <div class="screen" id="sc-sell">
+      <h2 class="sec">상품권 자동 판매</h2>
+      <div class="card">
+        <p class="muted small">보유 상품권을 등록하면 구매 대기 회원과 자동 매칭됩니다. 구매자가 부족하면 본사 봇이 자동 매입해 현금화를 보장합니다.</p>
+        <label>판매할 상품권</label>
+        <select id="sellCard"><option value="">보유 상품권 선택</option></select>
+        <label>판매 금액</label>
+        <input id="sellAmt" type="number" inputmode="numeric" placeholder="상품권 선택 시 자동 입력">
+        <button class="btn" onclick="doOrder('sell')">자동 판매하기</button>
+        <div class="note">수수료 1% 차감 후 판매 대금이 지갑에 즉시 입금됩니다.</div>
+      </div>
+      <h2 class="sec">구매 대기 수요</h2>
+      <div class="card" id="obBuy"><div class="empty">대기 중인 구매 수요가 없습니다</div></div>
+    </div>
+
+    <!-- QR결제 -->
+    <div class="screen" id="sc-pay">
+      <h2 class="sec">QR 간편결제</h2>
+      <div class="card">
+        <label>가맹점 QR 코드</label>
+        <input id="payQr" class="mono" placeholder="qr_... (가맹점 QR)">
+        <label>결제 금액</label>
+        <input id="payAmt" type="number" inputmode="numeric" placeholder="결제할 금액">
+        <button class="btn blue" onclick="doPay()">결제하기</button>
+      </div>
+      <h2 class="sec">내 가맹점</h2>
+      <div class="card">
+        <div id="myMerch"><div class="empty small">등록한 가맹점이 없습니다</div></div>
+        <div class="row" style="margin-top:10px"><input id="merchName" placeholder="가맹점 이름"><button class="btn alt" style="margin-top:0;max-width:120px" onclick="makeMerchant()">가맹점 개설</button></div>
+      </div>
+    </div>
+
+    <!-- 내역 -->
+    <div class="screen" id="sc-hist">
+      <h2 class="sec">거래 내역</h2>
+      <div class="card" id="allTrades"><div class="empty">거래 내역이 없습니다</div></div>
+      <h2 class="sec">내 주문</h2>
+      <div class="card" id="allOrders"><div class="empty">주문 내역이 없습니다</div></div>
+    </div>
+  </div>
+
+  <div class="tabbar">
+    <button class="tb on" data-s="home" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 21V12h6v9"/></svg>홈</button>
+    <button class="tb" data-s="buy" onclick="go('buy')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>구매</button>
+    <button class="tb" data-s="sell" onclick="go('sell')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>판매</button>
+    <button class="tb" data-s="pay" onclick="go('pay')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v7M17 21h4M14 21h0"/></svg>QR</button>
+    <button class="tb" data-s="hist" onclick="go('hist')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>내역</button>
+  </div>
+</div>
+
+<!-- 충전/환전/입금문자 모달 -->
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
 <script>
 const CFG = window.IGGIFT_API || { base: location.origin, key: '' };
-let SK = '';
-function api(path, opts={}, admin=false){
-  const h = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
-  const key = admin ? SK : CFG.key;
-  const u = CFG.base + '/api/iggift' + path + (path.includes('?')?'&':'?') + 'key=' + encodeURIComponent(key);
-  return fetch(u, Object.assign({}, opts, {headers:h})).then(async r=>{ const j=await r.json().catch(()=>({})); if(!r.ok) throw (j.message||j.error||('HTTP '+r.status)); return j; });
+let TOKEN = localStorage.getItem('igg_token') || '';
+let ME = null, MODE = 'login';
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => (n | 0).toLocaleString();
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),2200); }
+
+async function api(path, { method='GET', body, auth=true } = {}){
+  const h={'Content-Type':'application/json'};
+  if(auth && TOKEN) h['Authorization']='Bearer '+TOKEN;
+  const u=CFG.base+path+(path.includes('?')?'&':'?')+'key='+encodeURIComponent(CFG.key);
+  const r=await fetch(u,{method,headers:h,body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw Object.assign(new Error(j.message||'오류'),{status:r.status,data:j});
+  return j;
 }
-// 탭
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on')); b.classList.add('on');
-  document.getElementById('use').classList.toggle('hide', b.dataset.t!=='use');
-  document.getElementById('admin').classList.toggle('hide', b.dataset.t!=='admin');
-});
-// 사용자
-let curCard=null;
-function checkCard(){
-  const code=document.getElementById('u_code').value.trim(); if(!code) return;
-  document.getElementById('u_err').textContent='';
-  api('/cards/'+encodeURIComponent(code)).then(j=>{
-    curCard=j.card; const c=j.card;
-    document.getElementById('u_out').classList.remove('hide');
-    document.getElementById('u_bal').textContent=(c.balance).toLocaleString();
-    document.getElementById('u_cur').textContent=c.currency;
-    document.getElementById('u_init').textContent=(c.initial).toLocaleString()+' '+c.currency;
-    const st=document.getElementById('u_st'); st.textContent=c.status; st.className='pill '+c.status;
-  }).catch(e=>{document.getElementById('u_out').classList.add('hide');document.getElementById('u_err').textContent=e;});
+
+/* ---- 인증 ---- */
+function setMode(m){ MODE=m; $('segLogin').classList.toggle('on',m==='login'); $('segSignup').classList.toggle('on',m==='signup');
+  $('nameWrap').style.display=m==='signup'?'block':'none'; $('auBtn').textContent=m==='signup'?'가입하고 시작하기':'로그인'; $('auErr').textContent=''; }
+async function doAuth(){
+  const email=$('auEmail').value.trim(), pw=$('auPw').value, name=$('auName').value.trim();
+  $('auErr').textContent='';
+  if(!email||!pw){ $('auErr').textContent='이메일과 비밀번호를 입력하세요.'; return; }
+  try{
+    const path=MODE==='signup'?'/api/auth/signup':'/api/auth/login';
+    const body=MODE==='signup'?{email,password:pw,name}:{email,password:pw};
+    const r=await api(path,{method:'POST',body,auth:false});
+    TOKEN=r.token; localStorage.setItem('igg_token',TOKEN); ME=r.user;
+    enterApp();
+  }catch(e){ $('auErr').textContent=e.message; }
 }
-function redeem(){
-  if(!curCard) return; const amt=Number(document.getElementById('u_amt').value);
-  document.getElementById('u_err').textContent='';
-  api('/cards/'+encodeURIComponent(curCard.code)+'/redeem',{method:'POST',body:JSON.stringify({amount:amt})}).then(j=>{
-    document.getElementById('u_amt').value=''; checkCard();
-  }).catch(e=>document.getElementById('u_err').textContent=e);
+function logout(){ TOKEN=''; localStorage.removeItem('igg_token'); ME=null; $('appView').style.display='none'; $('authView').style.display='flex'; }
+
+async function enterApp(){
+  $('authView').style.display='none'; $('appView').style.display='flex';
+  await refresh();
 }
-// 운영자
-function adminLogin(){
-  SK=document.getElementById('a_key').value.trim(); document.getElementById('a_err').textContent='';
-  if(!SK){document.getElementById('a_err').textContent='시크릿 키를 입력하세요.';return;}
-  api('/stats',{},true).then(()=>{document.getElementById('a_panel').classList.remove('hide');loadStats();loadCards();loadLedger();})
-    .catch(e=>{document.getElementById('a_panel').classList.add('hide');document.getElementById('a_err').textContent='인증 실패: '+e;});
+
+/* ---- 화면 전환 ---- */
+function go(s){
+  document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('on',el.id==='sc-'+s));
+  document.querySelectorAll('.tb').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
+  $('appView').querySelector('.body').scrollTop=0;
+  if(s==='buy'||s==='sell') loadOrderbook();
+  if(s==='hist') loadHistory();
+  if(s==='pay') loadMerchants();
 }
-function issue(){
-  const body={amount:Number(document.getElementById('i_amt').value),currency:document.getElementById('i_cur').value,count:Number(document.getElementById('i_cnt').value),recipient:document.getElementById('i_rcpt').value||undefined,memo:document.getElementById('i_memo').value||undefined};
-  api('/cards',{method:'POST',body:JSON.stringify(body)},true).then(j=>{
-    const cards=j.cards||[j.card];
-    document.getElementById('i_out').innerHTML='발급 완료: '+cards.map(c=>'<span class="mono">'+c.code+'</span>').join(', ');
-    loadStats();loadCards();loadLedger();
-  }).catch(e=>document.getElementById('i_out').textContent='실패: '+e);
+
+/* ---- 데이터 로드 ---- */
+let WALLET={krw:0,locked:0}, CARDS=[];
+async function refresh(){
+  try{
+    const r=await api('/api/iggift/p2p/me');
+    ME={name:r.name,uid:r.uid}; WALLET=r.wallet; CARDS=r.cards||[];
+    $('meName').textContent=r.name;
+    $('balKrw').textContent=fmt(WALLET.krw); $('balLock').textContent=fmt(WALLET.locked); $('cardCnt').textContent=CARDS.length;
+    $('buyBal').textContent=fmt(WALLET.krw);
+    renderCards(); renderSellOptions(); loadHistory(true);
+  }catch(e){ if(e.status===401){ logout(); } else toast(e.message); }
 }
-function loadStats(){api('/stats',{},true).then(j=>{const s=j.stats;document.getElementById('st_out').innerHTML=
-  '총 '+s.total+'장 · 활성 '+s.active+' · 사용완료 '+s.used+' · 무효 '+(s.void||0)+'<br>발급총액 '+s.issued_amount.toLocaleString()+' · 잔여 '+s.outstanding.toLocaleString();}).catch(()=>{});}
-function loadCards(){api('/cards?limit=100',{},true).then(j=>{
-  const rows=j.cards.map(c=>'<tr><td class="mono">'+c.code+'</td><td>'+c.balance.toLocaleString()+' '+c.currency+'</td><td><span class="pill '+c.status+'">'+c.status+'</span></td></tr>').join('');
-  document.getElementById('cards_out').innerHTML=j.cards.length?'<table><tr><th>코드</th><th>잔액</th><th>상태</th></tr>'+rows+'</table>':'<div class="muted">발급된 카드가 없습니다.</div>';}).catch(()=>{});}
-function loadLedger(){api('/ledger?limit=50',{},true).then(j=>{
-  const rows=j.ledger.map(l=>'<tr><td>'+new Date(l.ts).toLocaleString('ko-KR')+'</td><td>'+l.type+'</td><td class="mono">'+(l.code||'')+'</td><td>'+((l.amount!=null)?l.amount.toLocaleString():'')+'</td></tr>').join('');
-  document.getElementById('led_out').innerHTML=j.ledger.length?'<table><tr><th>시각</th><th>종류</th><th>코드</th><th>금액</th></tr>'+rows+'</table>':'<div class="muted">기록이 없습니다.</div>';}).catch(()=>{});}
-</script></body></html>
+function renderCards(){
+  const el=$('myCards');
+  if(!CARDS.length){ el.innerHTML='<div class="empty">보유한 상품권이 없습니다</div>'; return; }
+  el.innerHTML=CARDS.map(c=>`<div class="item"><div class="ic">🎟️</div><div class="tt"><div class="t1">${fmt(c.balance)} ${c.currency}</div><div class="t2 mono">${c.code}</div></div><span class="pill ${c.status}">${c.status}</span></div>`).join('');
+}
+function renderSellOptions(){
+  const sel=$('sellCard');
+  sel.innerHTML='<option value="">보유 상품권 선택</option>'+CARDS.filter(c=>c.status==='active').map(c=>`<option value="${c.code}" data-amt="${c.balance}">${fmt(c.balance)}원 · ${c.code}</option>`).join('');
+  sel.onchange=()=>{ const o=sel.selectedOptions[0]; if(o&&o.dataset.amt) $('sellAmt').value=o.dataset.amt; };
+}
+
+const CHIPS=[10000,30000,50000,100000,300000,500000];
+function buildChips(){
+  $('buyChips').innerHTML=CHIPS.map(a=>`<button type="button" class="chip" onclick="$('buyAmt').value=${a};document.querySelectorAll('#buyChips .chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')">${a>=10000?a/10000+'만':a}</button>`).join('');
+}
+
+/* ---- 주문 ---- */
+async function doOrder(side){
+  const amt=parseInt((side==='buy'?$('buyAmt'):$('sellAmt')).value,10);
+  if(!(amt>0)){ toast('금액을 입력하세요'); return; }
+  const body={side,amount:amt};
+  if(side==='sell'){ const c=$('sellCard').value; if(c) body.cardCode=c; }
+  try{
+    const r=await api('/api/iggift/p2p/orders',{method:'POST',body});
+    if(r.matched){ toast(r.bot?'봇 자동매칭으로 거래 완료':'회원 매칭으로 거래 완료'); }
+    else toast('등록 완료 · 상대를 기다립니다');
+    if(side==='buy'){$('buyAmt').value='';} else {$('sellAmt').value='';$('sellCard').value='';}
+    await refresh(); loadOrderbook();
+  }catch(e){ toast(e.message); }
+}
+
+async function loadOrderbook(){
+  try{
+    const r=await api('/api/iggift/p2p/orderbook');
+    const sell=$('obSell'), buy=$('obBuy');
+    if(sell) sell.innerHTML=r.sell.length?r.sell.map(o=>obItem(o)).join(''):'<div class="empty small">대기 중인 판매 매물이 없습니다</div>';
+    if(buy) buy.innerHTML=r.buy.length?r.buy.map(o=>obItem(o)).join(''):'<div class="empty small">대기 중인 구매 수요가 없습니다</div>';
+  }catch(e){}
+}
+function obItem(o){ return `<div class="item"><div class="ic">${o.isBot?'🤖':'👤'}</div><div class="tt"><div class="t1">${fmt(o.amount)}원</div><div class="t2">${o.isBot?o.name:o.name+' 회원'}</div></div><span class="pill open">대기</span></div>`; }
+
+/* ---- 내역 ---- */
+async function loadHistory(homeOnly){
+  try{
+    const t=await api('/api/iggift/p2p/trades/mine');
+    const list=t.trades||[];
+    const ht=$('homeTrades');
+    ht.innerHTML=list.length?list.slice(0,4).map(tr=>tradeItem(tr)).join(''):'<div class="empty">거래 내역이 없습니다</div>';
+    if(homeOnly) return;
+    $('allTrades').innerHTML=list.length?list.map(tr=>tradeItem(tr)).join(''):'<div class="empty">거래 내역이 없습니다</div>';
+    const o=await api('/api/iggift/p2p/orders/mine');
+    const ol=o.orders||[];
+    $('allOrders').innerHTML=ol.length?ol.map(or=>`<div class="item"><div class="ic">${or.side==='buy'?'🛒':'💰'}</div><div class="tt"><div class="t1">${or.side==='buy'?'구매':'판매'} ${fmt(or.amount)}원</div><div class="t2">${new Date(or.createdAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div><span class="pill ${or.status}">${statusKo(or.status)}</span></div>`).join(''):'<div class="empty">주문 내역이 없습니다</div>';
+  }catch(e){}
+}
+function tradeItem(tr){
+  const buy=tr.buyerId===ME.uid;
+  return `<div class="item"><div class="ic">${buy?'🛒':'💰'}</div><div class="tt"><div class="t1">${buy?'상품권 구매':'상품권 판매'}</div><div class="t2">${new Date(tr.createdAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})} · ${tr.bot?'봇':'회원'}거래</div></div><div class="amt ${buy?'minus':'plus'}">${buy?'-':'+'}${fmt(buy?tr.amount:tr.sellerNet)}원</div></div>`;
+}
+function statusKo(s){ return {open:'대기',matched:'매칭',completed:'완료',cancelled:'취소',funded:'입금'}[s]||s; }
+
+/* ---- 충전/환전 모달 ---- */
+function openSheet(html){ $('sheet').innerHTML=html; $('modal').classList.add('on'); }
+function closeSheet(){ $('modal').classList.remove('on'); }
+$('modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeSheet(); });
+
+function openCharge(){
+  openSheet(`<button class="x" onclick="closeSheet()">&times;</button><h3>충전</h3>
+    <p class="muted small">계좌이체 입금 금액을 입력하면 지갑에 반영됩니다.</p>
+    <label>충전 금액</label><input id="cgAmt" type="number" inputmode="numeric" placeholder="예: 100000">
+    <div class="chips" id="cgChips">${CHIPS.map(a=>`<button type="button" class="chip" onclick="$('cgAmt').value=${a};document.querySelectorAll('#cgChips .chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')">${a>=10000?a/10000+'만':a}</button>`).join('')}</div>
+    <button class="btn" onclick="doCharge()">충전하기</button>
+    <div class="note">실서비스에서는 입금 문자를 자동 파싱해 충전합니다. 아래로 문자 파싱도 테스트할 수 있습니다.</div>
+    <label style="margin-top:14px">입금 문자 붙여넣기</label><textarea id="depText" placeholder="[KB] 홍길동 100,000원 입금"></textarea>
+    <button class="btn alt" onclick="doParse()">문자로 자동 충전</button>`);
+}
+async function doCharge(){
+  const amt=parseInt($('cgAmt').value,10); if(!(amt>0)){toast('금액을 입력하세요');return;}
+  try{ await api('/api/iggift/p2p/charge',{method:'POST',body:{amount:amt}}); toast(fmt(amt)+'원 충전 완료'); closeSheet(); refresh(); }catch(e){toast(e.message);}
+}
+async function doParse(){
+  const text=$('depText').value.trim(); if(!text){toast('입금 문자를 붙여넣으세요');return;}
+  try{ const r=await api('/api/iggift/p2p/parse-deposit',{method:'POST',body:{text}});
+    if(r.charged) toast(`${r.parsed.sender||'송금자'} · ${fmt(r.parsed.amount)}원 자동 충전`); else toast('금액을 인식하지 못했습니다');
+    closeSheet(); refresh();
+  }catch(e){toast(e.message);}
+}
+function openWithdraw(){
+  openSheet(`<button class="x" onclick="closeSheet()">&times;</button><h3>환전(출금)</h3>
+    <p class="muted small">지갑 잔액을 계좌로 환전 신청합니다. 현재 잔액 ${fmt(WALLET.krw)}원.</p>
+    <label>환전 금액</label><input id="wdAmt" type="number" inputmode="numeric" placeholder="출금할 금액">
+    <label>입금 은행</label><input id="wdBank" placeholder="예: 국민은행">
+    <label>계좌번호</label><input id="wdAcc" placeholder="계좌번호">
+    <button class="btn" onclick="doWithdraw()">환전 신청</button>`);
+}
+async function doWithdraw(){
+  const amt=parseInt($('wdAmt').value,10); if(!(amt>0)){toast('금액을 입력하세요');return;}
+  try{ await api('/api/iggift/p2p/withdraw',{method:'POST',body:{amount:amt,bank:$('wdBank').value,account:$('wdAcc').value}});
+    toast(fmt(amt)+'원 환전 신청 완료'); closeSheet(); refresh();
+  }catch(e){toast(e.message);}
+}
+
+/* ---- QR ---- */
+async function makeMerchant(){
+  const name=$('merchName').value.trim();
+  try{ const r=await api('/api/iggift/p2p/merchant',{method:'POST',body:{name}}); toast('가맹점 개설 완료'); $('merchName').value=''; loadMerchants(); }catch(e){toast(e.message);}
+}
+async function loadMerchants(){
+  try{ const r=await api('/api/iggift/p2p/merchant/mine');
+    const el=$('myMerch');
+    el.innerHTML=(r.merchants&&r.merchants.length)?r.merchants.map(m=>`<div class="item"><div class="ic">🏪</div><div class="tt"><div class="t1">${m.name}</div><div class="t2 mono">${m.token}</div></div><button class="chip" style="flex:none;min-width:auto;padding:6px 10px" onclick="$('payQr').value='${m.token}';toast('QR 입력됨')">결제창에</button></div>`).join(''):'<div class="empty small">등록한 가맹점이 없습니다</div>';
+  }catch(e){}
+}
+async function doPay(){
+  const qr=$('payQr').value.trim(), amt=parseInt($('payAmt').value,10);
+  if(!qr){toast('가맹점 QR을 입력하세요');return;} if(!(amt>0)){toast('결제 금액을 입력하세요');return;}
+  try{ const r=await api('/api/iggift/p2p/pay',{method:'POST',body:{qr,amount:amt}}); toast(`${r.merchant} · ${fmt(amt)}원 결제 완료`); $('payAmt').value=''; refresh(); }catch(e){toast(e.message);}
+}
+
+/* ---- 시작 ---- */
+buildChips();
+if(TOKEN){ enterApp().catch(()=>logout()); } else { setMode('login'); }
+</script>
+</body></html>

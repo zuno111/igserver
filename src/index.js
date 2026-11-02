@@ -32,6 +32,7 @@ import igcityRoutes from './routes/igcity.js';
 import messengerRoutes from './routes/messenger.js';
 import schoolyamRoutes from './routes/schoolyam.js';
 import iggiftRoutes from './routes/iggift.js';
+import iggiftP2pRoutes from './routes/iggift_p2p.js';
 import { ensureIgPlay, igplayInject } from './provision.js';
 import { ensureMessenger, messengerInject } from './provision_messenger.js';
 import { ensureSchoolyam, ensureIggift, schoolyamInject, iggiftInject } from './provision_apps.js';
@@ -99,6 +100,7 @@ async function main() {
   app.use('/api/nas', apiLimit, resolveProject, projectRateLimit(), enforceKeyScope, nasRoutes);
   // Vercel 이관 앱: 상품/광고 사진(base64 data URL) 때문에 넉넉한 바디 한도로 각자 분기(일반 /api json 파서 전에)
   app.use('/api/schoolyam', apiLimit, resolveProject, projectRateLimit(), express.json({ limit: '25mb' }), schoolyamRoutes);
+  app.use('/api/iggift/p2p', apiLimit, resolveProject, projectRateLimit(), express.json({ limit: '4mb' }), iggiftP2pRoutes);
   app.use('/api/iggift', apiLimit, resolveProject, projectRateLimit(), express.json({ limit: '4mb' }), iggiftRoutes);
   app.use('/api', apiLimit, express.json({ limit: '1mb' }), resolveProject, projectRateLimit());
   app.use('/api/auth', authRoutes);

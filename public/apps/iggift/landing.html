@@ -1,0 +1,193 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>igGift — 회원끼리 사고파는 P2P 상품권 거래</title>
+<meta name="description" content="회원과 회원이 직접 거래하는 P2P 상품권 플랫폼. 본사 리스크 제로, 매물 부족 시 봇 자동매매, 충전·결제·환전·P2P까지 하나의 앱에서.">
+<style>
+:root{
+  --bg:#0b100d;--surface:#111a15;--surface2:#16201a;--fg:#e8f0eb;--muted:#9aa89f;--border:#223029;
+  --accent:#2fbd84;--accent2:#36cc8f;--accentd:#0b8a5c;--chip:#16281f;
+  --f:system-ui,-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font-family:var(--f);line-height:1.6;font-style:normal;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-weight:800;font-style:normal;line-height:1.25}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.btn{display:inline-block;padding:14px 26px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;border:0}
+.btn.p{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#06130d}
+.btn.g{background:var(--surface2);color:var(--fg);border:1px solid var(--border)}
+/* 헤더 */
+header{position:sticky;top:0;z-index:50;background:rgba(11,16,13,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.nav{display:flex;align-items:center;gap:8px;padding:14px 0}
+.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accentd));display:flex;align-items:center;justify-content:center;color:#06130d;font-weight:900}
+.bname{font-weight:900;font-size:18px}
+.nav .links{margin-left:24px;display:flex;gap:20px;font-size:14px;color:var(--muted)}
+.nav .links a:hover{color:var(--fg)}
+.nav .cta{margin-left:auto;display:flex;gap:8px}
+.nav .cta .btn{padding:9px 16px;font-size:14px}
+@media(max-width:760px){.nav .links{display:none}}
+/* 히어로 */
+.hero{padding:76px 0 60px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 60% at 50% 0%,rgba(47,189,132,.14),transparent 70%);pointer-events:none}
+.badge{display:inline-block;padding:6px 14px;border-radius:999px;background:var(--chip);border:1px solid var(--border);color:var(--accent);font-size:13px;font-weight:700;margin-bottom:20px}
+.hero h1{font-size:44px;letter-spacing:-.5px}
+.hero h1 .hl{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--muted);font-size:17px;margin:18px auto 0;max-width:620px}
+.hero .cta{margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:52px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 14px}
+.stat .n{font-size:28px;font-weight:900;color:var(--accent)}
+.stat .l{color:var(--muted);font-size:13px;margin-top:4px}
+@media(max-width:760px){.hero h1{font-size:32px}.stats{grid-template-columns:repeat(2,1fr)}}
+/* 섹션 */
+section{padding:62px 0}
+.eyebrow{color:var(--accent);font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase}
+.stitle{font-size:30px;margin:8px 0 10px}
+.ssub{color:var(--muted);font-size:16px;max-width:640px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:34px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:34px}
+@media(max-width:860px){.grid3,.grid4{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+@media(max-width:560px){.grid3,.grid4{grid-template-columns:1fr}}
+.feat{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px}
+.feat.star{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.feat .fi{width:46px;height:46px;border-radius:12px;background:var(--chip);display:flex;align-items:center;justify-content:center;font-size:23px;margin-bottom:14px}
+.feat h3{font-size:18px;margin-bottom:8px}
+.feat p{color:var(--muted);font-size:14px}
+.feat .tag{display:inline-block;margin-top:12px;padding:4px 11px;border-radius:999px;background:var(--chip);color:var(--accent);font-size:12px;font-weight:700}
+.feat ul{list-style:none;margin-top:12px;font-size:14px}
+.feat ul li{padding:4px 0 4px 22px;position:relative;color:var(--muted)}
+.feat ul li::before{content:"✓";position:absolute;left:0;color:var(--accent);font-weight:900}
+/* 자동매매 흐름 */
+.flow{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px}
+.flow h3{font-size:19px;margin-bottom:4px}
+.flow .step{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.flow .step:last-child{border-bottom:0}
+.flow .sn{width:26px;height:26px;border-radius:999px;background:var(--chip);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0}
+.flow .st{font-size:14px}.flow .st b{display:block;margin-bottom:1px}
+.flow .st span{color:var(--muted)}
+.botnote{margin-top:14px;padding:12px 14px;background:var(--chip);border-radius:11px;font-size:13px;color:var(--accent);font-weight:700}
+/* 비교표 */
+.cmp{width:100%;border-collapse:collapse;margin-top:30px;font-size:14px;background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.cmp th,.cmp td{padding:13px 16px;text-align:left;border-bottom:1px solid var(--border)}
+.cmp thead th{background:var(--surface2);font-size:13px}
+.cmp thead th:last-child{color:var(--accent)}
+.cmp td:last-child{color:var(--accent);font-weight:700}
+.cmp tr:last-child td{border-bottom:0}
+/* CTA */
+.cta-band{background:linear-gradient(135deg,var(--accentd),var(--accent2));border-radius:22px;padding:46px 28px;text-align:center;color:#06130d;margin:40px 0}
+.cta-band h2{font-size:28px;color:#06130d}
+.cta-band p{margin:10px 0 22px;font-weight:600;opacity:.85}
+.cta-band .btn{background:#07140d;color:#fff}
+/* 푸터 */
+footer{border-top:1px solid var(--border);padding:30px 0;color:var(--muted);font-size:13px;text-align:center}
+</style></head><body>
+
+<header><div class="wrap nav">
+  <div class="logo">ig</div><div class="bname">igGift</div>
+  <div class="links"><a href="#strength">핵심 강점</a><a href="#service">서비스</a><a href="#auto">자동매매</a><a href="#ai">AI</a><a href="#safe">안전</a></div>
+  <div class="cta"><a class="btn g" href="/app/iggift/">💰 지갑 앱</a><a class="btn p" href="/app/iggift/">무료로 시작</a></div>
+</div></header>
+
+<div class="hero"><div class="wrap">
+  <div class="badge">회원끼리 직접 거래하는 P2P 플랫폼</div>
+  <h1>회원끼리 사고파는<br><span class="hl">P2P 상품권 거래</span></h1>
+  <p>회원과 회원이 직접 거래합니다. 본사 계좌는 노출되지 않고, 매물이 부족하면 봇이 자동으로 매매합니다. 충전·결제·환전·P2P까지 하나의 앱에서 끝냅니다.</p>
+  <div class="cta"><a class="btn p" href="/app/iggift/">무료로 시작하기 →</a><a class="btn g" href="#strength">왜 igGift인가?</a></div>
+  <div class="stats">
+    <div class="stat"><div class="n">0%</div><div class="l">본사 거래 리스크</div></div>
+    <div class="stat"><div class="n">24/7</div><div class="l">봇 자동 매매</div></div>
+    <div class="stat"><div class="n">P2P</div><div class="l">회원 간 직거래</div></div>
+    <div class="stat"><div class="n">AI</div><div class="l">매칭·입금 파싱</div></div>
+  </div>
+</div></div>
+
+<section id="strength"><div class="wrap">
+  <div class="eyebrow">Core Value</div>
+  <h2 class="stitle">회원끼리 거래하니까 가능합니다</h2>
+  <div class="ssub">P2P 구조이기 때문에 가능한 igGift의 차별점입니다.</div>
+  <div class="grid3">
+    <div class="feat"><div class="fi">🛡️</div><h3>본사 리스크 제로</h3><p>모든 거래는 회원과 회원 사이에서 이뤄집니다. 본사 계좌가 거래에 노출되지 않아 금융 리스크로부터 본사가 보호됩니다.</p><span class="tag">본사 안전 보장</span></div>
+    <div class="feat"><div class="fi">🤖</div><h3>본사 봇 자동 매매</h3><p>구매·판매 상대가 부족하면 본사 봇이 자동으로 거래에 참여합니다. 거래 불발이 없고 연락처 송금 자동화까지 지원합니다.</p><span class="tag">봇 자동 거래</span></div>
+    <div class="feat"><div class="fi">🚀</div><h3>충전·환전 자동화</h3><p>입금 문자 파싱과 정산 자동화로 반복 수작업을 없앴습니다. 시스템이 입금 확인부터 지급까지 처리합니다.</p><span class="tag">업무 자동화</span></div>
+  </div>
+</div></section>
+
+<section id="service" style="background:var(--surface)"><div class="wrap">
+  <div class="eyebrow">Services</div>
+  <h2 class="stitle">P2P 중심 4가지 핵심 서비스</h2>
+  <div class="ssub">회원끼리 거래하고, QR로 결제하고, 상품권을 선물하고, 충전과 환전까지 하나로 묶었습니다.</div>
+  <div class="grid4">
+    <div class="feat"><div class="fi">🔒</div><h3>QR 간편결제</h3><p>가맹점 QR을 찍으면 결제 끝. 카드도 현금도 계좌번호도 필요 없습니다.</p></div>
+    <div class="feat star"><div class="fi">🤝</div><h3>회원 P2P 거래</h3><p>회원과 회원이 직접 상품권을 사고팝니다. 자동 매칭으로 즉시 거래가 성사됩니다.</p></div>
+    <div class="feat"><div class="fi">🎟️</div><h3>상품권 보유·선물</h3><p>거래로 받은 상품권은 지갑에 보관되고, 사용·재판매·선물할 수 있습니다.</p></div>
+    <div class="feat"><div class="fi">💰</div><h3>충전 & 환전</h3><p>계좌이체로 충전해 결제하고, 필요할 때 언제든 현금으로 환전합니다.</p></div>
+  </div>
+</div></section>
+
+<section id="auto"><div class="wrap">
+  <div class="eyebrow">Auto Trade</div>
+  <h2 class="stitle">등록만 하면 자동 매칭됩니다</h2>
+  <div class="ssub">회원 간 자동 매칭, 부족하면 본사 봇이 채웁니다.</div>
+  <div class="grid2">
+    <div class="flow">
+      <h3>🛒 자동 구매</h3>
+      <div class="step"><div class="sn">1</div><div class="st"><b>구매 등록</b><span>원하는 금액을 입력하고 구매 신청</span></div></div>
+      <div class="step"><div class="sn">2</div><div class="st"><b>자동 매칭</b><span>판매 등록된 매물 중 최적을 자동 연결</span></div></div>
+      <div class="step"><div class="sn">3</div><div class="st"><b>결제·입금 확인</b><span>지갑 결제 또는 입금 문자 파싱으로 자동 확인</span></div></div>
+      <div class="step"><div class="sn">4</div><div class="st"><b>상품권 수령</b><span>확인 즉시 상품권이 지갑에 자동 지급</span></div></div>
+      <div class="botnote">🤖 판매자가 부족해도 OK — 본사 봇이 자동 판매. 거래 불발 0%</div>
+    </div>
+    <div class="flow">
+      <h3>💰 자동 판매</h3>
+      <div class="step"><div class="sn">1</div><div class="st"><b>판매 등록</b><span>판매할 상품권과 금액을 선택해 등록</span></div></div>
+      <div class="step"><div class="sn">2</div><div class="st"><b>자동 매칭</b><span>구매 대기 회원과 자동 연결</span></div></div>
+      <div class="step"><div class="sn">3</div><div class="st"><b>상품권 이전</b><span>체결 즉시 상품권이 구매자에게 자동 전달</span></div></div>
+      <div class="step"><div class="sn">4</div><div class="st"><b>대금 지급</b><span>수수료 차감 후 판매 대금이 지갑에 즉시 입금</span></div></div>
+      <div class="botnote">🤖 구매자가 부족해도 OK — 본사 봇이 자동 매입. 현금화 보장</div>
+    </div>
+  </div>
+</div></section>
+
+<section id="ai" style="background:var(--surface)"><div class="wrap">
+  <div class="eyebrow">AI Infra</div>
+  <h2 class="stitle">AI가 거래를 알아서 처리합니다</h2>
+  <div class="ssub">사람이 하던 반복 업무를 AI가 대신해 더 빠르고 정확하게 처리합니다.</div>
+  <div class="grid4">
+    <div class="feat"><div class="fi">🤖</div><h3>자동 매칭 엔진</h3><p>구매·판매 등록 즉시 최적 상대를 찾아 매칭. 매물 부족 시 봇이 참여합니다.</p></div>
+    <div class="feat"><div class="fi">💬</div><h3>입금 문자 파싱</h3><p>입금 알림 문자에서 송금자·금액·은행을 자동 추출해 수작업 확인을 없앱니다.</p></div>
+    <div class="feat"><div class="fi">🔁</div><h3>정산 자동화</h3><p>매칭·입금 확인·정산까지 전 과정을 자동으로 처리합니다.</p></div>
+    <div class="feat"><div class="fi">📈</div><h3>이상거래 탐지</h3><p>단시간 다수·고액 거래 등 비정상 패턴을 감지해 보류하고 관리자에게 알립니다.</p></div>
+  </div>
+</div></section>
+
+<section id="safe"><div class="wrap">
+  <div class="eyebrow">Compare</div>
+  <h2 class="stitle">기존 결제와 비교하세요</h2>
+  <table class="cmp">
+    <thead><tr><th>항목</th><th>기존 결제</th><th>igGift</th></tr></thead>
+    <tbody>
+      <tr><td>본사 계좌 노출</td><td>직접 노출</td><td>회원 간 거래 (본사 안전)</td></tr>
+      <tr><td>매물 부족 시</td><td>거래 불발</td><td>본사 봇 자동 매매</td></tr>
+      <tr><td>P2P 거래</td><td>지원 안 함</td><td>자동 매칭</td></tr>
+      <tr><td>입금 확인</td><td>수작업</td><td>입금 문자 자동 파싱</td></tr>
+      <tr><td>환전</td><td>불가능</td><td>언제든 가능</td></tr>
+      <tr><td>이상거래</td><td>사후 대응</td><td>실시간 탐지·보류</td></tr>
+      <tr><td>상품권 인프라</td><td>외부 의존</td><td>자체 발급·잔액·차감 API</td></tr>
+    </tbody>
+  </table>
+  <div class="cta-band">
+    <h2>지금 바로 P2P 거래를 시작하세요</h2>
+    <p>가입 즉시 지갑이 생성되고, 충전 한 번이면 자동 매칭 거래를 경험할 수 있습니다.</p>
+    <a class="btn" href="/app/iggift/">💰 지갑 앱 열기 →</a>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <div style="font-weight:900;color:var(--fg);font-size:16px;margin-bottom:6px">igGift</div>
+  회원끼리 사고파는 P2P 상품권 거래 플랫폼 · STUDIO ig<br>
+  © 2026 igGift. All rights reserved.
+</div></footer>
+
+</body></html>
