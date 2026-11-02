@@ -2635,15 +2635,46 @@ function exploreEngine(P0,key){
     amb.intensity=0.06+dayF*0.08;
     moon.visible=dayF<0.22; if(moon.visible)moon.position.set(CX-sx*180,Math.max(30,-sy*170+70),CZ-80);
     var nightF=1-Math.min(1,dayF*2.6);
-    cityGroup.traverse(function(o){ if(o.isMesh&&o.material&&o._lit!==undefined){ o.material.emissive.setHex(o._lit); o.material.emissiveIntensity=nightF*(o._litI||0.6); } });
+    gm.traverse(function(o){ if(!o.isMesh||!o.material)return;
+      if(o._lit!==undefined){ o.material.emissive.setHex(o._lit); o.material.emissiveIntensity=nightF*(o._litI||0.6); }
+      if(o._glow!==undefined){ o.visible=nightF>0.04; o.material.opacity=nightF*o._glow; } });
   }
   var propBoxes=buildProps(built.props,cityGroup);
+  // ===== 밤 연출: 가로등 + 네온 간판 (낮/밤 사이클에서 자동 점등) =====
+  var nightGroup=new THREE.Group(); gm.add(nightGroup);
+  var _poleMat=new THREE.MeshLambertMaterial({color:0x2a2f3a}), _headMat=new THREE.MeshLambertMaterial({color:0x3a4150});
+  var _discGeo=new THREE.CircleGeometry(7.5,20);
+  var NEON=[0xff3b8d,0x34e0ff,0x7cff4f,0xffb020,0xb060ff,0xff5a4a];
+  function _clearGrp(g){ while(g.children.length){ var c=g.children[0]; g.remove(c); try{ if(c.geometry&&c.geometry.dispose)c.geometry.dispose(); }catch(e){} } }
+  function _inBox(x,z,bs,pad){ for(var i=0;i<bs.length;i++){ var b=bs[i]; if(x>b.minx-pad&&x<b.maxx+pad&&z>b.minz-pad&&z<b.maxz+pad)return true; } return false; }
+  function buildNightDressing(boxes){
+    _clearGrp(nightGroup); var A=P0.area, step=46;
+    // 가로등 — 격자 배치, 건물 안이면 생략(거리·광장에만), 밤에 바닥 광원 디스크 점등
+    for(var gx=step*0.6; gx<A; gx+=step){ for(var gz=step*0.6; gz<A; gz+=step){
+      if(_inBox(gx,gz,boxes,1.5))continue;
+      var pole=new THREE.Mesh(new THREE.BoxGeometry(0.22,6.6,0.22),_poleMat); pole.position.set(gx,3.3,gz); pole.castShadow=true; nightGroup.add(pole);
+      var arm=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.18,0.18),_headMat); arm.position.set(gx+0.45,6.5,gz); nightGroup.add(arm);
+      var bulb=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.3,0.5),new THREE.MeshLambertMaterial({color:0x201a10,emissive:0xffd27a})); bulb.position.set(gx+0.9,6.4,gz); bulb._lit=0xffd27a; bulb._litI=1.5; nightGroup.add(bulb);
+      var disc=new THREE.Mesh(_discGeo,new THREE.MeshBasicMaterial({color:0xffdca0,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false})); disc.rotation.x=-Math.PI/2; disc.position.set(gx+0.9,0.14,gz); disc.visible=false; disc._glow=0.46; nightGroup.add(disc);
+    } }
+    // 네온 간판 — 높은 건물 일부 옆면에 발광 보드 + 밝은 튜브 바
+    var cnt=0; for(var i=0;i<boxes.length&&cnt<28;i++){ var b=boxes[i], h=b.maxy-b.miny; if(h<8||Math.random()>0.32)continue; cnt++;
+      var cx=(b.minx+b.maxx)/2, cz=(b.minz+b.maxz)/2, w=b.maxx-b.minx, nc=NEON[Math.floor(Math.random()*NEON.length)];
+      var sw=Math.min(w*0.62,5)+1.2, sh=2.0+Math.random()*2.4, sy=b.miny+h*(0.45+Math.random()*0.3);
+      var face=Math.floor(Math.random()*4), px=cx, pz=cz, ry=0, nx=0, nz=0;
+      if(face===0){ pz=b.maxz+0.12; nz=1; } else if(face===1){ pz=b.minz-0.12; nz=-1; ry=Math.PI; } else if(face===2){ px=b.maxx+0.12; nx=1; ry=-Math.PI/2; } else { px=b.minx-0.12; nx=-1; ry=Math.PI/2; }
+      var board=new THREE.Mesh(new THREE.PlaneGeometry(sw,sh),new THREE.MeshLambertMaterial({color:0x0a0a0f,emissive:nc,side:THREE.DoubleSide})); board.position.set(px,sy,pz); board.rotation.y=ry; board._lit=nc; board._litI=1.6; nightGroup.add(board);
+      var bar=new THREE.Mesh(new THREE.PlaneGeometry(sw*0.9,0.16),new THREE.MeshBasicMaterial({color:nc,transparent:true,opacity:0,fog:false,side:THREE.DoubleSide})); bar.position.set(px+nx*0.06,sy+sh*0.32,pz+nz*0.06); bar.rotation.y=ry; bar._glow=0.9; bar.visible=false; nightGroup.add(bar);
+    }
+  }
+  buildNightDressing(propBoxes);
   // 실제 지도(OSM) 건물로 복셀화 업그레이드 — 먼저 절차지형으로 즉시 보여주고, 건물이 받아지면 교체
   if(P0.lat&&P0.lng){ (function(){ var done=false;
     try{ cityFetchOSM(bb).then(function(f){ if(done||!f||!(f.buildings&&f.buildings.length))return; done=true;
       var rb; try{ rb=cityReal(f,{name:P0.name,maxBuildings:500}); }catch(e){ return; }
       while(cityGroup.children.length){ var c=cityGroup.children[0]; cityGroup.remove(c); try{ if(c.geometry&&c.geometry.dispose)c.geometry.dispose(); }catch(e){} }
       var nb=buildProps(rb.props,cityGroup); propBoxes.length=0; for(var i=0;i<nb.length;i++)propBoxes.push(nb[i]);
+      try{ buildNightDressing(propBoxes); }catch(e){}
       try{ toast('🏙 '+T('실제 지도 건물 적용')+' · '+f.buildings.length); }catch(e){}
     }).catch(function(){}); }catch(e){}
   })(); }
