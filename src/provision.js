@@ -9,6 +9,9 @@ import { config, randomId, randomKey, randomSecretKey } from './config.js';
 import { log } from './logger.js';
 
 let igplayKey = null; // 공개키 캐시
+// 고정 공개키 — memory 폴백/콜드스타트로 프로젝트가 재생성돼도 페이지 주입키와 항상 일치하도록 고정.
+// 공개키는 원래 페이지에 주입·노출되는 값이라 고정해도 보안 영향 없음(데이터 격리는 프로젝트 스코프).
+const IGPLAY_PUBLIC_KEY = process.env.IGPLAY_PUBLIC_KEY || 'igk_igplay_public_fixed_v1';
 
 export async function ensureIgPlay() {
   const repo = getRepo();
@@ -16,19 +19,23 @@ export async function ensureIgPlay() {
   if (!p) {
     p = await repo.createProject({
       id: randomId('p_'), name: 'igPlay', slug: 'igplay',
-      api_key: randomKey(), secret_key: randomSecretKey(), status: 'active', settings: { plan: 'free' },
+      api_key: IGPLAY_PUBLIC_KEY, secret_key: randomSecretKey(), status: 'active', settings: { plan: 'free' },
     });
     log('info', 'igPlay 프로젝트 자동 생성', { key: p.api_key });
+  } else if (p.api_key !== IGPLAY_PUBLIC_KEY) {
+    // 기존 랜덤키 프로젝트 → 고정키로 갱신(주입키 불일치로 인한 콜드스타트 401 제거)
+    try { const up = await repo.updateProject(p.id, { api_key: IGPLAY_PUBLIC_KEY }); if (up) p = up; } catch (e) { log('error', 'igPlay 키 고정 갱신 실패', { err: String(e) }); }
   }
   igplayKey = p.api_key;
   return p;
 }
 
 // /app/igplay/ 정적 서빙 전에 HTML을 주입해 반환하는 미들웨어
-export function igplayInject(req, res, next) {
+export async function igplayInject(req, res, next) {
   // /app/igplay 또는 /app/igplay/ 또는 /app/igplay/index.html 만 대상
   const p = req.path;
   if (!(p === '/igplay' || p === '/igplay/' || p === '/igplay/index.html')) return next();
+  if (!igplayKey) { try { await ensureIgPlay(); } catch (e) {} } // 키 미설정 상태 서빙 방지
   const file = path.join(config.root, 'public/apps/igplay/index.html');
   fs.readFile(file, 'utf8', (err, html) => {
     if (err) return next();
