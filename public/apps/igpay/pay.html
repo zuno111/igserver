@@ -1,0 +1,111 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>igPay 결제</title>
+<style>
+:root{--bg:#f3f6fb;--card:#fff;--fg:#101624;--muted:#5a6678;--border:#e2e8f2;--accent:#2563eb;--accent2:#1e40af;--bad:#c23b3b;--good:#1a8f5e;
+  --f:system-ui,-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#0a0e16;--card:#121826;--fg:#e6ecf5;--muted:#8a97a8;--border:#232d3e;--accent:#5b8bf5}}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--fg);font-family:var(--f);font-style:normal;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;max-width:380px;width:100%;overflow:hidden}
+.head{padding:18px 20px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:900;font-size:17px;display:flex;align-items:center;gap:8px}
+.head .lg{width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px}
+.body{padding:22px}
+.amt{text-align:center;font-size:32px;font-weight:900;margin:4px 0}
+.row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+.row:last-child{border-bottom:0}.row .k{color:var(--muted)}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+input{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--fg);font-size:15px}
+button{width:100%;padding:14px;border:0;border-radius:11px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;margin-top:12px}
+.ok{background:var(--accent);color:#fff}.cancel{background:var(--border);color:var(--fg)}
+.seg{display:flex;background:var(--border);border-radius:10px;padding:3px;margin-top:6px}
+.seg button{margin:0;padding:8px;background:none;color:var(--muted);border-radius:7px;font-size:13px}
+.seg button.on{background:var(--card);color:var(--fg)}
+.note{color:var(--muted);font-size:12px;text-align:center;margin-top:12px;line-height:1.5}
+.err{color:var(--bad);font-size:13px;text-align:center;margin-top:8px;min-height:16px}
+.msg{text-align:center;padding:30px 20px;font-weight:700}
+.bal{text-align:center;color:var(--muted);font-size:13px;margin-top:6px}
+.bal b{color:var(--fg)}
+</style></head><body>
+<div class="card">
+  <div class="head"><div class="lg">ig</div>igPay 결제</div>
+  <div class="body" id="body">
+    <div class="amt"><span id="amt">0</span>원</div>
+    <div style="margin-top:12px">
+      <div class="row"><span class="k">결제처</span><span id="merch">igGift</span></div>
+      <div class="row"><span class="k">수단</span><span>igPay 잔액</span></div>
+    </div>
+    <!-- 로그인 필요 시 -->
+    <div id="loginBox" style="display:none">
+      <div class="seg"><button id="sgL" class="on" onclick="sm('login')">로그인</button><button id="sgS" onclick="sm('signup')">가입</button></div>
+      <div id="nameW" style="display:none"><label>이름</label><input id="nm" placeholder="홍길동"></div>
+      <label>igPay 이메일</label><input id="em" type="email" placeholder="you@email.com">
+      <label>비밀번호</label><input id="pw" type="password" placeholder="6자 이상">
+      <button class="ok" onclick="login()">igPay 로그인</button>
+    </div>
+    <!-- 결제 버튼 -->
+    <div id="payBox" style="display:none">
+      <div class="bal">igPay 잔액 <b id="bal">-</b>원</div>
+      <button class="ok" id="payBtn" onclick="pay()">igPay로 결제</button>
+      <button class="cancel" onclick="cancel()">취소</button>
+    </div>
+    <div class="err" id="err"></div>
+    <div class="note">igPay 잔액에서 결제되고 igGift 지갑에 충전됩니다.</div>
+  </div>
+</div>
+<script>
+const Q=new URLSearchParams(location.search);
+const PI=Q.get('pi'), AMT=parseInt(Q.get('amount')||'0',10), MERCH=Q.get('merchant')||'igGift';
+let PAYTOK=localStorage.getItem('igpay_token')||'', MODE='login';
+const $=(id)=>document.getElementById(id);
+$('amt').textContent=AMT.toLocaleString(); $('merch').textContent=MERCH;
+async function api(path,{method='GET',body,token}={}){
+  const h={'Content-Type':'application/json'}; if(token)h.Authorization='Bearer '+token;
+  const r=await fetch(location.origin+path,{method,headers:h,body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({})); if(!r.ok) throw Object.assign(new Error(j.message||'오류'),{status:r.status}); return j;
+}
+function sm(m){MODE=m;$('sgL').classList.toggle('on',m==='login');$('sgS').classList.toggle('on',m==='signup');$('nameW').style.display=m==='signup'?'block':'none';}
+async function login(){
+  const email=$('em').value.trim(),pw=$('pw').value,name=$('nm').value.trim();$('err').textContent='';
+  if(!email||!pw){$('err').textContent='이메일과 비밀번호를 입력하세요.';return;}
+  try{ const path=MODE==='signup'?'/api/auth/signup':'/api/auth/login';
+    const body=MODE==='signup'?{email,password:pw,name}:{email,password:pw};
+    // igPay 프로젝트로 인증하려면 igPay 공개키가 필요 — 토큰엔 pid가 담기므로 로그인만 igPay 지갑앱 세션 토큰 재사용
+    const r=await fetch(location.origin+'/api/auth/'+(MODE==='signup'?'signup':'login')+'?key='+encodeURIComponent(await igpayKey()),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json(); if(!r.ok) throw new Error(j.message||'로그인 실패');
+    PAYTOK=j.token; localStorage.setItem('igpay_token',PAYTOK); showPay();
+  }catch(e){$('err').textContent=e.message;}
+}
+// igPay 공개키는 지갑앱(/app/igpay/)에 주입돼 있음 — 한 번 가져와 캐시
+let _k=null; async function igpayKey(){ if(_k)return _k; const html=await (await fetch('/app/igpay/')).text(); const m=html.match(/IGPAY_API=\{[^}]*key:"([^"]+)"/); _k=m?m[1]:''; return _k; }
+async function showLogin(){ $('loginBox').style.display='block'; $('payBox').style.display='none'; }
+async function showPay(){
+  $('loginBox').style.display='none';
+  try{ const key=await igpayKey(); const me=await api('/api/igpay/me?key='+encodeURIComponent(key),{token:PAYTOK});
+    $('bal').textContent=(me.wallet.krw|0).toLocaleString(); $('payBox').style.display='block';
+  }catch(e){ if(e.status===401){ localStorage.removeItem('igpay_token'); PAYTOK=''; showLogin(); } else $('err').textContent=e.message; }
+}
+async function pay(){
+  $('payBtn').disabled=true; $('err').textContent='';
+  try{
+    const key=await igpayKey();
+    // 1) igPay 잔액에서 차감
+    await api('/api/igpay/pay?key='+encodeURIComponent(key),{method:'POST',token:PAYTOK,body:{amount:AMT,merchant:MERCH,memo:'igGift 충전'}});
+    // 2) igGift 충전 확정(igGift 세션 토큰 — 같은 브라우저)
+    const iggTok=localStorage.getItem('igg_token')||'';
+    await api('/api/iggift/p2p/payin/confirm',{method:'POST',token:iggTok,body:{pi:PI,result:'success'}});
+    $('body').innerHTML='<div class="msg" style="color:var(--good)">✓ '+AMT.toLocaleString()+'원 결제·충전 완료<div class="note">잠시 후 igGift로 돌아갑니다</div></div>';
+    setTimeout(()=>location.href='/app/iggift/',1500);
+  }catch(e){
+    $('payBtn').disabled=false;
+    if(e.status===402){ $('err').innerHTML='igPay 잔액이 부족합니다. <a href="/app/igpay/" style="color:var(--accent)">충전하러 가기</a>'; }
+    else $('err').textContent=e.message;
+  }
+}
+async function cancel(){
+  try{ const iggTok=localStorage.getItem('igg_token')||''; await api('/api/iggift/p2p/payin/confirm',{method:'POST',token:iggTok,body:{pi:PI,result:'fail'}}); }catch(e){}
+  location.href='/app/iggift/';
+}
+// 시작: igPay 로그인 상태면 바로 결제, 아니면 로그인
+if(PAYTOK) showPay(); else showLogin();
+</script>
+</body></html>

@@ -26,6 +26,7 @@ async function ensureApp(slug, name) {
 
 export async function ensureSchoolyam() { return ensureApp('schoolyam', 'School Yam'); }
 export async function ensureIggift() { return ensureApp('iggift', 'igGift'); }
+export async function ensureIgpay() { return ensureApp('igpay', 'igPay'); }
 
 // 정적 HTML 서빙 전에 config 주입. slug/전역명 매핑.
 function makeInject(slug, globalName) {
@@ -47,3 +48,4 @@ function makeInject(slug, globalName) {
 
 export const schoolyamInject = makeInject('schoolyam', 'SCHOOLYAM');
 export const iggiftInject = makeInject('iggift', 'IGGIFT');
+export const igpayInject = makeInject('igpay', 'IGPAY');

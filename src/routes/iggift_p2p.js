@@ -48,6 +48,7 @@ const DEFAULT_CFG = {
   feeRate: 0.01, botEnabled: true, botName: 'P2P 자동봇', minAmount: 1000, maxAmount: 10000000,
   // 결제수단별 설정. live=true + 키가 있으면 실 API, 아니면 내장 샌드박스로 전 플로우 실동작.
   providers: {
+    igpay:    { label: 'igPay', enabled: true,     live: true },
     wallet:   { label: '계좌이체', enabled: true,  live: false },
     kakaopay: { label: '카카오페이', enabled: true, live: false, cid: '', secretKey: '' },
     naverpay: { label: '네이버페이', enabled: true, live: false, clientId: '', clientSecret: '', chainId: '' },
@@ -469,7 +470,7 @@ router.post('/admin/config', async (req, res, next) => {
 
 // ================= 결제(충전) 연동 — 카카오페이·네이버페이·PayPal·글로벌·계좌이체 =================
 // 키가 없으면 내장 샌드박스로 결제준비→승인→충전까지 실제로 동작. 키가 들어오면 그 수단만 실 API로 전환.
-const PROVIDER_META = { wallet:'계좌이체', kakaopay:'카카오페이', naverpay:'네이버페이', paypal:'PayPal', global:'글로벌페이' };
+const PROVIDER_META = { igpay:'igPay', wallet:'계좌이체', kakaopay:'카카오페이', naverpay:'네이버페이', paypal:'PayPal', global:'글로벌페이' };
 async function providerCfg(req, name) { const cfg = await getCfg(req); return (cfg.providers || {})[name] || null; }
 function originOf(req) { return (req.get('x-forwarded-proto') || req.protocol) + '://' + req.get('host'); }
 
@@ -533,6 +534,10 @@ router.post('/payin/start', async (req, res, next) => {
       } catch (e) {
         return res.status(502).json({ error: 'provider_error', message: 'PayPal 주문 생성에 실패했습니다. 키 설정을 확인하세요.' });
       }
+    } else if (provider === 'igpay') {
+      // 자체 페이(igPay): igPay 결제창으로 이동 → igPay 잔액에서 실제 차감 후 igGift 충전
+      approveUrl = `${origin}/app/igpay/pay.html?pi=${piId}&amount=${amount}&merchant=igGift`;
+      sandbox = false; live = true;
     } else {
       // 내장 샌드박스: 실제 승인 페이지로 이동 → 승인 시 충전까지 동작(키 꽂으면 실 결제로 교체)
       approveUrl = `${origin}/app/iggift/pay-approve.html?pi=${piId}&provider=${provider}&amount=${amount}`;

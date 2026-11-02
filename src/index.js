@@ -33,9 +33,10 @@ import messengerRoutes from './routes/messenger.js';
 import schoolyamRoutes from './routes/schoolyam.js';
 import iggiftRoutes from './routes/iggift.js';
 import iggiftP2pRoutes from './routes/iggift_p2p.js';
+import igpayRoutes from './routes/igpay.js';
 import { ensureIgPlay, igplayInject } from './provision.js';
 import { ensureMessenger, messengerInject } from './provision_messenger.js';
-import { ensureSchoolyam, ensureIggift, schoolyamInject, iggiftInject } from './provision_apps.js';
+import { ensureSchoolyam, ensureIggift, ensureIgpay, schoolyamInject, iggiftInject, igpayInject } from './provision_apps.js';
 
 const MODE = process.env.MODE || 'standalone';
 
@@ -52,6 +53,7 @@ async function main() {
   await ensureMessenger(); // 메신저 프로젝트 자동 프로비전
   await ensureSchoolyam(); // 스쿨얌(Vercel 이관) 자동 프로비전
   await ensureIggift();    // igGift(Vercel 이관) 자동 프로비전
+  await ensureIgpay();     // igPay(자체 핀테크 지갑) 자동 프로비전
 
   const app = express();
   app.disable('x-powered-by');
@@ -102,6 +104,7 @@ async function main() {
   app.use('/api/schoolyam', apiLimit, resolveProject, projectRateLimit(), express.json({ limit: '25mb' }), schoolyamRoutes);
   app.use('/api/iggift/p2p', apiLimit, resolveProject, projectRateLimit(), express.json({ limit: '4mb' }), iggiftP2pRoutes);
   app.use('/api/iggift', apiLimit, resolveProject, projectRateLimit(), express.json({ limit: '4mb' }), iggiftRoutes);
+  app.use('/api/igpay', apiLimit, resolveProject, projectRateLimit(), express.json({ limit: '2mb' }), igpayRoutes);
   app.use('/api', apiLimit, express.json({ limit: '1mb' }), resolveProject, projectRateLimit());
   app.use('/api/auth', authRoutes);
   app.use('/api/data', enforceKeyScope, dataRoutes);
@@ -131,6 +134,7 @@ async function main() {
   app.use('/app', messengerInject);
   app.use('/app', schoolyamInject);
   app.use('/app', iggiftInject);
+  app.use('/app', igpayInject);
   app.use('/app', express.static(path.join(config.root, 'public/apps')));
   // 루트 → 대시보드로
   app.get('/', (_req, res) => res.redirect('/admin/'));

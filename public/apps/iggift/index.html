@@ -320,7 +320,7 @@ function openSheet(html){ $('sheet').innerHTML=html; $('modal').classList.add('o
 function closeSheet(){ $('modal').classList.remove('on'); }
 $('modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeSheet(); });
 
-const PAY_BRAND={wallet:['계좌이체','🏦'],kakaopay:['카카오페이','🟡'],naverpay:['네이버페이','🟢'],paypal:['PayPal','🅿️'],global:['글로벌페이','🌐']};
+const PAY_BRAND={igpay:['igPay','🟦'],wallet:['계좌이체','🏦'],kakaopay:['카카오페이','🟡'],naverpay:['네이버페이','🟢'],paypal:['PayPal','🅿️'],global:['글로벌페이','🌐']};
 let PAY_SEL='wallet', PAY_METHODS=[];
 async function openCharge(){
   try{ const r=await api('/api/iggift/p2p/payin/methods'); PAY_METHODS=r.methods||[]; }catch(e){ PAY_METHODS=[{key:'wallet',label:'계좌이체'}]; }

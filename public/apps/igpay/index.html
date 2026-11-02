@@ -1,0 +1,170 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>igPay — 송금 지갑</title>
+<style>
+:root{
+  --bg:#f3f6fb;--surface:#fff;--surface2:#eef2f9;--fg:#101624;--muted:#5a6678;--border:#e2e8f2;
+  --accent:#2563eb;--accent2:#1e40af;--accent-fg:#fff;--good:#1a8f5e;--bad:#c23b3b;
+  --radius:14px;--f:system-ui,-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a0e16;--surface:#121826;--surface2:#18202f;--fg:#e6ecf5;--muted:#8a97a8;--border:#232d3e;
+  --accent:#5b8bf5;--accent2:#7aa2ff;--accent-fg:#06101f;--good:#3bbd82;--bad:#e06464;color-scheme:dark;
+}}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f);line-height:1.5;-webkit-font-smoothing:antialiased;font-style:normal}
+h1,h2,h3{margin:0;font-weight:800;font-style:normal}
+button,input,select{font-family:inherit;font-style:normal}
+.app{max-width:460px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:10px}
+.logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:var(--accent-fg);font-weight:900}
+.brand{font-weight:900;font-size:17px}.brand small{font-weight:600;color:var(--muted);font-size:11px;display:block;margin-top:-2px}
+.me{margin-left:auto;font-size:13px;color:var(--muted);text-align:right}.me b{color:var(--fg)}
+.logout{background:none;border:0;color:var(--bad);font-size:12px;cursor:pointer;padding:2px 0}
+.body{flex:1;padding:16px 16px 92px;overflow-y:auto}
+.screen{display:none}.screen.on{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.bal{background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--accent-fg);border:0}
+.bal .lbl{font-size:12px;opacity:.85}.bal .amt{font-size:34px;font-weight:900;margin:2px 0 4px}
+.bal .acts{display:flex;gap:8px;margin-top:14px}
+.bal .acts button{flex:1;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:10px;font-weight:700;font-size:14px;cursor:pointer}
+h2.sec{font-size:15px;margin:4px 2px 10px}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:11px;background:var(--bg);color:var(--fg);font-size:15px}
+.btn{width:100%;padding:13px;border:0;border-radius:11px;background:var(--accent);color:var(--accent-fg);font-weight:800;font-size:15px;cursor:pointer;margin-top:12px}
+.btn.alt{background:var(--surface2);color:var(--fg);border:1px solid var(--border)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.chip{flex:1;min-width:72px;padding:11px 4px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--fg);font-weight:700;font-size:13px;cursor:pointer;text-align:center}
+.chip.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.item:last-child{border-bottom:0}
+.item .ic{width:40px;height:40px;border-radius:11px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.item .tt{flex:1;min-width:0}.item .tt .t1{font-weight:700;font-size:14px}.item .tt .t2{color:var(--muted);font-size:12px}
+.item .amt{font-weight:800;font-size:14px;text-align:right;white-space:nowrap}
+.amt.plus{color:var(--good)}.amt.minus{color:var(--bad)}
+.empty{text-align:center;color:var(--muted);padding:30px 0;font-size:14px}
+.toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:.96}
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:30}
+.tb{flex:1;background:none;border:0;padding:9px 0 10px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700}
+.tb.on{color:var(--accent)}.tb svg{width:22px;height:22px}
+.auth{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:28px 22px;max-width:460px;margin:0 auto}
+.auth .hero{text-align:center;margin-bottom:26px}
+.auth .hero .logo{width:60px;height:60px;border-radius:17px;margin:0 auto 14px;font-size:26px}
+.auth .hero h1{font-size:24px}.auth .hero p{color:var(--muted);font-size:14px;margin-top:6px}
+.seg{display:flex;background:var(--surface2);border-radius:11px;padding:4px;margin-bottom:16px}
+.seg button{flex:1;padding:9px;border:0;background:none;border-radius:8px;font-weight:700;color:var(--muted);cursor:pointer;font-size:14px}
+.seg button.on{background:var(--surface);color:var(--fg)}
+.err{color:var(--bad);font-size:13px;margin-top:10px;min-height:18px;text-align:center}
+</style></head><body>
+<div id="authView" class="auth">
+  <div class="hero"><div class="logo">ig</div><h1>igPay</h1><p>보내고, 받고, 결제하는 igPay 지갑</p></div>
+  <div class="seg"><button id="segLogin" class="on" onclick="setMode('login')">로그인</button><button id="segSignup" onclick="setMode('signup')">회원가입</button></div>
+  <div id="nameWrap" style="display:none"><label>이름</label><input id="auName" placeholder="홍길동"></div>
+  <label>이메일</label><input id="auEmail" type="email" placeholder="you@email.com" autocomplete="username">
+  <label>비밀번호</label><input id="auPw" type="password" placeholder="6자 이상" autocomplete="current-password">
+  <button class="btn" id="auBtn" onclick="doAuth()">로그인</button>
+  <div class="err" id="auErr"></div>
+</div>
+
+<div id="appView" class="app" style="display:none">
+  <div class="top"><div class="logo">ig</div><div class="brand">igPay<small>송금 지갑</small></div>
+    <div class="me"><div><b id="meName">회원</b>님</div><button class="logout" onclick="logout()">로그아웃</button></div></div>
+  <div class="body">
+    <div class="screen on" id="sc-home">
+      <div class="card bal">
+        <div class="lbl">igPay 잔액</div><div class="amt"><span id="balKrw">0</span>원</div>
+        <div class="acts"><button onclick="go('charge')">충전</button><button onclick="go('send')">송금</button><button onclick="go('out')">출금</button></div>
+      </div>
+      <h2 class="sec">최근 내역</h2>
+      <div class="card" id="homeTx"><div class="empty">내역이 없습니다</div></div>
+    </div>
+    <div class="screen" id="sc-charge">
+      <h2 class="sec">충전</h2>
+      <div class="card">
+        <p class="muted" style="font-size:13px">계좌이체 입금 금액을 입력하면 지갑에 반영됩니다.</p>
+        <label>충전 금액</label><input id="cgAmt" type="number" inputmode="numeric" placeholder="예: 100000">
+        <div class="chips" id="cgChips"></div>
+        <button class="btn" onclick="doCharge()">충전하기</button>
+      </div>
+    </div>
+    <div class="screen" id="sc-send">
+      <h2 class="sec">송금</h2>
+      <div class="card">
+        <label>받는 분 이메일 (igPay 가입)</label><input id="toEmail" type="email" placeholder="friend@email.com">
+        <label>금액</label><input id="sendAmt" type="number" inputmode="numeric" placeholder="보낼 금액">
+        <label>메모(선택)</label><input id="sendMemo" placeholder="메모">
+        <button class="btn" onclick="doSend()">송금하기</button>
+      </div>
+    </div>
+    <div class="screen" id="sc-out">
+      <h2 class="sec">출금</h2>
+      <div class="card">
+        <label>출금 금액</label><input id="outAmt" type="number" inputmode="numeric" placeholder="출금할 금액">
+        <label>입금 은행/계좌</label><input id="outBank" placeholder="예: 국민 123-45">
+        <button class="btn" onclick="doOut()">출금 신청</button>
+      </div>
+    </div>
+    <div class="screen" id="sc-tx">
+      <h2 class="sec">거래 내역</h2>
+      <div class="card" id="allTx"><div class="empty">내역이 없습니다</div></div>
+    </div>
+  </div>
+  <div class="tabbar">
+    <button class="tb on" data-s="home" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 21V12h6v9"/></svg>홈</button>
+    <button class="tb" data-s="charge" onclick="go('charge')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>충전</button>
+    <button class="tb" data-s="send" onclick="go('send')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>송금</button>
+    <button class="tb" data-s="tx" onclick="go('tx')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>내역</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const CFG = window.IGPAY_API || { base: location.origin, key: '' };
+let TOKEN = localStorage.getItem('igpay_token')||'', ME=null, MODE='login';
+const $=(id)=>document.getElementById(id); const fmt=(n)=>(n|0).toLocaleString();
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200);}
+async function api(path,{method='GET',body,auth=true}={}){
+  const h={'Content-Type':'application/json'}; if(auth&&TOKEN)h.Authorization='Bearer '+TOKEN;
+  const u=CFG.base+path+(path.includes('?')?'&':'?')+'key='+encodeURIComponent(CFG.key);
+  const r=await fetch(u,{method,headers:h,body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({})); if(!r.ok) throw Object.assign(new Error(j.message||'오류'),{status:r.status}); return j;
+}
+function setMode(m){MODE=m;$('segLogin').classList.toggle('on',m==='login');$('segSignup').classList.toggle('on',m==='signup');
+  $('nameWrap').style.display=m==='signup'?'block':'none';$('auBtn').textContent=m==='signup'?'가입하고 시작':'로그인';$('auErr').textContent='';}
+async function doAuth(){
+  const email=$('auEmail').value.trim(),pw=$('auPw').value,name=$('auName').value.trim();$('auErr').textContent='';
+  if(!email||!pw){$('auErr').textContent='이메일과 비밀번호를 입력하세요.';return;}
+  try{ const path=MODE==='signup'?'/api/auth/signup':'/api/auth/login';
+    const body=MODE==='signup'?{email,password:pw,name}:{email,password:pw};
+    const r=await api(path,{method:'POST',body,auth:false}); TOKEN=r.token; localStorage.setItem('igpay_token',TOKEN); enterApp();
+  }catch(e){$('auErr').textContent=e.message;}
+}
+function logout(){TOKEN='';localStorage.removeItem('igpay_token');$('appView').style.display='none';$('authView').style.display='flex';}
+async function enterApp(){$('authView').style.display='none';$('appView').style.display='flex';buildChips();await refresh();}
+function go(s){document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('on',el.id==='sc-'+s));
+  document.querySelectorAll('.tb').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
+  if(s==='tx') loadTx();}
+let WALLET={krw:0};
+async function refresh(){
+  try{ const r=await api('/api/igpay/me'); ME={name:r.name,uid:r.uid}; WALLET=r.wallet;
+    $('meName').textContent=r.name; $('balKrw').textContent=fmt(WALLET.krw); renderTx($('homeTx'),(r.tx||[]).slice(0,5)); loadTx();
+  }catch(e){ if(e.status===401) logout(); else toast(e.message); }
+}
+function renderTx(el,list){
+  if(!list.length){el.innerHTML='<div class="empty">내역이 없습니다</div>';return;}
+  const ICON={charge:'＋',transfer_out:'↗',transfer_in:'↘',withdraw:'출',pay:'💳'};
+  const PLUS=['charge','transfer_in'];
+  el.innerHTML=list.map(t=>`<div class="item"><div class="ic">${ICON[t.type]||'·'}</div><div class="tt"><div class="t1">${({charge:'충전',transfer_out:'송금',transfer_in:'입금',withdraw:'출금',pay:(t.counter||'결제')})[t.type]||t.type}</div><div class="t2">${new Date(t.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}${t.counter&&t.type!=='pay'?' · '+t.counter:''}</div></div><div class="amt ${PLUS.includes(t.type)?'plus':'minus'}">${PLUS.includes(t.type)?'+':'-'}${fmt(t.amount)}원</div></div>`).join('');
+}
+async function loadTx(){ try{ const r=await api('/api/igpay/tx'); renderTx($('allTx'),r.tx||[]); }catch(e){} }
+const CHIPS=[10000,30000,50000,100000,300000,500000];
+function buildChips(){ $('cgChips').innerHTML=CHIPS.map(a=>`<button type="button" class="chip" onclick="$('cgAmt').value=${a};document.querySelectorAll('#cgChips .chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')">${a>=10000?a/10000+'만':a}</button>`).join(''); }
+async function doCharge(){const amt=parseInt($('cgAmt').value,10);if(!(amt>0)){toast('금액을 입력하세요');return;}
+  try{await api('/api/igpay/charge',{method:'POST',body:{amount:amt}});toast(fmt(amt)+'원 충전 완료');$('cgAmt').value='';go('home');refresh();}catch(e){toast(e.message);}}
+async function doSend(){const amt=parseInt($('sendAmt').value,10),to=$('toEmail').value.trim();if(!to){toast('받는 분 이메일');return;}if(!(amt>0)){toast('금액을 입력하세요');return;}
+  try{await api('/api/igpay/transfer',{method:'POST',body:{toEmail:to,amount:amt,memo:$('sendMemo').value}});toast(fmt(amt)+'원 송금 완료');$('sendAmt').value='';$('toEmail').value='';go('home');refresh();}catch(e){toast(e.message);}}
+async function doOut(){const amt=parseInt($('outAmt').value,10);if(!(amt>0)){toast('금액을 입력하세요');return;}
+  try{await api('/api/igpay/withdraw',{method:'POST',body:{amount:amt,bank:$('outBank').value}});toast(fmt(amt)+'원 출금 신청');$('outAmt').value='';go('home');refresh();}catch(e){toast(e.message);}}
+if(TOKEN){enterApp().catch(()=>logout());}else{setMode('login');}
+</script>
+</body></html>
