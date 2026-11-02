@@ -2628,7 +2628,6 @@ function exploreEngine(P0,key){
     var duskF=Math.max(0,1-Math.abs(dayT-6.5)/1.8)+Math.max(0,1-Math.abs(dayT-17.5)/1.8); duskF=Math.min(1,duskF);
     if(dayF<=0.001){ _sky.copy(skyNight); } else { lerpCol(skyNight,skyDay,Math.min(1,dayF*1.5),_sky); if(duskF>0)lerpCol(_sky,skyDusk,Math.min(0.55,duskF),_sky); }
     scene.background.copy(_sky); scene.fog.color.copy(_sky);
-    try{ window.__skyDbg={dayT:Math.round(dayT*10)/10,mode:dayMode,dayF:Math.round(dayF*100)/100,bg:scene.background.getHexString(),sunI:Math.round(sun.intensity*100)/100,hemiI:Math.round(hemi.intensity*100)/100}; }catch(e){}
     var ang=(dayT-6)/12*Math.PI, sx=Math.cos(ang), sy=Math.sin(ang);
     sunDir.set(sx,Math.max(0.2,sy),-0.42);
     sun.intensity=dayF*1.5; sun.color.setHex(duskF>0.35?0xffac66:0xfff0d0);
