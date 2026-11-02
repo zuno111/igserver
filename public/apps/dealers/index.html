@@ -139,11 +139,12 @@
 <div id="toast" class="toast"></div>
 
 <script src="/app/_sdk/igclient.js"></script>
+<script src="/app/_sdk/igpay-checkout.js"></script>
 <script>
 // ===== 설정: 딜러스 프로젝트 키 =====
 // 관리 대시보드에서 '딜러스' 프로젝트를 만들고 발급받은 키를 넣습니다.
 // (데모 편의를 위해 URL ?key= 로도 넘길 수 있게 함)
-const PROJECT_KEY = new URLSearchParams(location.search).get('key') || window.DEALERS_KEY || 'DEALERS_PROJECT_KEY';
+const PROJECT_KEY = new URLSearchParams(location.search).get('key') || (window.DEALERS_API&&window.DEALERS_API.key) || window.DEALERS_KEY || 'DEALERS_PROJECT_KEY';
 const ig = igClient(location.origin, PROJECT_KEY);
 
 let isSignup = false;
@@ -271,9 +272,16 @@ function reqPhoto(req){
 async function accept(dealer,price){
   const req=myRequests.find(r=>r.id===activeReq);
   if(!req)return;
-  await ig.put('requests',req.id,{...req.data,status:'done',acceptedDealer:dealer,acceptedPrice:price});
+  if(window.IgPayCheckout){
+    IgPayCheckout.open({amount:price,merchant:'딜러스',memo:dealer+' 견적',
+      onSuccess:function(r){ finalizeAccept(req,dealer,price,{payment:'igpay',paymentId:r.paymentId}); },
+      onCancel:function(){ toast('결제가 취소되었습니다'); }});
+  }else{ finalizeAccept(req,dealer,price); }
+}
+async function finalizeAccept(req,dealer,price,extra){
+  await ig.put('requests',req.id,Object.assign({...req.data,status:'done',acceptedDealer:dealer,acceptedPrice:price},extra||{}));
   if(quoteSub)quoteSub.close();
-  toast(`${dealer}의 ${won(price)} 견적을 수락했습니다`);
+  toast(`${dealer}의 ${won(price)} 견적 ${extra?'결제·':''}수락 완료`);
   await loadMyRequests();
   document.getElementById('live-ind').classList.add('hidden');
 }

@@ -36,7 +36,7 @@ import iggiftP2pRoutes from './routes/iggift_p2p.js';
 import igpayRoutes from './routes/igpay.js';
 import { ensureIgPlay, igplayInject } from './provision.js';
 import { ensureMessenger, messengerInject } from './provision_messenger.js';
-import { ensureSchoolyam, ensureIggift, ensureIgpay, ensureGyemoim, schoolyamInject, iggiftInject, igpayInject, gyemoimInject } from './provision_apps.js';
+import { ensureSchoolyam, ensureIggift, ensureIgpay, ensureGyemoim, ensureDealers, schoolyamInject, iggiftInject, igpayInject, gyemoimInject, dealersInject } from './provision_apps.js';
 
 const MODE = process.env.MODE || 'standalone';
 
@@ -55,6 +55,7 @@ async function main() {
   await ensureIggift();    // igGift(Vercel 이관) 자동 프로비전
   await ensureIgpay();     // igPay(자체 핀테크 지갑) 자동 프로비전
   await ensureGyemoim();   // 계모임(계) 자동 프로비전
+  await ensureDealers();   // 딜러스(역경매) 자동 프로비전
 
   const app = express();
   app.disable('x-powered-by');
@@ -137,6 +138,7 @@ async function main() {
   app.use('/app', iggiftInject);
   app.use('/app', igpayInject);
   app.use('/app', gyemoimInject);
+  app.use('/app', dealersInject);
   app.use('/app', express.static(path.join(config.root, 'public/apps')));
   // 루트 → 대시보드로
   app.get('/', (_req, res) => res.redirect('/admin/'));

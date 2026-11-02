@@ -28,6 +28,7 @@ export async function ensureSchoolyam() { return ensureApp('schoolyam', 'School 
 export async function ensureIggift() { return ensureApp('iggift', 'igGift'); }
 export async function ensureIgpay() { return ensureApp('igpay', 'igPay'); }
 export async function ensureGyemoim() { return ensureApp('gyemoim', '계모임'); }
+export async function ensureDealers() { return ensureApp('dealers', '딜러스'); }
 
 // 정적 HTML 서빙 전에 config 주입. slug/전역명 매핑.
 function makeInject(slug, globalName) {
@@ -51,3 +52,4 @@ export const schoolyamInject = makeInject('schoolyam', 'SCHOOLYAM');
 export const iggiftInject = makeInject('iggift', 'IGGIFT');
 export const igpayInject = makeInject('igpay', 'IGPAY');
 export const gyemoimInject = makeInject('gyemoim', 'GYEMOIM');
+export const dealersInject = makeInject('dealers', 'DEALERS');
