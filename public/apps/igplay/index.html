@@ -2646,17 +2646,25 @@ function exploreEngine(P0,key){
   var _discGeo=new THREE.CircleGeometry(7.5,20);
   var NEON=[0xff3b8d,0x34e0ff,0x7cff4f,0xffb020,0xb060ff,0xff5a4a];
   function _clearGrp(g){ while(g.children.length){ var c=g.children[0]; g.remove(c); try{ if(c.geometry&&c.geometry.dispose)c.geometry.dispose(); }catch(e){} } }
-  function _inBox(x,z,bs,pad){ for(var i=0;i<bs.length;i++){ var b=bs[i]; if(x>b.minx-pad&&x<b.maxx+pad&&z>b.minz-pad&&z<b.maxz+pad)return true; } return false; }
+  // 초대형 박스(지면/베이스 등 area급)는 무시 — 가로등 배치를 막지 않도록
+  function _inBox(x,z,bs,pad){ for(var i=0;i<bs.length;i++){ var b=bs[i]; if((b.maxx-b.minx)>70||(b.maxz-b.minz)>70)continue; if(x>b.minx-pad&&x<b.maxx+pad&&z>b.minz-pad&&z<b.maxz+pad)return true; } return false; }
+  function _addLamp(lx,lz){
+    var pole=new THREE.Mesh(new THREE.BoxGeometry(0.22,6.6,0.22),_poleMat); pole.position.set(lx,3.3,lz); pole.castShadow=true; nightGroup.add(pole);
+    var arm=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.18,0.18),_headMat); arm.position.set(lx+0.45,6.5,lz); nightGroup.add(arm);
+    var bulb=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.3,0.5),new THREE.MeshLambertMaterial({color:0x201a10,emissive:0xffd27a})); bulb.position.set(lx+0.9,6.4,lz); bulb._lit=0xffd27a; bulb._litI=1.5; nightGroup.add(bulb);
+    var disc=new THREE.Mesh(_discGeo,new THREE.MeshBasicMaterial({color:0xffdca0,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false})); disc.rotation.x=-Math.PI/2; disc.position.set(lx+0.9,0.14,lz); disc.visible=false; disc._glow=0.46; nightGroup.add(disc);
+  }
   function buildNightDressing(boxes){
-    _clearGrp(nightGroup); var A=P0.area, step=46;
-    // 가로등 — 격자 배치, 건물 안이면 생략(거리·광장에만), 밤에 바닥 광원 디스크 점등
-    for(var gx=step*0.6; gx<A; gx+=step){ for(var gz=step*0.6; gz<A; gz+=step){
-      if(_inBox(gx,gz,boxes,1.5))continue;
-      var pole=new THREE.Mesh(new THREE.BoxGeometry(0.22,6.6,0.22),_poleMat); pole.position.set(gx,3.3,gz); pole.castShadow=true; nightGroup.add(pole);
-      var arm=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.18,0.18),_headMat); arm.position.set(gx+0.45,6.5,gz); nightGroup.add(arm);
-      var bulb=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.3,0.5),new THREE.MeshLambertMaterial({color:0x201a10,emissive:0xffd27a})); bulb.position.set(gx+0.9,6.4,gz); bulb._lit=0xffd27a; bulb._litI=1.5; nightGroup.add(bulb);
-      var disc=new THREE.Mesh(_discGeo,new THREE.MeshBasicMaterial({color:0xffdca0,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false})); disc.rotation.x=-Math.PI/2; disc.position.set(gx+0.9,0.14,gz); disc.visible=false; disc._glow=0.46; nightGroup.add(disc);
-    } }
+    _clearGrp(nightGroup); var A=P0.area;
+    // 가로등 — 건물 모서리 바깥(길가)에 배치. 비정상 대형 박스(지면)는 제외, 최소 간격 유지
+    var placed=[], LMAX=70;
+    for(var i=0;i<boxes.length&&placed.length<LMAX;i+=2){ var b=boxes[i], bw=b.maxx-b.minx, bd=b.maxz-b.minz; if(bw>70||bd>70||bw<1.2||bd<1.2)continue;
+      var lx=b.maxx+2.0, lz=b.maxz+2.0; if(_inBox(lx,lz,boxes,0.4))continue;
+      var near=false; for(var k=0;k<placed.length;k++){ if(Math.abs(placed[k][0]-lx)<16&&Math.abs(placed[k][1]-lz)<16){ near=true; break; } } if(near)continue;
+      placed.push([lx,lz]); _addLamp(lx,lz);
+    }
+    // 건물이 적은 월드 대비 격자 보강
+    if(placed.length<8&&A){ for(var gx=A*0.22; gx<A*0.8; gx+=40){ for(var gz=A*0.22; gz<A*0.8; gz+=40){ if(_inBox(gx,gz,boxes,1.2))continue; placed.push([gx,gz]); _addLamp(gx,gz); } } }
     // 네온 간판 — 높은 건물 일부 옆면에 발광 보드 + 밝은 튜브 바
     var cnt=0; for(var i=0;i<boxes.length&&cnt<28;i++){ var b=boxes[i], h=b.maxy-b.miny; if(h<8||Math.random()>0.32)continue; cnt++;
       var cx=(b.minx+b.maxx)/2, cz=(b.minz+b.maxz)/2, w=b.maxx-b.minx, nc=NEON[Math.floor(Math.random()*NEON.length)];
