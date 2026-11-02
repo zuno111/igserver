@@ -74,7 +74,8 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
     <div class="screen on" id="sc-home">
       <div class="card bal">
         <div class="lbl">igPay 잔액</div><div class="amt"><span id="balKrw">0</span>원</div>
-        <div class="acts"><button onclick="go('charge')">충전</button><button onclick="go('send')">송금</button><button onclick="go('out')">출금</button></div>
+        <div class="sub" id="saveSummary" style="font-size:12px;opacity:.85;margin-top:2px"></div>
+        <div class="acts"><button onclick="go('charge')">충전</button><button onclick="go('send')">송금</button><button onclick="go('save')">예치</button><button onclick="go('out')">출금</button></div>
       </div>
       <h2 class="sec">최근 내역</h2>
       <div class="card" id="homeTx"><div class="empty">내역이 없습니다</div></div>
@@ -97,6 +98,24 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
         <button class="btn" onclick="doSend()">송금하기</button>
       </div>
     </div>
+    <div class="screen" id="sc-save">
+      <h2 class="sec">예치</h2>
+      <div class="card bal" style="background:linear-gradient(135deg,#1e40af,#2563eb)">
+        <div class="lbl">예치 자산 (원금+이자)</div>
+        <div class="amt"><span id="saveTotal">0</span>원</div>
+        <div class="sub" style="font-size:12px;opacity:.85">원금 <span id="savePrin">0</span>원 · 이자 <span id="saveInt">0</span>원 · 연 <span id="saveApr">0</span>%</div>
+      </div>
+      <div class="card">
+        <p class="muted" style="font-size:13px">지갑 잔액을 예치하면 연이율로 이자가 붙습니다. 언제든 지갑으로 다시 찾을 수 있습니다.</p>
+        <label>예치 금액</label><input id="saveAmt" type="number" inputmode="numeric" placeholder="지갑에서 예치할 금액">
+        <button class="btn" onclick="doSaveDeposit()">예치하기</button>
+        <label style="margin-top:14px">찾을 금액</label><input id="saveWdAmt" type="number" inputmode="numeric" placeholder="예치에서 찾을 금액">
+        <div class="row" style="display:flex;gap:8px">
+          <button class="btn alt" style="flex:1" onclick="doSaveWithdraw(false)">찾기</button>
+          <button class="btn alt" style="flex:1" onclick="doSaveWithdraw(true)">전액 찾기(이자 포함)</button>
+        </div>
+      </div>
+    </div>
     <div class="screen" id="sc-out">
       <h2 class="sec">출금</h2>
       <div class="card">
@@ -114,6 +133,7 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
     <button class="tb on" data-s="home" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 21V12h6v9"/></svg>홈</button>
     <button class="tb" data-s="charge" onclick="go('charge')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>충전</button>
     <button class="tb" data-s="send" onclick="go('send')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>송금</button>
+    <button class="tb" data-s="save" onclick="go('save')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/></svg>예치</button>
     <button class="tb" data-s="tx" onclick="go('tx')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>내역</button>
   </div>
 </div>
@@ -144,17 +164,24 @@ async function enterApp(){$('authView').style.display='none';$('appView').style.
 function go(s){document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('on',el.id==='sc-'+s));
   document.querySelectorAll('.tb').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
   if(s==='tx') loadTx();}
-let WALLET={krw:0};
+let WALLET={krw:0}, SAVINGS={principal:0,interest:0,total:0,apr:0};
 async function refresh(){
-  try{ const r=await api('/api/igpay/me'); ME={name:r.name,uid:r.uid}; WALLET=r.wallet;
-    $('meName').textContent=r.name; $('balKrw').textContent=fmt(WALLET.krw); renderTx($('homeTx'),(r.tx||[]).slice(0,5)); loadTx();
+  try{ const r=await api('/api/igpay/me'); ME={name:r.name,uid:r.uid}; WALLET=r.wallet; SAVINGS=r.savings||SAVINGS;
+    $('meName').textContent=r.name; $('balKrw').textContent=fmt(WALLET.krw);
+    renderSavings(); renderTx($('homeTx'),(r.tx||[]).slice(0,5)); loadTx();
   }catch(e){ if(e.status===401) logout(); else toast(e.message); }
+}
+function renderSavings(){
+  const total=SAVINGS.total|0;
+  $('saveSummary').textContent = total>0 ? `예치 ${fmt(total)}원 (이자 ${fmt(SAVINGS.interest)}원)` : `예치하면 연 ${(SAVINGS.apr*100).toFixed(1)}% 이자`;
+  if($('saveTotal')){ $('saveTotal').textContent=fmt(total); $('savePrin').textContent=fmt(SAVINGS.principal); $('saveInt').textContent=fmt(SAVINGS.interest); $('saveApr').textContent=(SAVINGS.apr*100).toFixed(1); }
 }
 function renderTx(el,list){
   if(!list.length){el.innerHTML='<div class="empty">내역이 없습니다</div>';return;}
-  const ICON={charge:'＋',transfer_out:'↗',transfer_in:'↘',withdraw:'출',pay:'💳'};
-  const PLUS=['charge','transfer_in'];
-  el.innerHTML=list.map(t=>`<div class="item"><div class="ic">${ICON[t.type]||'·'}</div><div class="tt"><div class="t1">${({charge:'충전',transfer_out:'송금',transfer_in:'입금',withdraw:'출금',pay:(t.counter||'결제')})[t.type]||t.type}</div><div class="t2">${new Date(t.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}${t.counter&&t.type!=='pay'?' · '+t.counter:''}</div></div><div class="amt ${PLUS.includes(t.type)?'plus':'minus'}">${PLUS.includes(t.type)?'+':'-'}${fmt(t.amount)}원</div></div>`).join('');
+  const ICON={charge:'＋',transfer_out:'↗',transfer_in:'↘',withdraw:'출',pay:'💳',save_in:'🏦',save_out:'💰'};
+  const PLUS=['charge','transfer_in','save_out'];
+  const KO={charge:'충전',transfer_out:'송금',transfer_in:'입금',withdraw:'출금',pay:'결제',save_in:'예치',save_out:'예치 찾기'};
+  el.innerHTML=list.map(t=>`<div class="item"><div class="ic">${ICON[t.type]||'·'}</div><div class="tt"><div class="t1">${t.type==='pay'?(t.counter||'결제'):(KO[t.type]||t.type)}</div><div class="t2">${new Date(t.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}${t.counter&&t.type!=='pay'?' · '+t.counter:''}</div></div><div class="amt ${PLUS.includes(t.type)?'plus':'minus'}">${PLUS.includes(t.type)?'+':'-'}${fmt(t.amount)}원</div></div>`).join('');
 }
 async function loadTx(){ try{ const r=await api('/api/igpay/tx'); renderTx($('allTx'),r.tx||[]); }catch(e){} }
 const CHIPS=[10000,30000,50000,100000,300000,500000];
@@ -165,6 +192,10 @@ async function doSend(){const amt=parseInt($('sendAmt').value,10),to=$('toEmail'
   try{await api('/api/igpay/transfer',{method:'POST',body:{toEmail:to,amount:amt,memo:$('sendMemo').value}});toast(fmt(amt)+'원 송금 완료');$('sendAmt').value='';$('toEmail').value='';go('home');refresh();}catch(e){toast(e.message);}}
 async function doOut(){const amt=parseInt($('outAmt').value,10);if(!(amt>0)){toast('금액을 입력하세요');return;}
   try{await api('/api/igpay/withdraw',{method:'POST',body:{amount:amt,bank:$('outBank').value}});toast(fmt(amt)+'원 출금 신청');$('outAmt').value='';go('home');refresh();}catch(e){toast(e.message);}}
+async function doSaveDeposit(){const amt=parseInt($('saveAmt').value,10);if(!(amt>0)){toast('예치 금액을 입력하세요');return;}
+  try{await api('/api/igpay/savings/deposit',{method:'POST',body:{amount:amt}});toast(fmt(amt)+'원 예치 완료');$('saveAmt').value='';await refresh();}catch(e){toast(e.message);}}
+async function doSaveWithdraw(all){const amt=parseInt($('saveWdAmt').value,10);if(!all&&!(amt>0)){toast('찾을 금액을 입력하세요');return;}
+  try{const r=await api('/api/igpay/savings/withdraw',{method:'POST',body:all?{all:true}:{amount:amt}});toast('예치 찾기 완료');$('saveWdAmt').value='';await refresh();}catch(e){toast(e.message);}}
 if(TOKEN){enterApp().catch(()=>logout());}else{setMode('login');}
 </script>
 </body></html>

@@ -94,6 +94,7 @@ async function loadStats(){
     ['송금',fmt(stats.transfer.sum)+'원',stats.transfer.cnt+'건'],
     ['출금',fmt(stats.withdraw.sum)+'원',stats.withdraw.cnt+'건'],
     ['가맹 결제',fmt(stats.pay.sum)+'원',stats.pay.cnt+'건'],
+    ['예치 총액',fmt(stats.savingsTotal||0)+'원','연 '+(((stats.savingsApr||0)*100).toFixed(1))+'%'],
   ].map(([l,n,s])=>`<div class="st"><div class="n">${n}</div><div class="l">${l}</div>${s?`<div class="s">${s}</div>`:''}</div>`).join('');
 }
 const TXKO={charge:'충전',transfer_out:'송금',transfer_in:'입금',withdraw:'출금',pay:'결제'};
