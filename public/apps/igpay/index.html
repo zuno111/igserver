@@ -43,6 +43,11 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
 .item .amt{font-weight:800;font-size:14px;text-align:right;white-space:nowrap}
 .amt.plus{color:var(--good)}.amt.minus{color:var(--bad)}
 .empty{text-align:center;color:var(--muted);padding:30px 0;font-size:14px}
+.chkcard{background:linear-gradient(135deg,#111826,#2563eb);color:#fff;border-radius:14px;padding:18px;position:relative;overflow:hidden}
+.chkcard .brand{font-weight:900;font-size:15px;opacity:.95}
+.chkcard .num{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:17px;letter-spacing:1px;margin:18px 0 10px}
+.chkcard .rowb{display:flex;justify-content:space-between;align-items:flex-end;font-size:12px;opacity:.9}
+.chkcard .cb{font-weight:800;font-size:14px}
 .toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:.96}
 .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:30}
@@ -77,6 +82,8 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
         <div class="sub" id="saveSummary" style="font-size:12px;opacity:.85;margin-top:2px"></div>
         <div class="acts"><button onclick="go('charge')">충전</button><button onclick="go('send')">송금</button><button onclick="go('save')">예치</button><button onclick="go('out')">출금</button></div>
       </div>
+      <h2 class="sec">체크카드</h2>
+      <div class="card" id="cardBox"><div class="empty">카드를 불러오는 중…</div></div>
       <h2 class="sec">최근 내역</h2>
       <div class="card" id="homeTx"><div class="empty">내역이 없습니다</div></div>
     </div>
@@ -167,10 +174,27 @@ function go(s){document.querySelectorAll('.screen').forEach(el=>el.classList.tog
 let WALLET={krw:0}, SAVINGS={principal:0,interest:0,total:0,apr:0};
 async function refresh(){
   try{ const r=await api('/api/igpay/me'); ME={name:r.name,uid:r.uid}; WALLET=r.wallet; SAVINGS=r.savings||SAVINGS;
+    CARD=r.card||null; CARD_RATE=r.cardCashbackRate||0;
     $('meName').textContent=r.name; $('balKrw').textContent=fmt(WALLET.krw);
-    renderSavings(); renderTx($('homeTx'),(r.tx||[]).slice(0,5)); loadTx();
+    renderSavings(); renderCard(); renderTx($('homeTx'),(r.tx||[]).slice(0,5)); loadTx();
   }catch(e){ if(e.status===401) logout(); else toast(e.message); }
 }
+let CARD=null, CARD_RATE=0;
+function renderCard(){
+  const el=$('cardBox'); if(!el) return;
+  if(CARD){
+    el.className='chkcard';
+    el.innerHTML=`<div class="brand">igPay Check</div><div class="num">${CARD.number}</div>`+
+      `<div class="rowb"><div>캐시백 누적 <span class="cb">${fmt(CARD.cashbackTotal)}원</span></div>`+
+      `<div><button class="chip" style="min-width:auto;padding:6px 12px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3)" onclick="doCardClose()">해지</button></div></div>`+
+      `<div style="font-size:11px;opacity:.8;margin-top:8px">결제 시 ${(CARD_RATE*100).toFixed(1)}% 캐시백이 지갑으로 적립됩니다</div>`;
+  }else{
+    el.className='card';
+    el.innerHTML=`<div class="empty" style="padding:16px 0">아직 체크카드가 없습니다<div style="margin-top:4px;font-size:12px">발급하면 가맹 결제 시 ${(CARD_RATE*100).toFixed(1)}% 캐시백 적립</div></div><button class="btn" onclick="doCardIssue()">체크카드 발급</button>`;
+  }
+}
+async function doCardIssue(){ try{ await api('/api/igpay/card/issue',{method:'POST'}); toast('체크카드 발급 완료'); await refresh(); }catch(e){ toast(e.message); } }
+async function doCardClose(){ try{ await api('/api/igpay/card/close',{method:'POST'}); toast('카드 해지 완료'); await refresh(); }catch(e){ toast(e.message); } }
 function renderSavings(){
   const total=SAVINGS.total|0;
   $('saveSummary').textContent = total>0 ? `예치 ${fmt(total)}원 (이자 ${fmt(SAVINGS.interest)}원)` : `예치하면 연 ${(SAVINGS.apr*100).toFixed(1)}% 이자`;
@@ -178,9 +202,9 @@ function renderSavings(){
 }
 function renderTx(el,list){
   if(!list.length){el.innerHTML='<div class="empty">내역이 없습니다</div>';return;}
-  const ICON={charge:'＋',transfer_out:'↗',transfer_in:'↘',withdraw:'출',pay:'💳',save_in:'🏦',save_out:'💰'};
-  const PLUS=['charge','transfer_in','save_out'];
-  const KO={charge:'충전',transfer_out:'송금',transfer_in:'입금',withdraw:'출금',pay:'결제',save_in:'예치',save_out:'예치 찾기'};
+  const ICON={charge:'＋',transfer_out:'↗',transfer_in:'↘',withdraw:'출',pay:'💳',save_in:'🏦',save_out:'💰',cashback:'🎁'};
+  const PLUS=['charge','transfer_in','save_out','cashback'];
+  const KO={charge:'충전',transfer_out:'송금',transfer_in:'입금',withdraw:'출금',pay:'결제',save_in:'예치',save_out:'예치 찾기',cashback:'캐시백'};
   el.innerHTML=list.map(t=>`<div class="item"><div class="ic">${ICON[t.type]||'·'}</div><div class="tt"><div class="t1">${t.type==='pay'?(t.counter||'결제'):(KO[t.type]||t.type)}</div><div class="t2">${new Date(t.ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}${t.counter&&t.type!=='pay'?' · '+t.counter:''}</div></div><div class="amt ${PLUS.includes(t.type)?'plus':'minus'}">${PLUS.includes(t.type)?'+':'-'}${fmt(t.amount)}원</div></div>`).join('');
 }
 async function loadTx(){ try{ const r=await api('/api/igpay/tx'); renderTx($('allTx'),r.tx||[]); }catch(e){} }

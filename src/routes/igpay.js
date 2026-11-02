@@ -44,7 +44,10 @@ router.get('/me', async (req, res, next) => {
     const apr = await getSavingsCfg(req);
     const s = await accrue(req, m.uid, apr);
     const savings = { principal: s.principal | 0, interest: Math.floor(s.accrued || 0), total: (s.principal | 0) + Math.floor(s.accrued || 0), apr };
-    res.json({ ok: true, uid: m.uid, name: m.name, wallet: w, savings, tx });
+    const cardRate = await getCardCashbackRate(req);
+    const cardRec = await getRepo().getRecord(PID(req), 'pay_card', m.uid);
+    const card = (cardRec && cardRec.data.status === 'active') ? cardPublic(cardRec.data, cardRate) : null;
+    res.json({ ok: true, uid: m.uid, name: m.name, wallet: w, savings, card, cardCashbackRate: cardRate, tx });
   } catch (e) { next(e); }
 });
 
@@ -195,11 +198,77 @@ router.post('/pay', async (req, res, next) => {
     if (!(amount > 0)) return res.status(400).json({ error: 'bad_amount' });
     const w = await getWallet(req, m.uid);
     if ((w.krw | 0) < amount) return res.status(402).json({ error: 'insufficient', message: 'igPay 잔액이 부족합니다.', balance: w.krw | 0 });
-    w.krw -= amount; await saveWallet(req, m.uid, w);
+    w.krw -= amount;
+    // 체크카드 보유 시 캐시백 적립(지갑으로 즉시)
+    const card = await getRepo().getRecord(PID(req), 'pay_card', m.uid);
+    let cashback = 0;
+    if (card && card.data.status === 'active') {
+      const rate = await getCardCashbackRate(req);
+      cashback = Math.floor(amount * rate);
+      if (cashback > 0) {
+        w.krw += cashback;
+        card.data.cashbackTotal = (card.data.cashbackTotal || 0) + cashback;
+        await getRepo().putRecord({ project_id: PID(req), collection: 'pay_card', doc_id: m.uid, data: card.data, owner_id: m.uid });
+      }
+    }
+    await saveWallet(req, m.uid, w);
     const source = b.source ? String(b.source).slice(0, 40) : null;
-    const pay = await getRepo().putRecord({ project_id: PID(req), collection: 'pay_payment', doc_id: randomId('pm_'), data: { uid: m.uid, name: m.name, merchant, source, amount, memo: b.memo || null, ts: now() }, owner_id: m.uid });
+    const pay = await getRepo().putRecord({ project_id: PID(req), collection: 'pay_payment', doc_id: randomId('pm_'), data: { uid: m.uid, name: m.name, merchant, source, amount, cashback, memo: b.memo || null, ts: now() }, owner_id: m.uid });
     await addTx(req, m.uid, { type: 'pay', amount, balance: w.krw, counter: merchant, memo: b.memo || (merchant + ' 결제') });
-    res.json({ ok: true, paid: amount, merchant, wallet: w, paymentId: pay.doc_id });
+    if (cashback > 0) await addTx(req, m.uid, { type: 'cashback', amount: cashback, balance: w.krw, counter: merchant, memo: '카드 캐시백' });
+    res.json({ ok: true, paid: amount, merchant, wallet: w, paymentId: pay.doc_id, cashback });
+  } catch (e) { next(e); }
+});
+
+// ================= 체크카드(가상) + 캐시백 =================
+// 발급하면 가상 카드번호가 생기고, 이후 가맹 결제 시 캐시백이 지갑으로 적립된다.
+const DEFAULT_CASHBACK = 0.005; // 0.5%
+async function getCardCashbackRate(req) {
+  const rec = await getRepo().getRecord(PID(req), 'pay_meta', 'config');
+  const r = rec?.data?.cardCashbackRate;
+  return (typeof r === 'number' && r >= 0 && r <= 0.05) ? r : DEFAULT_CASHBACK;
+}
+function newCardNumber() {
+  let n = '';
+  const buf = new Uint8Array(16); (globalThis.crypto || require('node:crypto').webcrypto).getRandomValues(buf);
+  for (let i = 0; i < 16; i++) n += (buf[i] % 10);
+  return n; // 16자리
+}
+function maskCard(n) { return n ? n.slice(0, 4) + ' •••• •••• ' + n.slice(12) : null; }
+function cardPublic(d, rate) {
+  return { number: maskCard(d.number), status: d.status, cashbackTotal: d.cashbackTotal || 0, cashbackRate: rate, issuedAt: d.issuedAt };
+}
+// 내 카드 조회
+router.get('/card', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const rate = await getCardCashbackRate(req);
+    const rec = await getRepo().getRecord(PID(req), 'pay_card', m.uid);
+    res.json({ ok: true, card: rec && rec.data.status === 'active' ? cardPublic(rec.data, rate) : null, cashbackRate: rate });
+  } catch (e) { next(e); }
+});
+// 발급
+router.post('/card/issue', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const repo = getRepo(), pid = PID(req);
+    const ex = await repo.getRecord(pid, 'pay_card', m.uid);
+    if (ex && ex.data.status === 'active') return res.status(409).json({ error: 'exists', message: '이미 발급된 카드가 있습니다.' });
+    const data = { number: newCardNumber(), status: 'active', cashbackTotal: (ex?.data?.cashbackTotal) || 0, issuedAt: now() };
+    await repo.putRecord({ project_id: pid, collection: 'pay_card', doc_id: m.uid, data, owner_id: m.uid });
+    const rate = await getCardCashbackRate(req);
+    res.status(201).json({ ok: true, card: cardPublic(data, rate) });
+  } catch (e) { next(e); }
+});
+// 해지
+router.post('/card/close', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const rec = await getRepo().getRecord(PID(req), 'pay_card', m.uid);
+    if (!rec || rec.data.status !== 'active') return res.status(404).json({ error: 'no_card' });
+    rec.data.status = 'closed';
+    await getRepo().putRecord({ project_id: PID(req), collection: 'pay_card', doc_id: m.uid, data: rec.data, owner_id: m.uid });
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 
@@ -241,6 +310,18 @@ router.get('/admin/payments', async (req, res, next) => {
   try { if (!requireAdmin(req, res)) return;
     const rows = await getRepo().queryRecords(PID(req), 'pay_payment', { limit: 300, sort: 'created_at:desc' });
     res.json({ ok: true, payments: rows.map((r) => ({ id: r.doc_id, ...r.data })) });
+  } catch (e) { next(e); }
+});
+// 카드 캐시백율 설정
+router.post('/admin/card-cashback', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const repo = getRepo(), pid = PID(req);
+    const rate = Number((req.body || {}).rate);
+    if (!(rate >= 0 && rate <= 0.05)) return res.status(400).json({ error: 'bad_rate', message: '캐시백율은 0~5% 사이여야 합니다.' });
+    const rec = await repo.getRecord(pid, 'pay_meta', 'config');
+    const data = { ...(rec?.data || {}), cardCashbackRate: rate };
+    await repo.putRecord({ project_id: pid, collection: 'pay_meta', doc_id: 'config', data, owner_id: null });
+    res.json({ ok: true, cardCashbackRate: rate });
   } catch (e) { next(e); }
 });
 // 예치 연이율 설정
