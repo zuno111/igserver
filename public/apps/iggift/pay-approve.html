@@ -1,0 +1,58 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>결제 승인 — igGift</title>
+<style>
+:root{--bg:#0c110e;--card:#121a15;--fg:#e7efea;--muted:#92a099;--border:#232e27;--accent:#2fbd84;--bad:#e06464;
+  --f:system-ui,-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif}
+@media(prefers-color-scheme:light){:root{--bg:#f4f7f5;--card:#fff;--fg:#121a16;--muted:#5d685f;--border:#e2e7e2}}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--fg);font-family:var(--f);font-style:normal;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;max-width:380px;width:100%;overflow:hidden}
+.head{padding:20px;text-align:center;color:#fff;font-weight:800;font-size:18px}
+.body{padding:22px}
+.amt{text-align:center;font-size:34px;font-weight:900;margin:6px 0}
+.row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+.row:last-child{border-bottom:0}.row .k{color:var(--muted)}
+.btns{display:flex;gap:10px;margin-top:20px}
+button{flex:1;padding:14px;border:0;border-radius:11px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit}
+.ok{background:var(--accent);color:#06130d}.cancel{background:var(--border);color:var(--fg)}
+.note{color:var(--muted);font-size:12px;text-align:center;margin-top:14px;line-height:1.5}
+.msg{text-align:center;padding:30px 20px;font-weight:700}
+.sandbox{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;background:rgba(210,153,79,.16);color:#d2994f;font-size:11px;font-weight:800}
+</style></head><body>
+<div class="card" id="card">
+  <div class="head" id="head">결제</div>
+  <div class="body" id="body">
+    <div class="amt"><span id="amt">0</span>원</div>
+    <div style="text-align:center"><span class="sandbox">테스트 결제(샌드박스)</span></div>
+    <div style="margin-top:16px">
+      <div class="row"><span class="k">결제수단</span><span id="pname">-</span></div>
+      <div class="row"><span class="k">상품</span><span>igGift 지갑 충전</span></div>
+      <div class="row"><span class="k">결제사</span><span>igGift Pay</span></div>
+    </div>
+    <div class="btns"><button class="cancel" onclick="done('fail')">취소</button><button class="ok" id="okBtn" onclick="done('success')">결제 승인</button></div>
+    <div class="note">실제 결제수단 키가 등록되면 이 화면 대신 해당 결제사의 실 결제창으로 연결됩니다.</div>
+  </div>
+</div>
+<script>
+const Q = new URLSearchParams(location.search);
+const PI = Q.get('pi'), PROVIDER = Q.get('provider')||'wallet', AMT = parseInt(Q.get('amount')||'0',10);
+const TOKEN = localStorage.getItem('igg_token')||'';
+const BRAND = {wallet:['계좌이체','#0b8a5c'],kakaopay:['카카오페이','#ffcd00'],naverpay:['네이버페이','#03c75a'],paypal:['PayPal','#0070ba'],global:['글로벌페이','#2563eb']};
+const [pname,color] = BRAND[PROVIDER]||['결제','#0b8a5c'];
+document.getElementById('amt').textContent = AMT.toLocaleString();
+document.getElementById('pname').textContent = pname;
+const head = document.getElementById('head'); head.textContent = pname; head.style.background = color;
+if(PROVIDER==='kakaopay') head.style.color='#3c1e1e';
+async function done(result){
+  document.getElementById('okBtn').disabled = true;
+  try{
+    const r = await fetch(location.origin+'/api/iggift/p2p/payin/confirm',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:JSON.stringify({pi:PI,result})});
+    const j = await r.json().catch(()=>({}));
+    const body = document.getElementById('body');
+    if(result==='success' && j.ok){ body.innerHTML = '<div class="msg" style="color:var(--accent)">✓ '+AMT.toLocaleString()+'원 충전 완료<div class="note">잠시 후 지갑으로 돌아갑니다</div></div>'; }
+    else { body.innerHTML = '<div class="msg" style="color:var(--muted)">결제가 취소되었습니다<div class="note">잠시 후 지갑으로 돌아갑니다</div></div>'; }
+  }catch(e){ document.getElementById('body').innerHTML = '<div class="msg" style="color:var(--bad)">오류가 발생했습니다</div>'; }
+  setTimeout(()=>{ location.href='/app/iggift/'; }, 1400);
+}
+</script>
+</body></html>

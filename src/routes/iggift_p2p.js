@@ -44,7 +44,17 @@ const PID = (req) => req.project.id;
 const now = () => Date.now();
 
 // ---- 운영 설정 ----
-const DEFAULT_CFG = { feeRate: 0.01, botEnabled: true, botName: 'P2P 자동봇', minAmount: 1000, maxAmount: 10000000 };
+const DEFAULT_CFG = {
+  feeRate: 0.01, botEnabled: true, botName: 'P2P 자동봇', minAmount: 1000, maxAmount: 10000000,
+  // 결제수단별 설정. live=true + 키가 있으면 실 API, 아니면 내장 샌드박스로 전 플로우 실동작.
+  providers: {
+    wallet:   { label: '계좌이체', enabled: true,  live: false },
+    kakaopay: { label: '카카오페이', enabled: true, live: false, cid: '', secretKey: '' },
+    naverpay: { label: '네이버페이', enabled: true, live: false, clientId: '', clientSecret: '', chainId: '' },
+    paypal:   { label: 'PayPal', enabled: true,    live: false, clientId: '', clientSecret: '', env: 'sandbox' },
+    global:   { label: '글로벌페이', enabled: true, live: false },
+  },
+};
 async function getCfg(req) {
   const rec = await getRepo().getRecord(PID(req), 'p2p_meta', 'config');
   return { ...DEFAULT_CFG, ...(rec?.data || {}) };
@@ -454,6 +464,172 @@ router.post('/admin/config', async (req, res, next) => {
     if (b.minAmount != null) patch.minAmount = Math.max(0, Math.floor(Number(b.minAmount)));
     if (b.maxAmount != null) patch.maxAmount = Math.max(1000, Math.floor(Number(b.maxAmount)));
     res.json({ ok: true, config: await setCfg(req, patch) });
+  } catch (e) { next(e); }
+});
+
+// ================= 결제(충전) 연동 — 카카오페이·네이버페이·PayPal·글로벌·계좌이체 =================
+// 키가 없으면 내장 샌드박스로 결제준비→승인→충전까지 실제로 동작. 키가 들어오면 그 수단만 실 API로 전환.
+const PROVIDER_META = { wallet:'계좌이체', kakaopay:'카카오페이', naverpay:'네이버페이', paypal:'PayPal', global:'글로벌페이' };
+async function providerCfg(req, name) { const cfg = await getCfg(req); return (cfg.providers || {})[name] || null; }
+function originOf(req) { return (req.get('x-forwarded-proto') || req.protocol) + '://' + req.get('host'); }
+
+// PayPal 실 API (키가 설정된 경우에만 호출). sandbox/live 환경 선택.
+function paypalBase(pc) { return (pc.env === 'live') ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com'; }
+async function paypalToken(pc) {
+  const r = await fetch(paypalBase(pc) + '/v1/oauth2/token', {
+    method: 'POST',
+    headers: { 'Authorization': 'Basic ' + Buffer.from(`${pc.clientId}:${pc.clientSecret}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials',
+  });
+  if (!r.ok) throw new Error('paypal_auth_failed');
+  return (await r.json()).access_token;
+}
+async function paypalCreateOrder(pc, { amount, returnUrl, cancelUrl }) {
+  const tok = await paypalToken(pc);
+  const r = await fetch(paypalBase(pc) + '/v2/checkout/orders', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: 'USD', value: (amount / 1300).toFixed(2) }, custom_id: 'iggift_charge' }], application_context: { return_url: returnUrl, cancel_url: cancelUrl, user_action: 'PAY_NOW', brand_name: 'igGift' } }),
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error('paypal_order_failed');
+  const approve = (j.links || []).find((l) => l.rel === 'approve' || l.rel === 'payer-action');
+  return { orderId: j.id, approveUrl: approve ? approve.href : null };
+}
+async function paypalCapture(pc, orderId) {
+  const tok = await paypalToken(pc);
+  const r = await fetch(paypalBase(pc) + `/v2/checkout/orders/${orderId}/capture`, {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
+  });
+  const j = await r.json();
+  return { ok: r.ok && j.status === 'COMPLETED', status: j.status };
+}
+
+// 결제 시작: payin(pending) 생성 → 승인 URL 반환
+// POST /payin/start { provider, amount }
+router.post('/payin/start', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const b = req.body || {};
+    const provider = PROVIDER_META[b.provider] ? b.provider : null;
+    const amount = Math.floor(Number(b.amount));
+    const cfg = await getCfg(req);
+    if (!provider) return res.status(400).json({ error: 'bad_provider', message: '지원하지 않는 결제수단입니다.' });
+    if (!(amount >= 1000)) return res.status(400).json({ error: 'bad_amount', message: '최소 1,000원부터 충전할 수 있습니다.' });
+    if (amount > cfg.maxAmount) return res.status(400).json({ error: 'over_max', message: `1회 최대 ${cfg.maxAmount.toLocaleString()}원까지 가능합니다.` });
+    const pc = cfg.providers[provider] || {};
+    if (pc.enabled === false) return res.status(400).json({ error: 'disabled', message: '현재 사용할 수 없는 결제수단입니다.' });
+
+    const repo = getRepo(), pid = PID(req), piId = randomId('pi_');
+    const origin = originOf(req);
+    let approveUrl, providerRef = null, sandbox = true, live = false;
+
+    // 실 API 분기: PayPal 키가 모두 있으면 실제 주문 생성
+    if (provider === 'paypal' && pc.live && pc.clientId && pc.clientSecret) {
+      try {
+        const returnUrl = `${origin}/app/iggift/pay-return.html?pi=${piId}`;
+        const cancelUrl = `${origin}/app/iggift/pay-return.html?pi=${piId}&cancel=1`;
+        const o = await paypalCreateOrder(pc, { amount, returnUrl, cancelUrl });
+        approveUrl = o.approveUrl; providerRef = o.orderId; sandbox = false; live = true;
+      } catch (e) {
+        return res.status(502).json({ error: 'provider_error', message: 'PayPal 주문 생성에 실패했습니다. 키 설정을 확인하세요.' });
+      }
+    } else {
+      // 내장 샌드박스: 실제 승인 페이지로 이동 → 승인 시 충전까지 동작(키 꽂으면 실 결제로 교체)
+      approveUrl = `${origin}/app/iggift/pay-approve.html?pi=${piId}&provider=${provider}&amount=${amount}`;
+    }
+
+    await repo.putRecord({ project_id: pid, collection: 'p2p_payin', doc_id: piId, data: {
+      uid: m.uid, name: m.name, provider, label: PROVIDER_META[provider], amount, status: 'pending', providerRef, sandbox, live, createdAt: now(),
+    }, owner_id: m.uid });
+    res.status(201).json({ ok: true, payinId: piId, provider, label: PROVIDER_META[provider], approveUrl, sandbox });
+  } catch (e) { next(e); }
+});
+
+// 결제 확정: 승인 페이지(샌드박스) 또는 PayPal 리턴 후 호출 → 검증·충전
+// POST /payin/confirm { pi, result? }
+router.post('/payin/confirm', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const b = req.body || {};
+    const repo = getRepo(), pid = PID(req);
+    const rec = await repo.getRecord(pid, 'p2p_payin', String(b.pi || ''));
+    if (!rec || rec.data.uid !== m.uid) return res.status(404).json({ error: 'not_found', message: '결제 요청을 찾을 수 없습니다.' });
+    if (rec.data.status !== 'pending') return res.json({ ok: rec.data.status === 'approved', status: rec.data.status, already: true });
+    const d = rec.data;
+
+    let paid = false;
+    if (d.live && d.provider === 'paypal' && d.providerRef) {
+      const pc = await providerCfg(req, 'paypal');
+      const cap = await paypalCapture(pc, d.providerRef);
+      paid = cap.ok;
+      if (!paid) { d.status = 'failed'; await repo.putRecord({ project_id: pid, collection: 'p2p_payin', doc_id: rec.doc_id, data: d, owner_id: m.uid }); return res.status(402).json({ error: 'capture_failed', message: 'PayPal 결제 승인에 실패했습니다.', status: cap.status }); }
+    } else {
+      // 샌드박스: 승인 페이지에서 success 전달 시 충전
+      paid = (b.result === 'success' || b.result === undefined);
+    }
+
+    if (paid) {
+      const w = await getWallet(req, m.uid);
+      w.krw = (w.krw | 0) + d.amount;
+      await saveWallet(req, m.uid, w);
+      d.status = 'approved'; d.approvedAt = now();
+      await repo.putRecord({ project_id: pid, collection: 'p2p_payin', doc_id: rec.doc_id, data: d, owner_id: m.uid });
+      await ledger(req, { type: 'charge', uid: m.uid, amount: d.amount, balance: w.krw, src: 'payin:' + d.provider });
+      return res.json({ ok: true, status: 'approved', amount: d.amount, wallet: w, label: d.label });
+    }
+    d.status = 'failed';
+    await repo.putRecord({ project_id: pid, collection: 'p2p_payin', doc_id: rec.doc_id, data: d, owner_id: m.uid });
+    res.json({ ok: false, status: 'failed' });
+  } catch (e) { next(e); }
+});
+
+// 사용 가능한 결제수단 목록(공개 — 프론트 충전 화면용). ':id'보다 먼저 등록해야 'methods'가 id로 안 잡힌다.
+router.get('/payin/methods', async (req, res, next) => {
+  try {
+    const cfg = await getCfg(req);
+    const methods = Object.entries(cfg.providers || {})
+      .filter(([, v]) => v.enabled !== false)
+      .map(([k, v]) => ({ key: k, label: v.label || PROVIDER_META[k] || k, live: !!v.live }));
+    res.json({ ok: true, methods });
+  } catch (e) { next(e); }
+});
+
+// 결제 상태 조회
+router.get('/payin/:id', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const rec = await getRepo().getRecord(PID(req), 'p2p_payin', req.params.id);
+    if (!rec || rec.data.uid !== m.uid) return res.status(404).json({ error: 'not_found' });
+    res.json({ ok: true, payin: { id: rec.doc_id, ...rec.data } });
+  } catch (e) { next(e); }
+});
+
+// 운영자: 결제수단 목록(상세) 및 설정
+router.get('/admin/payin', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const cfg = await getCfg(req);
+    // 시크릿 값은 설정 여부만 노출
+    const providers = Object.fromEntries(Object.entries(cfg.providers || {}).map(([k, v]) => [k, {
+      label: v.label, enabled: v.enabled !== false, live: !!v.live,
+      hasClientId: !!v.clientId, hasSecret: !!(v.secretKey || v.clientSecret), env: v.env || null,
+    }]));
+    const rows = await getRepo().queryRecords(PID(req), 'p2p_payin', { limit: 100, sort: 'created_at:desc' });
+    res.json({ ok: true, providers, recent: rows.map((r) => ({ id: r.doc_id, ...r.data })) });
+  } catch (e) { next(e); }
+});
+router.post('/admin/payin/config', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const b = req.body || {}; const cfg = await getCfg(req);
+    const providers = { ...(cfg.providers || {}) };
+    const p = String(b.provider || '');
+    if (!providers[p]) return res.status(400).json({ error: 'bad_provider' });
+    const cur = { ...providers[p] };
+    if (b.enabled != null) cur.enabled = !!b.enabled;
+    if (b.live != null) cur.live = !!b.live;
+    for (const k of ['cid', 'secretKey', 'clientId', 'clientSecret', 'chainId', 'env']) if (b[k] != null) cur[k] = String(b[k]);
+    providers[p] = cur;
+    await setCfg(req, { providers });
+    res.json({ ok: true, provider: p, live: cur.live, enabled: cur.enabled !== false });
   } catch (e) { next(e); }
 });
 

@@ -320,19 +320,31 @@ function openSheet(html){ $('sheet').innerHTML=html; $('modal').classList.add('o
 function closeSheet(){ $('modal').classList.remove('on'); }
 $('modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeSheet(); });
 
-function openCharge(){
+const PAY_BRAND={wallet:['계좌이체','🏦'],kakaopay:['카카오페이','🟡'],naverpay:['네이버페이','🟢'],paypal:['PayPal','🅿️'],global:['글로벌페이','🌐']};
+let PAY_SEL='wallet', PAY_METHODS=[];
+async function openCharge(){
+  try{ const r=await api('/api/iggift/p2p/payin/methods'); PAY_METHODS=r.methods||[]; }catch(e){ PAY_METHODS=[{key:'wallet',label:'계좌이체'}]; }
+  PAY_SEL=PAY_METHODS[0]?.key||'wallet';
+  const methodBtns=PAY_METHODS.map(m=>{const b=PAY_BRAND[m.key]||[m.label,'💳'];return `<button type="button" class="chip paym" data-k="${m.key}" onclick="selPay('${m.key}')">${b[1]} ${b[0]}${m.live?'':' <span style=\"font-size:10px;opacity:.7\">test</span>'}</button>`;}).join('');
   openSheet(`<button class="x" onclick="closeSheet()">&times;</button><h3>충전</h3>
-    <p class="muted small">계좌이체 입금 금액을 입력하면 지갑에 반영됩니다.</p>
-    <label>충전 금액</label><input id="cgAmt" type="number" inputmode="numeric" placeholder="예: 100000">
+    <p class="muted small">결제수단을 고르고 금액을 입력하면 승인 후 지갑에 반영됩니다.</p>
+    <label>결제수단</label><div class="chips" id="payMethods" style="margin-top:4px">${methodBtns}</div>
+    <label style="margin-top:12px">충전 금액</label><input id="cgAmt" type="number" inputmode="numeric" placeholder="예: 100000">
     <div class="chips" id="cgChips">${CHIPS.map(a=>`<button type="button" class="chip" onclick="$('cgAmt').value=${a};document.querySelectorAll('#cgChips .chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')">${a>=10000?a/10000+'만':a}</button>`).join('')}</div>
-    <button class="btn" onclick="doCharge()">충전하기</button>
-    <div class="note">실서비스에서는 입금 문자를 자동 파싱해 충전합니다. 아래로 문자 파싱도 테스트할 수 있습니다.</div>
-    <label style="margin-top:14px">입금 문자 붙여넣기</label><textarea id="depText" placeholder="[KB] 홍길동 100,000원 입금"></textarea>
+    <button class="btn" onclick="doPayin()">결제하고 충전</button>
+    <div class="note">계좌이체 입금 문자로도 자동 충전할 수 있습니다.</div>
+    <label style="margin-top:10px">입금 문자 붙여넣기</label><textarea id="depText" placeholder="[KB] 홍길동 100,000원 입금"></textarea>
     <button class="btn alt" onclick="doParse()">문자로 자동 충전</button>`);
+  selPay(PAY_SEL);
 }
-async function doCharge(){
+function selPay(k){ PAY_SEL=k; document.querySelectorAll('.paym').forEach(b=>b.classList.toggle('on',b.dataset.k===k)); }
+async function doPayin(){
   const amt=parseInt($('cgAmt').value,10); if(!(amt>0)){toast('금액을 입력하세요');return;}
-  try{ await api('/api/iggift/p2p/charge',{method:'POST',body:{amount:amt}}); toast(fmt(amt)+'원 충전 완료'); closeSheet(); refresh(); }catch(e){toast(e.message);}
+  try{
+    const r=await api('/api/iggift/p2p/payin/start',{method:'POST',body:{provider:PAY_SEL,amount:amt}});
+    if(r.approveUrl){ location.href=r.approveUrl; }
+    else { toast('결제창을 열 수 없습니다'); }
+  }catch(e){ toast(e.message); }
 }
 async function doParse(){
   const text=$('depText').value.trim(); if(!text){toast('입금 문자를 붙여넣으세요');return;}

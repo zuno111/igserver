@@ -1,0 +1,29 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>결제 처리 중 — igGift</title>
+<style>
+:root{--bg:#0c110e;--fg:#e7efea;--muted:#92a099;--accent:#2fbd84;--bad:#e06464;--f:system-ui,"Malgun Gothic","Noto Sans KR",sans-serif}
+@media(prefers-color-scheme:light){:root{--bg:#f4f7f5;--fg:#121a16;--muted:#5d685f}}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--fg);font-family:var(--f);font-style:normal;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+.box{max-width:340px}.sp{width:44px;height:44px;border:4px solid var(--muted);border-top-color:var(--accent);border-radius:50%;margin:0 auto 18px;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+h2{font-weight:800;font-size:18px}p{color:var(--muted);font-size:14px;margin-top:8px}
+</style></head><body>
+<div class="box" id="box"><div class="sp"></div><h2>결제 처리 중…</h2><p>PayPal 승인을 확인하고 지갑에 반영합니다.</p></div>
+<script>
+const Q=new URLSearchParams(location.search);
+const PI=Q.get('pi'), CANCEL=Q.get('cancel');
+const TOKEN=localStorage.getItem('igg_token')||'';
+(async()=>{
+  const box=document.getElementById('box');
+  if(CANCEL){ box.innerHTML='<h2>결제가 취소되었습니다</h2><p>잠시 후 지갑으로 돌아갑니다</p>'; setTimeout(()=>location.href='/app/iggift/',1400); return; }
+  try{
+    const r=await fetch(location.origin+'/api/iggift/p2p/payin/confirm',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:JSON.stringify({pi:PI})});
+    const j=await r.json().catch(()=>({}));
+    if(j.ok) box.innerHTML='<h2 style="color:var(--accent)">✓ 충전 완료</h2><p>'+(j.amount||0).toLocaleString()+'원이 지갑에 반영되었습니다</p>';
+    else box.innerHTML='<h2>결제 확인 실패</h2><p>'+(j.message||'다시 시도해 주세요')+'</p>';
+  }catch(e){ box.innerHTML='<h2>오류</h2><p>결제 확인 중 문제가 발생했습니다</p>'; }
+  setTimeout(()=>location.href='/app/iggift/',1600);
+})();
+</script>
+</body></html>
