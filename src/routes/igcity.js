@@ -181,18 +181,22 @@ const _osmCache = new Map(); // key -> { features, ts }
 const OSM_TTL = 1000 * 60 * 60 * 24 * 7; // 7일
 function bbKey(bb) { return ['s', 'w', 'n', 'e'].map((k) => (+bb[k]).toFixed(4)).join(','); }
 
-// Overpass가 전부 바쁠 때(502) 그 bbox를 큐에 넣고 백그라운드로 주기 재시도 → 열리는 순간 캐시 확보
-const _retryQueue = new Map(); // key -> bb
+// Overpass가 전부 바쁠 때(502) 그 bbox를 큐에 넣고 백그라운드로 주기 재시도 → 열리는 순간 캐시(메모리+DB 영구) 확보
+const _retryQueue = new Map(); // key -> { bb, pid }
 let _retryTimer = null;
-function scheduleOSMRetry(bb) {
+async function saveOSM(pid, key, features) {
+  _osmCache.set(key, { features, ts: Date.now() });
+  if (pid) { try { await getRepo().putRecord({ project_id: pid, collection: 'osmcache', doc_id: key, data: features }); } catch (e) {} }
+}
+function scheduleOSMRetry(bb, pid) {
   const key = bbKey(bb);
   if (_osmCache.has(key) || _retryQueue.has(key)) return;
-  _retryQueue.set(key, bb);
+  _retryQueue.set(key, { bb, pid });
   if (!_retryTimer) {
     _retryTimer = setInterval(async () => {
-      for (const [k, b] of _retryQueue) {
+      for (const [k, v] of _retryQueue) {
         if (_osmCache.has(k)) { _retryQueue.delete(k); continue; }
-        try { const f = await fetchOSM(b); _osmCache.set(k, { features: f, ts: Date.now() }); _retryQueue.delete(k); } catch (e) { /* 다음 주기 재시도 */ }
+        try { const f = await fetchOSM(v.bb); await saveOSM(v.pid, k, f); _retryQueue.delete(k); } catch (e) { /* 다음 주기 재시도 */ }
       }
       if (!_retryQueue.size && _retryTimer) { clearInterval(_retryTimer); _retryTimer = null; }
     }, 60000);
@@ -251,11 +255,14 @@ router.get('/osm', async (req, res, next) => {
     if ((bb.n - bb.s) > 0.05 || (bb.e - bb.w) > 0.05) return res.status(400).json({ error: 'too_wide' });
     const key = bbKey(bb);
     const hit = _osmCache.get(key);
-    if (hit && (Date.now() - hit.ts) < OSM_TTL) return res.json({ features: hit.features, cached: true });
+    if (hit && (Date.now() - hit.ts) < OSM_TTL) return res.json({ features: hit.features, cached: 'mem' });
+    const pid = req.project && req.project.id;
+    // DB 영구 캐시 — 서버 콜드스타트로 메모리 캐시가 날아가도 DB에서 즉시 복구
+    if (pid) { try { const rec = await getRepo().getRecord(pid, 'osmcache', key); if (rec && rec.data && rec.data.buildings) { _osmCache.set(key, { features: rec.data, ts: Date.now() }); return res.json({ features: rec.data, cached: 'db' }); } } catch (e) {} }
     let features;
     try { features = await fetchOSM(bb); }
-    catch (e) { scheduleOSMRetry(bb); return res.status(502).json({ error: 'osm_fail', message: e.message }); }
-    _osmCache.set(key, { features, ts: Date.now() });
+    catch (e) { scheduleOSMRetry(bb, pid); return res.status(502).json({ error: 'osm_fail', message: e.message }); }
+    await saveOSM(pid, key, features);
     res.json({ features, cached: false, buildings: features.buildings.length });
   } catch (e) { next(e); }
 });
