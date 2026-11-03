@@ -29,8 +29,21 @@ async function getWallet(req, uid) {
   if (rec.data.coin == null) rec.data.coin = 0; // 기존 지갑 호환
   if (rec.data.goldG == null) rec.data.goldG = 0;
   if (rec.data.silverG == null) rec.data.silverG = 0;
+  if (rec.data.fx == null) rec.data.fx = {}; // { USD: 0, JPY: 0, ... }
   return rec.data;
 }
+// 외화 환율(1단위당 원). 기본값은 데모용 — 운영에서 실환율로 설정.
+const FX_CCYS = ['USD', 'JPY', 'EUR', 'CNY'];
+const FX_NAME = { USD: '미국 달러', JPY: '일본 엔', EUR: '유로', CNY: '중국 위안' };
+const DEFAULT_FX = { USD: 1350, JPY: 9, EUR: 1450, CNY: 190 }; // JPY는 1엔당, 나머지는 1단위당 원
+async function getFxRates(req) {
+  const rec = await getRepo().getRecord(PID(req), 'pay_meta', 'config');
+  const saved = rec?.data?.fxRates || {};
+  const out = {};
+  for (const c of FX_CCYS) out[c] = (typeof saved[c] === 'number' && saved[c] > 0) ? saved[c] : DEFAULT_FX[c];
+  return out;
+}
+function roundFx(v) { return Math.round((v + Number.EPSILON) * 100) / 100; } // 소수 2자리
 // 금·은 시세(1g당 원). 기본값은 데모용 — 운영에서 실시세로 설정.
 const DEFAULT_METAL = { gold: 110000, silver: 1300 };
 async function getMetalPrice(req, metal) {
@@ -74,7 +87,10 @@ router.get('/me', async (req, res, next) => {
       gold: { grams: roundGram(w.goldG || 0), valueKrw: Math.floor((w.goldG || 0) * goldP) },
       silver: { grams: roundGram(w.silverG || 0), valueKrw: Math.floor((w.silverG || 0) * silverP) },
     };
-    res.json({ ok: true, uid: m.uid, name: m.name, wallet: { krw: w.krw | 0, coin: roundCoin(w.coin || 0) }, savings, card, cardCashbackRate: cardRate, coinRate, metals, tx });
+    const fxRates = await getFxRates(req);
+    const fx = { rates: fxRates, currencies: FX_CCYS, holdings: {} };
+    for (const c of FX_CCYS) { const bal = roundFx(w.fx[c] || 0); fx.holdings[c] = { balance: bal, name: FX_NAME[c], rate: fxRates[c], valueKrw: Math.floor(bal * fxRates[c]) }; }
+    res.json({ ok: true, uid: m.uid, name: m.name, wallet: { krw: w.krw | 0, coin: roundCoin(w.coin || 0) }, savings, card, cardCashbackRate: cardRate, coinRate, metals, fx, tx });
   } catch (e) { next(e); }
 });
 
@@ -335,6 +351,57 @@ router.get('/metal/deliveries', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ================= 다통화·환전(외화 지갑) =================
+// 원화로 달러·엔·유로·위안을 사고 팔 수 있다. 환율은 운영 설정.
+router.get('/fx', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const w = await getWallet(req, m.uid);
+    const rates = await getFxRates(req);
+    const holdings = {};
+    for (const c of FX_CCYS) { const bal = roundFx(w.fx[c] || 0); holdings[c] = { balance: bal, name: FX_NAME[c], rate: rates[c], valueKrw: Math.floor(bal * rates[c]) }; }
+    res.json({ ok: true, rates, holdings, krw: w.krw | 0, currencies: FX_CCYS });
+  } catch (e) { next(e); }
+});
+// 환전 매수(원화→외화)
+router.post('/fx/buy', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const b = req.body || {};
+    const ccy = FX_CCYS.includes(b.ccy) ? b.ccy : null;
+    const krw = Math.floor(Number(b.krw));
+    if (!ccy) return res.status(400).json({ error: 'bad_ccy' });
+    if (!(krw > 0)) return res.status(400).json({ error: 'bad_amount' });
+    const w = await getWallet(req, m.uid);
+    if ((w.krw | 0) < krw) return res.status(402).json({ error: 'insufficient', message: '지갑 잔액이 부족합니다.', balance: w.krw | 0 });
+    const rates = await getFxRates(req);
+    const got = roundFx(krw / rates[ccy]);
+    w.krw -= krw; w.fx[ccy] = roundFx((w.fx[ccy] || 0) + got);
+    await saveWallet(req, m.uid, w);
+    await addTx(req, m.uid, { type: 'fx_buy', amount: krw, balance: w.krw, memo: `환전 매수 +${got} ${ccy}` });
+    res.json({ ok: true, ccy, bought: got, rate: rates[ccy], wallet: { krw: w.krw | 0, fx: roundFx(w.fx[ccy]) } });
+  } catch (e) { next(e); }
+});
+// 환전 매도(외화→원화)
+router.post('/fx/sell', async (req, res, next) => {
+  try {
+    const m = requireMember(req, res); if (!m) return;
+    const b = req.body || {};
+    const ccy = FX_CCYS.includes(b.ccy) ? b.ccy : null;
+    const amount = roundFx(Number(b.amount));
+    if (!ccy) return res.status(400).json({ error: 'bad_ccy' });
+    if (!(amount > 0)) return res.status(400).json({ error: 'bad_amount' });
+    const w = await getWallet(req, m.uid);
+    if ((w.fx[ccy] || 0) < amount) return res.status(402).json({ error: 'insufficient', message: `${ccy} 보유액이 부족합니다.`, balance: w.fx[ccy] || 0 });
+    const rates = await getFxRates(req);
+    const krw = Math.floor(amount * rates[ccy]);
+    w.fx[ccy] = roundFx((w.fx[ccy] || 0) - amount); w.krw = (w.krw | 0) + krw;
+    await saveWallet(req, m.uid, w);
+    await addTx(req, m.uid, { type: 'fx_sell', amount: krw, balance: w.krw, memo: `환전 매도 -${amount} ${ccy}` });
+    res.json({ ok: true, ccy, sold: amount, krw, rate: rates[ccy], wallet: { krw: w.krw | 0, fx: roundFx(w.fx[ccy]) } });
+  } catch (e) { next(e); }
+});
+
 // 거래 내역
 router.get('/tx', async (req, res, next) => {
   try {
@@ -482,6 +549,21 @@ router.get('/admin/payments', async (req, res, next) => {
   try { if (!requireAdmin(req, res)) return;
     const rows = await getRepo().queryRecords(PID(req), 'pay_payment', { limit: 300, sort: 'created_at:desc' });
     res.json({ ok: true, payments: rows.map((r) => ({ id: r.doc_id, ...r.data })) });
+  } catch (e) { next(e); }
+});
+// 외화 환율 설정(1단위당 원)
+router.post('/admin/fx-rate', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const repo = getRepo(), pid = PID(req), b = req.body || {};
+    const ccy = FX_CCYS.includes(b.ccy) ? b.ccy : null;
+    const rate = Number(b.rate);
+    if (!ccy) return res.status(400).json({ error: 'bad_ccy' });
+    if (!(rate > 0)) return res.status(400).json({ error: 'bad_rate', message: '환율은 0보다 커야 합니다.' });
+    const rec = await repo.getRecord(pid, 'pay_meta', 'config');
+    const data = { ...(rec?.data || {}) };
+    data.fxRates = { ...(data.fxRates || {}), [ccy]: rate };
+    await repo.putRecord({ project_id: pid, collection: 'pay_meta', doc_id: 'config', data, owner_id: null });
+    res.json({ ok: true, ccy, rate });
   } catch (e) { next(e); }
 });
 // 금·은 시세 설정(1g당 원)
