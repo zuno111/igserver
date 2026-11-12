@@ -2122,14 +2122,26 @@ function renderWatchFor(m,lv,isTest){
 
 /* ============================= CHANNEL ============================= */
 var chanTab='all';
+function donateChannel(){ var nick=window._curChan||me();
+  function doDonate(v){ var amt=Math.round(+v||0); if(amt<1){ toast('금액을 입력하세요'); return; }
+    if(NET.on){ api('POST','/api/igplay/support',{to:nick,amount:amt}).then(function(r){ if(r&&r.wallet){db.isc=r.wallet.balance;saveDB();updateWallet();} else if(!spend(amt)){ toast('ISC가 부족합니다'); return; } toast('후원 완료 · '+amt+' ISC 🙏'); }).catch(function(){ if(spend(amt))toast('후원 완료 · '+amt+' ISC 🙏'); else toast('ISC가 부족합니다'); }); }
+    else { if(spend(amt))toast('후원 완료 · '+amt+' ISC 🙏'); else toast('ISC가 부족합니다'); } }
+  if(typeof askText==='function'){ askText({title:'창작자 후원',desc:nick+' 님에게 ISC로 후원합니다',placeholder:'금액(ISC)',ok:'후원',onOk:doDonate}); }
+  else { doDonate(prompt('후원 금액(ISC)')); } }
+function toggleFriend(){ var nick=window._curChan||me(); db.friends=db.friends||[]; var i=db.friends.indexOf(nick);
+  if(i>=0){ db.friends.splice(i,1); toast('친구 해제'); } else { db.friends.push(nick); toast('친구 추가 완료'); }
+  saveDB(); var m=document.getElementById('main'); if(m)renderChannel(m); }
 function renderChannel(m){
-  var nick=me();
+  var nick=me(); window._curChan=nick; db.friends=db.friends||[]; var isFriend=db.friends.indexOf(nick)>=0;
   var mine=NET.on ? netLevels.filter(function(l){return l.creatorId===NET.uid;}) : db.myLevels;
   var liked=allLevels().filter(function(l){return db.likes[l.id];});
   var cleared=allLevels().filter(function(l){return (db.times[l.id]||[]).some(function(t){return (t.n||t.name)===nick;});});
   var html='<div class="wrap"><div class="chead"><div class="ava" style="background:'+avaColor(nick)+'">'+esc(nick.charAt(0))+'</div>'+
     '<div><h1>'+esc(nick)+'</h1><div class="s">@'+esc((NET.on?(NET.name||'me'):(db.nick||'guest')).toLowerCase())+' · 업로드 '+mine.length+' · 클리어 '+cleared.length+(NET.on?' · 서버':'')+'</div>'+
     '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn brand" onclick="go(\'create\')">+ 레벨 만들기</button>'+
+    '<button class="btn" onclick="donateChannel()">☕ 후원</button>'+
+    '<button class="btn'+(isFriend?' accent':'')+'" onclick="toggleFriend()">'+(isFriend?'친구 ✓':'👥 친구 추가')+'</button>'+
+    '<button class="btn" onclick="toast(\'메시지(DM)는 준비 중입니다\')">💬 메시지</button>'+
     (NET.on?'<button class="btn" id="chInvest">채널 투자 모집</button><button class="btn" id="chToken">내 토큰 발행</button>':(db.nick?'':'<button class="btn" onclick="login()">닉네임 설정</button>'))+'</div></div></div>';
   html+='<div class="ctabs">'+[['all','전체'],['mine','내 레벨'],['cleared','클리어'],['liked','좋아요']].map(function(t){return '<button class="ctab'+(t[0]===chanTab?' on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
   html+='<div class="grid" id="cfeed"></div></div>';
@@ -2252,8 +2264,8 @@ var mktTab='all';
 /* ============================= 스토어(통합 콘텐츠 마켓) ============================= */
 // 게임·앱·3D에셋·이미지·음원·영상·문서를 하나의 스토어에서 올리고 받는다. ISC 결제/무료/광고해제/토큰 홀더.
 var storeTab='all';
-var STORE_KINDS=[['all','전체'],['game','게임'],['app','앱'],['asset3d','3D에셋'],['image','이미지'],['music','음원'],['video','영상'],['doc','문서'],['mine','내 보관함']];
-var STORE_KIND_LABEL={game:'게임',level:'레벨',app:'앱',asset3d:'3D에셋',image:'이미지',music:'음원',video:'영상',doc:'문서',bundle:'번들'};
+var STORE_KINDS=[['all','전체'],['game','게임'],['app','앱'],['asset3d','3D에셋'],['image','이미지'],['music','음원'],['video','영상'],['doc','문서'],['food','푸드·외식'],['fashion','패션·뷰티'],['living','리빙·생활'],['hobby','취미·레저'],['item','아이템'],['mine','내 보관함']];
+var STORE_KIND_LABEL={game:'게임',level:'레벨',app:'앱',asset3d:'3D에셋',image:'이미지',music:'음원',video:'영상',doc:'문서',bundle:'번들',food:'푸드·외식',fashion:'패션·뷰티',living:'리빙·생활',hobby:'취미·레저',item:'아이템'};
 function storeAccessBadge(it){
   if(it.access==='paid') return '<span class="vf" style="color:var(--brand)">'+fmt(it.price)+' ISC</span>';
   if(it.access==='ad') return '<span class="vf" style="color:var(--accent)">광고</span>';
@@ -2368,7 +2380,7 @@ function publishStoreDialog(m){
   var inputS='width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--fg);outline:none;margin-bottom:10px';
   wrap.innerHTML='<div class="ocard" style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:22px;text-align:left;max-width:460px;max-height:86vh;overflow:auto">'+
     '<h3 style="font-size:18px;margin-bottom:12px">콘텐츠 올리기</h3>'+
-    '<select id="pKind" style="'+inputS+'"><option value="game">게임</option><option value="app">앱</option><option value="asset3d">3D에셋(GLB/OBJ)</option><option value="image">이미지</option><option value="music">음원</option><option value="video">영상</option><option value="doc">문서/프리셋</option><option value="bundle">번들</option></select>'+
+    '<select id="pKind" style="'+inputS+'"><option value="game">게임</option><option value="app">앱</option><option value="asset3d">3D에셋(GLB/OBJ)</option><option value="image">이미지</option><option value="music">음원</option><option value="video">영상</option><option value="doc">문서/프리셋</option><option value="bundle">번들</option><option value="food">푸드·외식</option><option value="fashion">패션·뷰티</option><option value="living">리빙·생활</option><option value="hobby">취미·레저</option><option value="item">아이템</option></select>'+
     '<input id="pTitle" placeholder="제목" style="'+inputS+'">'+
     '<textarea id="pDesc" placeholder="설명(선택)" rows="2" style="'+inputS+';resize:vertical"></textarea>'+
     '<input id="pUrl" placeholder="콘텐츠 링크(https://... 다운로드/실행 주소)" style="'+inputS+'">'+
