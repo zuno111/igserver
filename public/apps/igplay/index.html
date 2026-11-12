@@ -3359,7 +3359,7 @@ function renderLive(m,arg){
 function renderWorld(m){
   var L=window.__LEAF; // Leaflet (전역 L 은 복셀 헬퍼에 의해 덮여 있음)
   if(!L||typeof L.map!=='function'){ m.innerHTML='<div class="wrap"><div class="empty"><h3>지도를 불러오지 못했습니다</h3></div></div>'; return; }
-  m.innerHTML='<div style="position:relative;width:100%;height:calc(100vh - 60px);min-height:460px"><div id="worldmap" style="position:absolute;inset:0;background:#dfe6ee"></div>'+
+  m.innerHTML='<div style="position:relative;width:100%;height:calc(100vh - 60px);min-height:460px"><div id="worldmap" style="position:absolute;inset:0;background:#0d1117"></div>'+
     '<div style="position:absolute;top:12px;left:12px;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--muted);pointer-events:none">월드 · 핀을 눌러 콘텐츠로 이동</div>'+
     '<button class="btn brand" id="cityBtn" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:500">이 구역 월드로 올리기</button>'+
     '<div style="position:absolute;top:12px;right:12px;z-index:500;display:flex;gap:6px">'+
@@ -3370,15 +3370,16 @@ function renderWorld(m){
   // 아티팩트 보안정책이 외부 지도 타일(OSM 등) 이미지를 막으므로, 타일을 직접 그려 지도 배경을 만든다(네트워크 0)
   var LocalMap=L.GridLayer.extend({ createTile:function(coords){ var tile=document.createElement('canvas'); var s=this.getTileSize(); tile.width=s.x; tile.height=s.y; var c=tile.getContext('2d');
     function hsh(a,b){ var n=Math.sin(a*127.1+b*311.7+(coords.z||0)*13.37)*43758.5453; return n-Math.floor(n); }
-    c.fillStyle='#e9eef0'; c.fillRect(0,0,s.x,s.y);
+    c.fillStyle='#141a22'; c.fillRect(0,0,s.x,s.y);
     var g=4, cw=s.x/g, ch=s.y/g;
     for(var i=0;i<g;i++)for(var j=0;j<g;j++){ var r=hsh(coords.x*g+i,coords.y*g+j);
-      c.fillStyle=r<0.14?'#cfe6d6':(r<0.26?'#cfe0ef':(r<0.62?'#e2e8ec':'#dde5ea')); c.fillRect(i*cw+1.5,j*ch+1.5,cw-3,ch-3); }
-    c.strokeStyle='#c4ced5'; c.lineWidth=2; c.beginPath(); for(var k=0;k<=g;k++){ c.moveTo(k*cw,0);c.lineTo(k*cw,s.y); c.moveTo(0,k*ch);c.lineTo(s.x,k*ch);} c.stroke();
+      c.fillStyle=r<0.14?'#16304a':(r<0.26?'#1a2b40':(r<0.62?'#171d26':'#1b222c')); c.fillRect(i*cw+1.5,j*ch+1.5,cw-3,ch-3); }
+    c.strokeStyle='#283240'; c.lineWidth=2; c.beginPath(); for(var k=0;k<=g;k++){ c.moveTo(k*cw,0);c.lineTo(k*cw,s.y); c.moveTo(0,k*ch);c.lineTo(s.x,k*ch);} c.stroke();
     return tile; } });
   new LocalMap({maxZoom:19,attribution:'igPlay 월드맵'}).addTo(map);
   // 실제 도메인에선 OSM 타일이 위에 로드되어 진짜 지도가 되고, 차단되는 환경(아티팩트)에선 위 자체 지도가 그대로 보인다.
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap',crossOrigin:true}).addTo(map);
+  // OSM 공식 타일은 앱 직접사용이 정책상 403 차단되므로, 앱 사용 허용되는 무료 다크 타일(CARTO)을 사용
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO',crossOrigin:true}).addTo(map);
   var layer=L.layerGroup().addTo(map);
   var KLABEL={world:'복셀 월드',level:'레벨',vod:'영상',live:'라이브',store:'상점',shop:'상점',channel:'채널'};
   function drawPins(pins){ layer.clearLayers();
