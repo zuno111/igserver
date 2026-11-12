@@ -3363,10 +3363,10 @@ function renderWorld(m){
     '<div style="position:absolute;top:12px;left:12px;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--muted);pointer-events:none">월드 · 핀을 눌러 콘텐츠로 이동</div>'+
     '<button class="btn brand" id="cityBtn" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:500">이 구역 월드로 올리기</button>'+
     '<div style="position:absolute;top:12px;right:12px;z-index:500;display:flex;gap:6px">'+
-      ['level|레벨|#ffb02e','vod|영상|#3aa0ff','live|라이브|#f0556b','store|상점|#27d4b8'].map(function(s){var p=s.split("|");return '<span style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px 9px;font-size:11px"><b style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p[2]+';margin-right:4px"></b>'+p[1]+'</span>';}).join('')+
+      ['world|월드|#a855f7','level|레벨|#ffb02e','vod|영상|#3aa0ff','live|라이브|#f0556b','store|상점|#27d4b8'].map(function(s){var p=s.split("|");return '<span style="background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px 9px;font-size:11px"><b style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p[2]+';margin-right:4px"></b>'+p[1]+'</span>';}).join('')+
     '</div></div>';
-  var COLORS={level:'#ffb02e',vod:'#3aa0ff',live:'#f0556b',store:'#27d4b8'};
-  var map=L.map('worldmap',{zoomControl:true,attributionControl:true}).setView([37.5665,126.9780],13);
+  var COLORS={world:'#a855f7',level:'#ffb02e',vod:'#3aa0ff',live:'#f0556b',store:'#27d4b8',shop:'#27d4b8',channel:'#c084fc'};
+  var map=L.map('worldmap',{zoomControl:true,attributionControl:true,worldCopyJump:true}).setView([37.5400,127.0000],11);
   // 아티팩트 보안정책이 외부 지도 타일(OSM 등) 이미지를 막으므로, 타일을 직접 그려 지도 배경을 만든다(네트워크 0)
   var LocalMap=L.GridLayer.extend({ createTile:function(coords){ var tile=document.createElement('canvas'); var s=this.getTileSize(); tile.width=s.x; tile.height=s.y; var c=tile.getContext('2d');
     function hsh(a,b){ var n=Math.sin(a*127.1+b*311.7+(coords.z||0)*13.37)*43758.5453; return n-Math.floor(n); }
@@ -3380,23 +3380,32 @@ function renderWorld(m){
   // 실제 도메인에선 OSM 타일이 위에 로드되어 진짜 지도가 되고, 차단되는 환경(아티팩트)에선 위 자체 지도가 그대로 보인다.
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap',crossOrigin:true}).addTo(map);
   var layer=L.layerGroup().addTo(map);
+  var KLABEL={world:'복셀 월드',level:'레벨',vod:'영상',live:'라이브',store:'상점',shop:'상점',channel:'채널'};
   function drawPins(pins){ layer.clearLayers();
     (pins||[]).forEach(function(p){ var col=COLORS[p.kind]||'#ffffff';
-      var mk=L.circleMarker([p.lat,p.lng],{radius:9,color:'#0b0f16',fillColor:col,fillOpacity:0.9,weight:2}).addTo(layer);
-      var html='<b>'+esc(p.title||'')+'</b><br><span style="color:#888">'+esc(p.kind)+(p.label?(' · '+esc(p.label)):'')+'</span>';
-      if(p.kind==='level')html+='<br><a href="#watch/'+p.id+'">플레이</a>';
-      if(p.kind==='live')html+='<br><a href="#live/'+p.id+'" style="color:#f0556b;font-weight:700">🔴 라이브 입장</a>';
+      var mk=L.circleMarker([p.lat,p.lng],{radius:p.kind==='world'?11:9,color:'#0b0f16',fillColor:col,fillOpacity:0.92,weight:2}).addTo(layer);
+      var html='<b>'+esc(p.title||'')+'</b><br><span style="color:#888">'+esc(KLABEL[p.kind]||p.kind)+(p.label?(' · '+esc(p.label)):'')+'</span>';
+      if(p.addr)html+='<br><span style="color:#888;font-size:11px">📍 '+esc(p.addr)+'</span>';
+      if(p.branch)html+='<br><span style="color:#888;font-size:11px">🏬 '+esc(p.branch)+'</span>';
+      if(p.kind==='world')html+='<br><a href="#explore/'+esc(p.key||'seoul')+'" style="color:#a855f7;font-weight:700">🧊 복셀 월드 입장</a>';
+      else if(p.kind==='level')html+='<br><a href="#watch/'+esc(p.id)+'" style="color:#ffb02e;font-weight:700">▶ 플레이</a>';
+      else if(p.kind==='vod')html+='<br><a href="#watch/'+esc(p.id)+'" style="color:#3aa0ff;font-weight:700">▶ 영상 보기</a>';
+      else if(p.kind==='live')html+='<br><a href="#live/'+esc(p.id)+'" style="color:#f0556b;font-weight:700">🔴 라이브 입장</a>';
+      else if(p.kind==='store'||p.kind==='shop')html+='<br><a href="#shop" style="color:#27d4b8;font-weight:700">🛒 상점에서 보기</a>';
+      else if(p.kind==='channel')html+='<br><a href="#channel/'+esc(p.id||'')+'" style="color:#c084fc;font-weight:700">📺 채널 보기</a>'+(p.id?'  <a href="#shop" style="color:#27d4b8;font-weight:700">🛒 상품</a>':'');
       mk.bindPopup(html);
     });
   }
   // 로컬 레벨(geo 있는 것)을 핀으로
   function localPins(){ return allLevels().filter(function(l){return l.geo&&l.geo.lat!=null;}).map(function(l){return {kind:'level',id:l.id,title:l.title,lat:l.geo.lat,lng:l.geo.lng,label:l.geo.label||''};}); }
+  // 복셀 탐험 지역(CITY_PRESETS)을 '월드' 핀으로 — 지도에서 바로 복셀 월드 입장(원본 BlockBuster 월드처럼)
+  function cityPins(){ return Object.keys(CITY_PRESETS).map(function(k){ var c=CITY_PRESETS[k]; return {kind:'world',key:k,id:'world-'+k,title:(c.flag?c.flag+' ':'')+c.name,lat:c.lat,lng:c.lng,label:(c.landmarks?c.landmarks.length:0)+' 랜드마크'}; }); }
   // 현재 라이브(geo 있는 것)를 핀으로 합쳐 그린다
   function withLive(pins){ if(!liveReady()){ drawPins(pins); return; }
     api('GET','/api/iglive/sessions').then(function(r){ var lp=(r.sessions||[]).filter(function(s){return s.geo&&s.geo.lat!=null;}).map(function(s){return {kind:'live',id:s.id,title:s.title||'라이브',lat:s.geo.lat,lng:s.geo.lng,label:(s.watching|0)+'명 시청'};}); drawPins((pins||[]).concat(lp)); }).catch(function(){ drawPins(pins); }); }
-  function load(){ var b=map.getBounds();
-    if(NET.on){ api('GET','/api/igmap/pins?minLat='+b.getSouth()+'&maxLat='+b.getNorth()+'&minLng='+b.getWest()+'&maxLng='+b.getEast()).then(function(r){ withLive(r.pins); }).catch(function(){ withLive(localPins()); }); }
-    else { withLive(localPins()); }
+  function load(){ var b=map.getBounds(); var base=cityPins();
+    if(NET.on){ api('GET','/api/igmap/pins?minLat='+b.getSouth()+'&maxLat='+b.getNorth()+'&minLng='+b.getWest()+'&maxLng='+b.getEast()).then(function(r){ withLive(base.concat(r.pins||[])); }).catch(function(){ withLive(base.concat(localPins())); }); }
+    else { withLive(base.concat(localPins())); }
   }
   map.on('moveend',load); setTimeout(function(){ map.invalidateSize(); load(); },80);
   // 이 구역(현재 지도 범위) 땅을 OSM 건물·도로로 복셀화해 월드 레벨로 올림
