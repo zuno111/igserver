@@ -3378,8 +3378,8 @@ function renderWorld(m){
     return tile; } });
   new LocalMap({maxZoom:19,attribution:'igPlay 월드맵'}).addTo(map);
   // 실제 도메인에선 OSM 타일이 위에 로드되어 진짜 지도가 되고, 차단되는 환경(아티팩트)에선 위 자체 지도가 그대로 보인다.
-  // OSM 공식 타일은 앱 직접사용이 정책상 403 차단되므로, 앱 사용 허용되는 무료 다크 타일(CARTO)을 사용
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO',crossOrigin:true}).addTo(map);
+  // OSM 공식(403)·CARTO(API키 요구) 모두 막혀, 키 없이 쓰는 무료 Esri 다크 그레이 베이스맵 사용. 로드 실패 시 아래 자체 다크 그리드가 배경.
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,maxNativeZoom:16,attribution:'© Esri',crossOrigin:true}).addTo(map);
   var layer=L.layerGroup().addTo(map);
   var KLABEL={world:'복셀 월드',level:'레벨',vod:'영상',live:'라이브',store:'상점',shop:'상점',channel:'채널'};
   function drawPins(pins){ layer.clearLayers();
