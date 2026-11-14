@@ -50,6 +50,7 @@ th{color:var(--muted);font-weight:600}
       <button class="tab on" data-t="dash" onclick="tab('dash')">대시보드</button>
       <button class="tab" data-t="tx" onclick="tab('tx')">거래 내역</button>
       <button class="tab" data-t="pay" onclick="tab('pay')">가맹 결제</button>
+      <button class="tab" data-t="rate" onclick="tab('rate')">시세</button>
       <button class="tab ghost" onclick="loadAll()" style="margin-left:auto">새로고침</button>
     </div>
     <div class="pane" id="p-dash">
@@ -58,6 +59,19 @@ th{color:var(--muted);font-weight:600}
     </div>
     <div class="pane hide" id="p-tx"><div class="card"><h3>전체 거래 내역</h3><div id="txTbl"></div></div></div>
     <div class="pane hide" id="p-pay"><div class="card"><h3>가맹 결제(다른 앱에서 igPay 결제)</h3><div id="payTbl"></div></div></div>
+    <div class="pane hide" id="p-rate">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h3>시세 자동 갱신</h3>
+          <div class="row" style="gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;margin:0"><input type="checkbox" id="autoChk" onchange="toggleAuto()" style="width:auto"> 자동 갱신</label>
+            <button onclick="doRefresh()">지금 갱신</button>
+          </div>
+        </div>
+        <p class="muted" style="margin-top:6px">외화 환율·금·은 시세를 무료 공개 소스에서 가져옵니다(외화: open.er-api.com, 금·은: goldprice.org). igCoin은 자체 토큰이라 수동 설정입니다.</p>
+        <div id="rateInfo" style="margin-top:10px"></div>
+      </div>
+    </div>
   </div>
 </div>
 <script>
@@ -79,7 +93,39 @@ function tab(t){
   document.querySelectorAll('.tab[data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('hide',p.id!=='p-'+t));
 }
-async function loadAll(){ await Promise.all([loadStats(),loadTx(),loadPay()]); }
+async function apiPost(path,body){
+  const u=CFG.base+'/api/igpay'+path+'?key='+encodeURIComponent(SK);
+  const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.message||('오류 '+r.status)); return j;
+}
+async function loadAll(){ await Promise.all([loadStats(),loadTx(),loadPay(),loadRate()]); }
+function ago(ts){ if(!ts) return '아직 없음'; const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60) return s+'초 전'; if(s<3600) return Math.floor(s/60)+'분 전'; if(s<86400) return Math.floor(s/3600)+'시간 전'; return Math.floor(s/86400)+'일 전'; }
+async function loadRate(){
+  try{
+    const d=await api('/admin/rate-feed');
+    $('autoChk').checked = d.auto!==false;
+    const rf=d.rateFeed||{}; const fx=d.fxRates||{};
+    const CCY={USD:'달러',JPY:'엔(1엔)',EUR:'유로',CNY:'위안'};
+    const rows=Object.keys(CCY).map(c=>`<tr><td>${CCY[c]}</td><td>${fx[c]!=null?fmt(fx[c])+'원':'-'}</td></tr>`).join('')
+      +`<tr><td>금(1g)</td><td>${d.goldPrice!=null?fmt(d.goldPrice)+'원':'-'}</td></tr>`
+      +`<tr><td>은(1g)</td><td>${d.silverPrice!=null?fmt(d.silverPrice)+'원':'-'}</td></tr>`;
+    $('rateInfo').innerHTML=`<div class="muted" style="margin-bottom:8px">마지막 갱신: <b>${ago(rf.lastAt)}</b>`
+      +(rf.fxSrc?` · 외화 ${rf.fxSrc}`:'')+(rf.metalSrc?` · 금·은 ${rf.metalSrc}`:'')
+      +((rf.errors&&rf.errors.length)?` · <span style="color:#c0392b">일부 실패: ${rf.errors.join(', ')}</span>`:'')
+      +`</div><table><thead><tr><th>항목</th><th>현재 시세</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){ $('rateInfo').innerHTML=`<div class="empty">${e.message}</div>`; }
+}
+async function doRefresh(){
+  $('rateInfo').innerHTML='<div class="muted">가져오는 중…</div>';
+  try{ const r=await apiPost('/admin/rate-refresh',{}); await loadRate();
+    if(!r.ok) alert('갱신 실패: '+((r.errors||[]).join(', ')||'소스 응답 없음')+'\n(서버에서 외부 인터넷이 막혀 있을 수 있습니다)');
+  }catch(e){ alert(e.message); await loadRate(); }
+}
+async function toggleAuto(){
+  try{ await apiPost('/admin/rate-feed-auto',{auto:$('autoChk').checked}); }
+  catch(e){ alert(e.message); }
+}
 const SRC_LABEL={iggift:'igGift',schoolyam:'School Yam',gyemoim:'계모임',dealers:'딜러스'};
 async function loadStats(){
   const {stats}=await api('/admin/stats');

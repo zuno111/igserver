@@ -12,6 +12,7 @@ import { resolveProject, enforceKeyScope } from './middleware/project.js';
 import { rateLimit, projectRateLimit } from './ratelimit.js';
 import { getUsage } from './quota.js';
 import { startScheduler } from './scheduler.js';
+import { startRateFeed } from './rate_feed.js';
 import { createGateway, startWorkerHeartbeat } from './cluster.js';
 import authRoutes from './routes/auth.js';
 import dataRoutes from './routes/data.js';
@@ -53,7 +54,7 @@ async function main() {
   await ensureMessenger(); // 메신저 프로젝트 자동 프로비전
   await ensureSchoolyam(); // 스쿨얌(Vercel 이관) 자동 프로비전
   await ensureIggift();    // igGift(Vercel 이관) 자동 프로비전
-  await ensureIgpay();     // igPay(자체 핀테크 지갑) 자동 프로비전
+  const igpayProject = await ensureIgpay();     // igPay(자체 핀테크 지갑) 자동 프로비전
   await ensureGyemoim();   // 계모임(계) 자동 프로비전
   await ensureDealers();   // 딜러스(역경매) 자동 프로비전
 
@@ -169,6 +170,9 @@ async function main() {
 
   // 예약 작업 스케줄러 (워커 모드는 게이트웨이와 DB 공유 시 중복 방지를 위해 standalone/단일에서만)
   if (MODE !== 'worker') startScheduler();
+
+  // igPay 시세 자동 갱신(외화·금·은) — 무료 공개 소스, 6시간 주기 (단일/standalone에서만)
+  if (MODE !== 'worker' && igpayProject?.id) startRateFeed(igpayProject.id);
 
   // 보존 워커
   if (config.retentionDays > 0) {

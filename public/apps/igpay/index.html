@@ -140,6 +140,7 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
     </div>
     <div class="screen" id="sc-fx">
       <h2 class="sec">환전 (외화)</h2>
+      <div class="note" id="fxFeedNote" style="font-size:12px;color:var(--muted);margin-bottom:6px"></div>
       <div class="card" id="fxHoldings"></div>
       <div class="card">
         <label>통화</label>
@@ -153,6 +154,7 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
     </div>
     <div class="screen" id="sc-metal">
       <h2 class="sec">금·은 실물</h2>
+      <div class="note" id="metalFeedNote" style="font-size:12px;color:var(--muted);margin-bottom:6px"></div>
       <div class="card bal" style="background:linear-gradient(135deg,#b45309,#f59e0b)">
         <div class="lbl">보유 금 (GOLD)</div>
         <div class="amt"><span id="goldG">0</span> g</div>
@@ -235,7 +237,7 @@ function go(s){document.querySelectorAll('.screen').forEach(el=>el.classList.tog
 let WALLET={krw:0}, SAVINGS={principal:0,interest:0,total:0,apr:0};
 async function refresh(){
   try{ const r=await api('/api/igpay/me'); ME={name:r.name,uid:r.uid}; WALLET=r.wallet; SAVINGS=r.savings||SAVINGS;
-    CARD=r.card||null; CARD_RATE=r.cardCashbackRate||0; COIN_RATE=r.coinRate||1000; METALS=r.metals||METALS; FX=r.fx||FX;
+    CARD=r.card||null; CARD_RATE=r.cardCashbackRate||0; COIN_RATE=r.coinRate||1000; METALS=r.metals||METALS; FX=r.fx||FX; RATEFEED=r.rateFeed||RATEFEED;
     $('meName').textContent=r.name; $('balKrw').textContent=fmt(WALLET.krw);
     renderSavings(); renderCard(); renderCoin(); renderMetal(); renderFx(); renderTx($('homeTx'),(r.tx||[]).slice(0,5)); loadTx();
   }catch(e){ if(e.status===401) logout(); else toast(e.message); }
@@ -257,13 +259,17 @@ function renderCard(){
 async function doCardIssue(){ try{ await api('/api/igpay/card/issue',{method:'POST'}); toast('체크카드 발급 완료'); await refresh(); }catch(e){ toast(e.message); } }
 async function doCardClose(){ try{ await api('/api/igpay/card/close',{method:'POST'}); toast('카드 해지 완료'); await refresh(); }catch(e){ toast(e.message); } }
 let FX={rates:{},currencies:[],holdings:{}};
+let RATEFEED={lastAt:null,fxSrc:null,metalSrc:null};
 const FX_SYMBOL={USD:'$',JPY:'¥',EUR:'€',CNY:'¥'};
+function feedAgo(ts){ if(!ts) return '시세 수동 설정'; const s=Math.floor((Date.now()-ts)/1000);
+  const t=s<60?'방금':s<3600?Math.floor(s/60)+'분 전':s<86400?Math.floor(s/3600)+'시간 전':Math.floor(s/86400)+'일 전'; return '시세 갱신 '+t; }
 function renderFx(){
   if(!$('fxHoldings')) return;
   const ccys=FX.currencies||[];
   $('fxHoldings').innerHTML=ccys.map(c=>{const h=FX.holdings[c]||{balance:0,valueKrw:0,rate:0,name:c};
     return `<div class="item"><div class="ic">${FX_SYMBOL[c]||'💱'}</div><div class="tt"><div class="t1">${h.balance} ${c}</div><div class="t2">${h.name} · 1 ${c} = ${fmt(h.rate)}원</div></div><div class="amt">≈${fmt(h.valueKrw)}원</div></div>`;}).join('');
   const sel=$('fxSel'); if(sel && !sel._built){ sel.innerHTML=ccys.map(c=>`<option value="${c}">${c} (${(FX.holdings[c]||{}).name||c})</option>`).join(''); sel._built=true; sel.onchange=updateFxHint; }
+  if($('fxFeedNote')) $('fxFeedNote').textContent=feedAgo(RATEFEED.lastAt)+(RATEFEED.fxSrc?' · '+RATEFEED.fxSrc:'');
   updateFxHint();
 }
 function updateFxHint(){ const c=$('fxSel')&&$('fxSel').value; const krw=parseInt(($('fxBuyKrw')||{}).value,10); const rate=(FX.rates||{})[c];
@@ -277,6 +283,7 @@ function renderMetal(){
   if(!$('goldG')) return;
   $('goldG').textContent=METALS.gold.grams; $('goldKrw').textContent=fmt(METALS.gold.valueKrw); $('goldPrice').textContent=fmt(METALS.prices.gold);
   $('silverG').textContent=METALS.silver.grams; $('silverKrw').textContent=fmt(METALS.silver.valueKrw); $('silverPrice').textContent=fmt(METALS.prices.silver);
+  if($('metalFeedNote')) $('metalFeedNote').textContent=feedAgo(RATEFEED.lastAt)+(RATEFEED.metalSrc?' · '+RATEFEED.metalSrc:'');
 }
 async function doMetalBuy(){const metal=$('metalSel').value;const krw=parseInt($('metalBuyKrw').value,10);if(!(krw>0)){toast('매수 금액을 입력하세요');return;}
   try{const r=await api('/api/igpay/metal/buy',{method:'POST',body:{metal,krw}});toast((metal==='gold'?'금':'은')+' '+r.bought+'g 매수 완료');$('metalBuyKrw').value='';await refresh();}catch(e){toast(e.message);}}

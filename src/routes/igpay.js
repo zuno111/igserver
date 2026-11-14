@@ -5,6 +5,7 @@ import { Router } from 'express';
 import { getRepo } from '../db/index.js';
 import { verifyToken } from '../auth.js';
 import { randomId } from '../config.js';
+import { refreshRates } from '../rate_feed.js';
 
 const router = Router();
 const now = () => Date.now();
@@ -44,6 +45,13 @@ async function getFxRates(req) {
   return out;
 }
 function roundFx(v) { return Math.round((v + Number.EPSILON) * 100) / 100; } // 소수 2자리
+// 시세 자동 갱신 상태(마지막 갱신 시각·출처) — 프론트 표시용
+async function getRateFeedMeta(req) {
+  const rec = await getRepo().getRecord(PID(req), 'pay_meta', 'config');
+  const rf = rec?.data?.rateFeed || null;
+  const auto = rec?.data?.rateFeedAuto !== false; // 기본 자동 ON
+  return { auto, lastAt: rf?.lastAt || null, fxSrc: rf?.fxSrc || null, metalSrc: rf?.metalSrc || null };
+}
 // 금·은 시세(1g당 원). 기본값은 데모용 — 운영에서 실시세로 설정.
 const DEFAULT_METAL = { gold: 110000, silver: 1300 };
 async function getMetalPrice(req, metal) {
@@ -90,7 +98,7 @@ router.get('/me', async (req, res, next) => {
     const fxRates = await getFxRates(req);
     const fx = { rates: fxRates, currencies: FX_CCYS, holdings: {} };
     for (const c of FX_CCYS) { const bal = roundFx(w.fx[c] || 0); fx.holdings[c] = { balance: bal, name: FX_NAME[c], rate: fxRates[c], valueKrw: Math.floor(bal * fxRates[c]) }; }
-    res.json({ ok: true, uid: m.uid, name: m.name, wallet: { krw: w.krw | 0, coin: roundCoin(w.coin || 0) }, savings, card, cardCashbackRate: cardRate, coinRate, metals, fx, tx });
+    res.json({ ok: true, uid: m.uid, name: m.name, wallet: { krw: w.krw | 0, coin: roundCoin(w.coin || 0) }, savings, card, cardCashbackRate: cardRate, coinRate, metals, fx, tx, rateFeed: await getRateFeedMeta(req) });
   } catch (e) { next(e); }
 });
 
@@ -278,7 +286,7 @@ router.get('/metal', async (req, res, next) => {
         gold: { grams: roundGram(w.goldG || 0), valueKrw: Math.floor((w.goldG || 0) * goldP) },
         silver: { grams: roundGram(w.silverG || 0), valueKrw: Math.floor((w.silverG || 0) * silverP) },
       },
-      krw: w.krw | 0 });
+      krw: w.krw | 0, rateFeed: await getRateFeedMeta(req) });
   } catch (e) { next(e); }
 });
 // 매수(원화→금/은)
@@ -360,7 +368,7 @@ router.get('/fx', async (req, res, next) => {
     const rates = await getFxRates(req);
     const holdings = {};
     for (const c of FX_CCYS) { const bal = roundFx(w.fx[c] || 0); holdings[c] = { balance: bal, name: FX_NAME[c], rate: rates[c], valueKrw: Math.floor(bal * rates[c]) }; }
-    res.json({ ok: true, rates, holdings, krw: w.krw | 0, currencies: FX_CCYS });
+    res.json({ ok: true, rates, holdings, krw: w.krw | 0, currencies: FX_CCYS, rateFeed: await getRateFeedMeta(req) });
   } catch (e) { next(e); }
 });
 // 환전 매수(원화→외화)
@@ -619,6 +627,39 @@ router.post('/admin/savings-apr', async (req, res, next) => {
     const data = { ...(rec?.data || {}), savingsApr: apr };
     await repo.putRecord({ project_id: pid, collection: 'pay_meta', doc_id: 'config', data, owner_id: null });
     res.json({ ok: true, savingsApr: apr });
+  } catch (e) { next(e); }
+});
+
+// 시세 자동 갱신 상태 조회(운영)
+router.get('/admin/rate-feed', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const rec = await getRepo().getRecord(PID(req), 'pay_meta', 'config');
+    const d = rec?.data || {};
+    res.json({ ok: true,
+      auto: d.rateFeedAuto !== false,
+      rateFeed: d.rateFeed || null,
+      fxRates: d.fxRates || null,
+      goldPrice: d.goldPrice || null,
+      silverPrice: d.silverPrice || null,
+    });
+  } catch (e) { next(e); }
+});
+// 시세 지금 갱신(운영) — 무료 공개 소스에서 즉시 가져오기
+router.post('/admin/rate-refresh', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const r = await refreshRates(PID(req));
+    res.json({ ok: r.ok, fx: r.fx, metal: r.metal, errors: r.errors, rateFeed: r.rateFeed });
+  } catch (e) { next(e); }
+});
+// 시세 자동 갱신 ON/OFF(운영)
+router.post('/admin/rate-feed-auto', async (req, res, next) => {
+  try { if (!requireAdmin(req, res)) return;
+    const repo = getRepo(), pid = PID(req);
+    const auto = !!(req.body || {}).auto;
+    const rec = await repo.getRecord(pid, 'pay_meta', 'config');
+    const data = { ...(rec?.data || {}), rateFeedAuto: auto };
+    await repo.putRecord({ project_id: pid, collection: 'pay_meta', doc_id: 'config', data, owner_id: null });
+    res.json({ ok: true, auto });
   } catch (e) { next(e); }
 });
 
