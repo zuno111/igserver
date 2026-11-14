@@ -1,66 +1,117 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <title>igPay — 송금 지갑</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendard-dynamic-subset.min.css">
 <style>
 :root{
-  --bg:#f3f6fb;--surface:#fff;--surface2:#eef2f9;--fg:#101624;--muted:#5a6678;--border:#e2e8f2;
-  --accent:#2563eb;--accent2:#1e40af;--accent-fg:#fff;--good:#1a8f5e;--bad:#c23b3b;
-  --radius:14px;--f:system-ui,-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;
+  --bg:#eef2f8;--surface:#fff;--surface2:#f1f4fa;--fg:#0e1726;--muted:#6b7889;--border:#e5eaf2;
+  --ink:#0b1b33;--ink2:#15325c;--accent:#2e6bff;--accent-soft:#eaf0ff;--accent-fg:#fff;
+  --good:#0e9a6c;--bad:#d64545;--amber:#d4902c;--slate:#7b8aa0;--violet:#6f5bff;--teal:#1c9c92;
+  --r:18px;--r-sm:12px;
+  --f:"Pretendard Variable",Pretendard,system-ui,-apple-system,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --num:"Pretendard Variable",Pretendard,system-ui,sans-serif;
 }
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0a0e16;--surface:#121826;--surface2:#18202f;--fg:#e6ecf5;--muted:#8a97a8;--border:#232d3e;
-  --accent:#5b8bf5;--accent2:#7aa2ff;--accent-fg:#06101f;--good:#3bbd82;--bad:#e06464;color-scheme:dark;
+  --bg:#070e1a;--surface:#0f1a2b;--surface2:#16233a;--fg:#e8eef7;--muted:#8695a8;--border:#1e2c44;
+  --ink:#0a1627;--ink2:#132948;--accent:#5b8bf5;--accent-soft:#16233a;--accent-fg:#06101f;
+  --good:#3bbd82;--bad:#e06464;--amber:#e0a84a;--slate:#93a2b8;--violet:#8c7cff;--teal:#3cc0b4;color-scheme:dark;
 }}
 *{box-sizing:border-box}html,body{margin:0;height:100%}
-body{background:var(--bg);color:var(--fg);font-family:var(--f);line-height:1.5;-webkit-font-smoothing:antialiased;font-style:normal}
-h1,h2,h3{margin:0;font-weight:800;font-style:normal}
+body{background:var(--bg);color:var(--fg);font-family:var(--f);line-height:1.5;-webkit-font-smoothing:antialiased;font-style:normal;letter-spacing:-.01em}
+h1,h2,h3{margin:0;font-weight:700;font-style:normal;letter-spacing:-.02em}
 button,input,select{font-family:inherit;font-style:normal}
-.app{max-width:460px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
-.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:10px}
-.logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:var(--accent-fg);font-weight:900}
-.brand{font-weight:900;font-size:17px}.brand small{font-weight:600;color:var(--muted);font-size:11px;display:block;margin-top:-2px}
-.me{margin-left:auto;font-size:13px;color:var(--muted);text-align:right}.me b{color:var(--fg)}
-.logout{background:none;border:0;color:var(--bad);font-size:12px;cursor:pointer;padding:2px 0}
-.body{flex:1;padding:16px 16px 92px;overflow-y:auto}
-.screen{display:none}.screen.on{display:block}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
-.bal{background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--accent-fg);border:0}
-.bal .lbl{font-size:12px;opacity:.85}.bal .amt{font-size:34px;font-weight:900;margin:2px 0 4px}
-.bal .acts{display:flex;gap:8px;margin-top:14px}
-.bal .acts button{flex:1;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:10px;font-weight:700;font-size:14px;cursor:pointer}
-h2.sec{font-size:15px;margin:4px 2px 10px}
-label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
-input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:11px;background:var(--bg);color:var(--fg);font-size:15px}
-.btn{width:100%;padding:13px;border:0;border-radius:11px;background:var(--accent);color:var(--accent-fg);font-weight:800;font-size:15px;cursor:pointer;margin-top:12px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.app{max-width:460px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;background:var(--bg)}
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--surface) 86%,transparent);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--border);padding:13px 18px;display:flex;align-items:center;gap:11px}
+.logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(145deg,var(--ink2),var(--accent));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;letter-spacing:-.03em}
+.brand{font-weight:800;font-size:18px;letter-spacing:-.03em}
+.brand small{font-weight:500;color:var(--muted);font-size:11px;display:block;margin-top:-3px;letter-spacing:0}
+.me{margin-left:auto;font-size:13px;color:var(--muted);text-align:right}.me b{color:var(--fg);font-weight:600}
+.logout{background:none;border:0;color:var(--muted);font-size:12px;cursor:pointer;padding:2px 0;text-decoration:underline;text-underline-offset:2px}
+.body{flex:1;padding:16px 16px 96px;overflow-y:auto}
+.screen{display:none}.screen.on{display:block;animation:fade .22s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:17px;margin-bottom:13px}
+h2.sec{font-size:14px;font-weight:700;color:var(--fg);margin:18px 3px 9px}
+.sub-muted,.muted{color:var(--muted);font-size:13px;line-height:1.55}
+p.muted{margin:2px 0 0}
+
+/* 잔액 히어로 — 유일하게 색을 쓰는 곳 */
+.hero{position:relative;overflow:hidden;background:linear-gradient(158deg,var(--ink),var(--ink2));color:#fff;border-radius:22px;padding:22px 20px 18px;margin-bottom:14px;box-shadow:0 10px 30px -14px rgba(11,27,51,.6)}
+.hero::after{content:"";position:absolute;right:-50px;top:-60px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(90,139,255,.38),transparent 70%);pointer-events:none}
+.hero .lbl{font-size:12.5px;color:rgba(255,255,255,.72);font-weight:500}
+.hero .amt{font-size:38px;font-weight:800;margin:3px 0 2px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.hero .amt .won{font-size:22px;font-weight:700;margin-left:2px;color:rgba(255,255,255,.88)}
+.hero .sub{font-size:12.5px;color:rgba(255,255,255,.66);min-height:16px}
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:17px;position:relative;z-index:1}
+.acts button{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:13px;padding:11px 4px 9px;font-weight:600;font-size:12.5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;transition:background .15s}
+.acts button:hover{background:rgba(255,255,255,.2)}
+.acts button svg{width:19px;height:19px;stroke:#fff;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* 자산 한 줄 요약 */
+.asset-row{width:100%;display:flex;align-items:center;gap:12px;padding:13px 4px;border:0;border-bottom:1px solid var(--border);background:none;cursor:pointer;text-align:left;color:var(--fg)}
+.asset-row:last-child{border-bottom:0}
+.badge{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;color:#fff}
+.b-blue{background:var(--accent)}.b-violet{background:var(--violet)}.b-teal{background:var(--teal)}.b-amber{background:var(--amber)}
+.ar-tt{flex:1;min-width:0}
+.ar-name{font-weight:600;font-size:14.5px}
+.ar-sub{color:var(--muted);font-size:12px}
+.ar-val{font-weight:700;font-size:14.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ar-chev{color:var(--muted);font-size:17px;margin-left:2px}
+
+label{display:block;font-size:12.5px;color:var(--muted);margin:13px 0 5px;font-weight:500}
+input,select{width:100%;padding:13px 14px;border:1px solid var(--border);border-radius:13px;background:var(--surface2);color:var(--fg);font-size:15px;outline:none;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input::placeholder{color:var(--muted);opacity:.7}
+.btn{width:100%;padding:14px;border:0;border-radius:14px;background:var(--accent);color:var(--accent-fg);font-weight:700;font-size:15px;cursor:pointer;margin-top:14px;transition:filter .15s}
+.btn:hover{filter:brightness(1.06)}
 .btn.alt{background:var(--surface2);color:var(--fg);border:1px solid var(--border)}
-.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.chip{flex:1;min-width:72px;padding:11px 4px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--fg);font-weight:700;font-size:13px;cursor:pointer;text-align:center}
+.row{display:flex;gap:8px}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.chip{flex:1;min-width:68px;padding:11px 4px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--fg);font-weight:600;font-size:13px;cursor:pointer;text-align:center;transition:all .12s}
 .chip.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+
 .item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
 .item:last-child{border-bottom:0}
-.item .ic{width:40px;height:40px;border-radius:11px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-.item .tt{flex:1;min-width:0}.item .tt .t1{font-weight:700;font-size:14px}.item .tt .t2{color:var(--muted);font-size:12px}
-.item .amt{font-weight:800;font-size:14px;text-align:right;white-space:nowrap}
-.amt.plus{color:var(--good)}.amt.minus{color:var(--bad)}
-.empty{text-align:center;color:var(--muted);padding:30px 0;font-size:14px}
-.chkcard{background:linear-gradient(135deg,#111826,#2563eb);color:#fff;border-radius:14px;padding:18px;position:relative;overflow:hidden}
-.chkcard .brand{font-weight:900;font-size:15px;opacity:.95}
-.chkcard .num{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:17px;letter-spacing:1px;margin:18px 0 10px}
-.chkcard .rowb{display:flex;justify-content:space-between;align-items:flex-end;font-size:12px;opacity:.9}
-.chkcard .cb{font-weight:800;font-size:14px}
-.toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:11px 18px;border-radius:999px;font-size:13px;font-weight:700;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
-.toast.on{opacity:.96}
-.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:30}
-.tb{flex:1;background:none;border:0;padding:9px 0 10px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700}
+.item .ic{width:40px;height:40px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;color:var(--muted);font-weight:700}
+.item .tt{flex:1;min-width:0}.item .tt .t1{font-weight:600;font-size:14px}.item .tt .t2{color:var(--muted);font-size:12px}
+.item .amt{font-weight:700;font-size:14px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.amt.plus{color:var(--good)}.amt.minus{color:var(--fg)}
+.empty{text-align:center;color:var(--muted);padding:28px 0;font-size:14px}
+
+/* 자산 상세 패널(예치·코인·금·은) — 톤온톤, 무지개 금지 */
+.panel{border-radius:var(--r);padding:18px;margin-bottom:13px;color:#fff;position:relative;overflow:hidden}
+.panel .lbl{font-size:12.5px;opacity:.78;font-weight:500}
+.panel .amt{font-size:30px;font-weight:800;margin:2px 0 3px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.panel .sub{font-size:12px;opacity:.74}
+.p-save{background:linear-gradient(150deg,#0b1b33,#1f5fd6)}
+.p-coin{background:linear-gradient(150deg,#241a4d,#6f5bff)}
+.p-gold{background:linear-gradient(150deg,#4a3410,#d4902c)}
+.p-silver{background:linear-gradient(150deg,#2b3340,#7b8aa0)}
+
+.chkcard{background:linear-gradient(140deg,#0b1b33,#2e6bff);color:#fff;border-radius:var(--r);padding:19px;position:relative;overflow:hidden}
+.chkcard::after{content:"";position:absolute;right:-30px;bottom:-40px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+.chkcard .brand{font-weight:700;font-size:14px;opacity:.95;letter-spacing:-.02em}
+.chkcard .num{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:17px;letter-spacing:2px;margin:20px 0 12px}
+.chkcard .rowb{display:flex;justify-content:space-between;align-items:flex-end;font-size:12px;opacity:.92;position:relative;z-index:1}
+.chkcard .cb{font-weight:700;font-size:14px}
+
+.toast{position:fixed;left:50%;bottom:108px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:0 8px 24px -8px rgba(0,0,0,.45)}
+.toast.on{opacity:1}
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:saturate(1.4) blur(12px);border-top:1px solid var(--border);display:flex;z-index:30;padding-bottom:env(safe-area-inset-bottom)}
+.tb{flex:1;background:none;border:0;padding:10px 0 11px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:600}
 .tb.on{color:var(--accent)}.tb svg{width:22px;height:22px}
-.auth{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:28px 22px;max-width:460px;margin:0 auto}
-.auth .hero{text-align:center;margin-bottom:26px}
-.auth .hero .logo{width:60px;height:60px;border-radius:17px;margin:0 auto 14px;font-size:26px}
-.auth .hero h1{font-size:24px}.auth .hero p{color:var(--muted);font-size:14px;margin-top:6px}
-.seg{display:flex;background:var(--surface2);border-radius:11px;padding:4px;margin-bottom:16px}
-.seg button{flex:1;padding:9px;border:0;background:none;border-radius:8px;font-weight:700;color:var(--muted);cursor:pointer;font-size:14px}
-.seg button.on{background:var(--surface);color:var(--fg)}
-.err{color:var(--bad);font-size:13px;margin-top:10px;min-height:18px;text-align:center}
+
+.auth{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:28px 24px;max-width:460px;margin:0 auto}
+.auth .hero{background:none;color:var(--fg);box-shadow:none;text-align:center;margin-bottom:28px;padding:0;overflow:visible}
+.auth .hero::after{display:none}
+.auth .hero .logo{width:62px;height:62px;border-radius:19px;margin:0 auto 16px;font-size:24px}
+.auth .hero h1{font-size:26px;font-weight:800}.auth .hero p{color:var(--muted);font-size:14.5px;margin-top:7px}
+.seg{display:flex;background:var(--surface2);border-radius:13px;padding:4px;margin-bottom:8px}
+.seg button{flex:1;padding:10px;border:0;background:none;border-radius:10px;font-weight:600;color:var(--muted);cursor:pointer;font-size:14px;transition:all .15s}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.err{color:var(--bad);font-size:13px;margin-top:12px;min-height:18px;text-align:center}
 </style></head><body>
 <div id="authView" class="auth">
   <div class="hero"><div class="logo">ig</div><h1>igPay</h1><p>보내고, 받고, 결제하는 igPay 지갑</p></div>
@@ -77,11 +128,19 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
     <div class="me"><div><b id="meName">회원</b>님</div><button class="logout" onclick="logout()">로그아웃</button></div></div>
   <div class="body">
     <div class="screen on" id="sc-home">
-      <div class="card bal">
-        <div class="lbl">igPay 잔액</div><div class="amt"><span id="balKrw">0</span>원</div>
-        <div class="sub" id="saveSummary" style="font-size:12px;opacity:.85;margin-top:2px"></div>
-        <div class="acts"><button onclick="go('charge')">충전</button><button onclick="go('send')">송금</button><button onclick="go('save')">예치</button><button onclick="go('out')">출금</button></div>
+      <div class="hero">
+        <div class="lbl">igPay 머니</div>
+        <div class="amt"><span id="balKrw" class="num">0</span><span class="won">원</span></div>
+        <div class="sub" id="saveSummary"></div>
+        <div class="acts">
+          <button onclick="go('send')"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg>송금</button>
+          <button onclick="go('charge')"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>충전</button>
+          <button onclick="go('out')"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6 6 6-6"/></svg>출금</button>
+          <button onclick="go('save')"><svg viewBox="0 0 24 24"><path d="M4 9a8 5 0 0 1 16 0v6a8 5 0 0 1-16 0z"/><path d="M4 9v6"/></svg>예치</button>
+        </div>
       </div>
+      <h2 class="sec">내 자산</h2>
+      <div class="card" style="padding:4px 13px"><div id="homeAssets"></div></div>
       <h2 class="sec">체크카드</h2>
       <div class="card" id="cardBox"><div class="empty">카드를 불러오는 중…</div></div>
       <h2 class="sec">최근 내역</h2>
@@ -107,10 +166,10 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
     </div>
     <div class="screen" id="sc-save">
       <h2 class="sec">예치</h2>
-      <div class="card bal" style="background:linear-gradient(135deg,#1e40af,#2563eb)">
+      <div class="panel p-save">
         <div class="lbl">예치 자산 (원금+이자)</div>
-        <div class="amt"><span id="saveTotal">0</span>원</div>
-        <div class="sub" style="font-size:12px;opacity:.85">원금 <span id="savePrin">0</span>원 · 이자 <span id="saveInt">0</span>원 · 연 <span id="saveApr">0</span>%</div>
+        <div class="amt"><span id="saveTotal" class="num">0</span>원</div>
+        <div class="sub">원금 <span id="savePrin" class="num">0</span>원 · 이자 <span id="saveInt" class="num">0</span>원 · 연 <span id="saveApr">0</span>%</div>
       </div>
       <div class="card">
         <p class="muted" style="font-size:13px">지갑 잔액을 예치하면 연이율로 이자가 붙습니다. 언제든 지갑으로 다시 찾을 수 있습니다.</p>
@@ -125,10 +184,10 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
     </div>
     <div class="screen" id="sc-coin">
       <h2 class="sec">코인 (IGC)</h2>
-      <div class="card bal" style="background:linear-gradient(135deg,#6d28d9,#a855f7)">
+      <div class="panel p-coin">
         <div class="lbl">보유 코인</div>
-        <div class="amt"><span id="coinBal">0</span> IGC</div>
-        <div class="sub" style="font-size:12px;opacity:.85">≈ <span id="coinKrw">0</span>원 · 시세 1 IGC = <span id="coinRate">0</span>원</div>
+        <div class="amt"><span id="coinBal" class="num">0</span> IGC</div>
+        <div class="sub">≈ <span id="coinKrw" class="num">0</span>원 · 시세 1 IGC = <span id="coinRate" class="num">0</span>원</div>
       </div>
       <div class="card">
         <p class="muted" style="font-size:13px">원화로 코인을 사고, 코인을 팔아 원화로 바꿉니다. 코인으로 가맹 결제도 됩니다.</p>
@@ -155,15 +214,15 @@ input{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:
     <div class="screen" id="sc-metal">
       <h2 class="sec">금·은 실물</h2>
       <div class="note" id="metalFeedNote" style="font-size:12px;color:var(--muted);margin-bottom:6px"></div>
-      <div class="card bal" style="background:linear-gradient(135deg,#b45309,#f59e0b)">
-        <div class="lbl">보유 금 (GOLD)</div>
-        <div class="amt"><span id="goldG">0</span> g</div>
-        <div class="sub" style="font-size:12px;opacity:.9">≈ <span id="goldKrw">0</span>원 · 1g <span id="goldPrice">0</span>원</div>
+      <div class="panel p-gold">
+        <div class="lbl">보유 금</div>
+        <div class="amt"><span id="goldG" class="num">0</span> g</div>
+        <div class="sub">≈ <span id="goldKrw" class="num">0</span>원 · 1g <span id="goldPrice" class="num">0</span>원</div>
       </div>
-      <div class="card bal" style="background:linear-gradient(135deg,#64748b,#94a3b8)">
-        <div class="lbl">보유 은 (SILVER)</div>
-        <div class="amt"><span id="silverG">0</span> g</div>
-        <div class="sub" style="font-size:12px;opacity:.9">≈ <span id="silverKrw">0</span>원 · 1g <span id="silverPrice">0</span>원</div>
+      <div class="panel p-silver">
+        <div class="lbl">보유 은</div>
+        <div class="amt"><span id="silverG" class="num">0</span> g</div>
+        <div class="sub">≈ <span id="silverKrw" class="num">0</span>원 · 1g <span id="silverPrice" class="num">0</span>원</div>
       </div>
       <div class="card">
         <label>종류</label>
@@ -239,7 +298,7 @@ async function refresh(){
   try{ const r=await api('/api/igpay/me'); ME={name:r.name,uid:r.uid}; WALLET=r.wallet; SAVINGS=r.savings||SAVINGS;
     CARD=r.card||null; CARD_RATE=r.cardCashbackRate||0; COIN_RATE=r.coinRate||1000; METALS=r.metals||METALS; FX=r.fx||FX; RATEFEED=r.rateFeed||RATEFEED;
     $('meName').textContent=r.name; $('balKrw').textContent=fmt(WALLET.krw);
-    renderSavings(); renderCard(); renderCoin(); renderMetal(); renderFx(); renderTx($('homeTx'),(r.tx||[]).slice(0,5)); loadTx();
+    renderSavings(); renderCard(); renderCoin(); renderMetal(); renderFx(); renderHomeAssets(); renderTx($('homeTx'),(r.tx||[]).slice(0,5)); loadTx();
   }catch(e){ if(e.status===401) logout(); else toast(e.message); }
 }
 let CARD=null, CARD_RATE=0;
@@ -306,6 +365,19 @@ async function doCoinBuy(){const krw=parseInt($('coinBuyKrw').value,10);if(!(krw
   try{const r=await api('/api/igpay/coin/buy',{method:'POST',body:{krw}});toast(r.bought+' IGC 구매 완료');$('coinBuyKrw').value='';await refresh();}catch(e){toast(e.message);}}
 async function doCoinSell(){const coin=parseFloat($('coinSell').value);if(!(coin>0)){toast('팔 코인을 입력하세요');return;}
   try{const r=await api('/api/igpay/coin/sell',{method:'POST',body:{coin}});toast(fmt(r.krw)+'원으로 판매 완료');$('coinSell').value='';await refresh();}catch(e){toast(e.message);}}
+function renderHomeAssets(){
+  const el=$('homeAssets'); if(!el) return;
+  const coinKrw=Math.floor((WALLET.coin||0)*COIN_RATE);
+  let fxKrw=0; const hs=(FX&&FX.holdings)||{}; for(const c in hs) fxKrw+=Math.floor(hs[c].valueKrw||0);
+  const metalKrw=Math.floor(((METALS.gold||{}).valueKrw||0)+((METALS.silver||{}).valueKrw||0));
+  const rows=[
+    {k:'save',b:'예',cls:'b-blue',name:'예치',sub:`연 ${(SAVINGS.apr*100).toFixed(1)}% 이자`,val:SAVINGS.total|0},
+    {k:'coin',b:'C',cls:'b-violet',name:'코인',sub:`${WALLET.coin||0} IGC`,val:coinKrw},
+    {k:'fx',b:'$',cls:'b-teal',name:'외화',sub:'달러·엔·유로·위안',val:fxKrw},
+    {k:'metal',b:'金',cls:'b-amber',name:'금·은',sub:`금 ${(METALS.gold||{}).grams||0}g · 은 ${(METALS.silver||{}).grams||0}g`,val:metalKrw},
+  ];
+  el.innerHTML=rows.map(r=>`<button class="asset-row" onclick="go('${r.k}')"><span class="badge ${r.cls}">${r.b}</span><span class="ar-tt"><div class="ar-name">${r.name}</div><div class="ar-sub">${r.sub}</div></span><span class="ar-val num">${fmt(r.val)}원</span><span class="ar-chev">›</span></button>`).join('');
+}
 function renderSavings(){
   const total=SAVINGS.total|0;
   $('saveSummary').textContent = total>0 ? `예치 ${fmt(total)}원 (이자 ${fmt(SAVINGS.interest)}원)` : `예치하면 연 ${(SAVINGS.apr*100).toFixed(1)}% 이자`;
