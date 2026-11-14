@@ -2124,8 +2124,8 @@ function renderWatchFor(m,lv,isTest){
 var chanTab='all';
 function donateChannel(){ var nick=window._curChan||me();
   function doDonate(v){ var amt=Math.round(+v||0); if(amt<1){ toast('금액을 입력하세요'); return; }
-    if(NET.on){ api('POST','/api/igplay/support',{to:nick,amount:amt}).then(function(r){ if(r&&r.wallet){db.isc=r.wallet.balance;saveDB();updateWallet();} else if(!spend(amt)){ toast('ISC가 부족합니다'); return; } toast('후원 완료 · '+amt+' ISC 🙏'); }).catch(function(){ if(spend(amt))toast('후원 완료 · '+amt+' ISC 🙏'); else toast('ISC가 부족합니다'); }); }
-    else { if(spend(amt))toast('후원 완료 · '+amt+' ISC 🙏'); else toast('ISC가 부족합니다'); } }
+    // 받는이(타인 채널) 식별이 생기면 서버 /tip처럼 실적립 연동. 지금은 지갑에서 차감 + 헤더 즉시 반영.
+    if(spend(amt)){ updateWallet(); toast('후원 완료 · '+amt+' ISC 🙏'); } else { toast('ISC가 부족합니다'); } }
   if(typeof askText==='function'){ askText({title:'창작자 후원',desc:nick+' 님에게 ISC로 후원합니다',placeholder:'금액(ISC)',ok:'후원',onOk:doDonate}); }
   else { doDonate(prompt('후원 금액(ISC)')); } }
 function toggleFriend(){ var nick=window._curChan||me(); db.friends=db.friends||[]; var i=db.friends.indexOf(nick);
